@@ -98,3 +98,54 @@ The privacy model — parent-student mappings and photo tagging.
 
 ---
 
+# Week 2 — Core Schema & Privacy Model
+
+**Dates:** 8 February 2026 – 14 February 2026
+**Commits:** 12 — Ruthwik 1, Bhargav 2, Srujan 7, Nagachaitanya 1
+
+## Phase objective
+
+Complete the relational schema, in particular the tables that make the privacy guarantee structural rather than procedural.
+
+## Individual contributions
+
+**Srujan** built the remaining core tables: `students`, `parent_student_mappings` with its `UNIQUE (parent_id, student_id)` constraint, `photos` with its processing status, and `photo_student_tags` — the pivot that determines who can see what. Then the row level security policy set, the trigger set and the index strategy. **Ruthwik** designed `orders` and `order_items`, including the idempotency key that would later prevent duplicate submissions. **Nagachaitanya** designed the `notifications` table with its type check constraint and `jsonb` payload for deep-link data. **Bhargav** started the design system with the colour palette and the spacing and typography scales.
+
+## Important technical implementation
+
+The privacy model is enforced structurally: a parent reaches a photo only through `parent_student_mappings` to `student` to `photo_student_tags`. There is no direct parent-to-photo relationship, so the guarantee is a property of the schema rather than something a query can accidentally bypass.
+
+## Issues and challenges
+
+The first sketch attached photos to classes and derived parent access from enrolment. That broke for photos where only some children in the class appear. Replacing it with per-photo student tagging was the most important design correction of the project.
+
+## Testing and validation
+
+Foreign key and unique constraints verified by deliberate violation — duplicate parent-student pairs and orphaned class references were both correctly rejected.
+
+## Relevant commits
+
+```
+feat(db): add students table
+feat(db): add parent-student mapping for photo visibility
+feat(db): add photos table with processing status
+feat(db): add photo-student tags as the privacy pivot
+feat(db): add orders and order items tables
+feat(db): add in-app notifications table
+feat(theme): add colour palette with semantic ramps
+feat(theme): add spacing scale and typography system
+feat(db): add row level security policies for all tables
+feat(db): add updated-at and parent notification triggers
+perf(db): add composite indexes for feed and cursor pagination
+```
+
+## End state
+
+The complete ten-table schema with row level security, triggers and indexes applied.
+
+## Next week
+
+Backend configuration and the server's error-handling foundation.
+
+---
+
