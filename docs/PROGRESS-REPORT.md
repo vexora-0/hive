@@ -149,3 +149,54 @@ Backend configuration and the server's error-handling foundation.
 
 ---
 
+# Week 3 — Data Security & Backend Configuration
+
+**Dates:** 15 February 2026 – 21 February 2026
+**Commits:** 12 — Ruthwik 5, Bhargav 2, Srujan 3, Nagachaitanya 1
+
+## Phase objective
+
+Close the signup gap left by Supabase Auth owning `auth.users`, and build the backend's configuration, logging and error-handling foundation.
+
+## Individual contributions
+
+**Nagachaitanya** implemented the `handle_new_user` trigger creating a `profiles` row automatically when Supabase Auth inserts into `auth.users`, reading the intended role from signup metadata. **Ruthwik** built the environment configuration validated with Zod at startup, Winston logging with JSON in production, the standard response envelope, and the global error handler with its `AppError` class. **Srujan** added the storage bucket migration, relaxed the photo hash constraint for client uploads, and wrote the Zod request validation middleware. **Bhargav** completed the design tokens with the cross-platform shadow system and the unified theme export.
+
+## Important technical implementation
+
+Environment configuration is validated at startup, so the process refuses to boot on bad config rather than failing at first request. The shadow system includes a `platformShadow` helper reconciling the iOS `shadow*` model with Android `elevation`, so no component needs a `Platform.select`.
+
+## Issues and challenges
+
+A user could authenticate before their profile row existed, leaving the client with a session but no role. The `handle_new_user` trigger closed this by creating the profile in the same transaction as the auth user, with the role read from signup metadata and a defensive fallback to `parent`.
+
+## Testing and validation
+
+Trigger verified by creating an auth user and confirming a matching profile row with the correct role. Error handler verified against thrown `AppError`, Zod errors and unexpected exceptions.
+
+## Relevant commits
+
+```
+feat(db): create profile automatically on user signup
+feat(db): add photos storage bucket
+fix(db): make photo hash nullable for client uploads
+feat(config): add validated environment configuration
+feat(config): add structured winston logging
+feat(config): add supabase admin client
+feat(theme): add cross-platform shadow system
+feat(theme): add shared constants and unified theme export
+feat(api): add standard response envelope
+feat(api): add global error handler with AppError
+feat(api): add zod request validation middleware
+```
+
+## End state
+
+A backend that validates its own configuration and returns consistent, well-formed errors.
+
+## Next week
+
+Authentication middleware and the storage layer.
+
+---
+
