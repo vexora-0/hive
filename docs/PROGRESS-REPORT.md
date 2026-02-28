@@ -200,3 +200,54 @@ Authentication middleware and the storage layer.
 
 ---
 
+# Week 4 — Authentication, Access Control & Storage Layer
+
+**Dates:** 22 February 2026 – 28 February 2026
+**Commits:** 12 — Ruthwik 4, Bhargav 2, Srujan 2, Nagachaitanya 3
+
+## Phase objective
+
+Secure the API with token verification and role-based access, and prepare the storage layer for photo uploads.
+
+## Individual contributions
+
+**Nagachaitanya** built the authentication middleware, which verifies the Bearer token against Supabase then loads the user's profile to attach role and school to the request, plus the role guard and the rate limiters. **Ruthwik** built the storage client configuration, signed URL and Supabase Storage helpers, the hashing helper, and the multipart upload middleware with its MIME and size gates. **Srujan** wrote the photo upload and tagging validation schemas. **Bhargav** built the first UI primitives — `Text` with its twelve-variant scale, `Button` and `TextInput` with focus and error states.
+
+## Important technical implementation
+
+Authorisation runs at two layers: the middleware attaches role and school to every request and the guard rejects wrong-role callers before a controller runs; the service layer then re-checks resource ownership. Row level security remains the last line for any query reaching the database directly.
+
+## Issues and challenges
+
+Each authenticated request makes two round trips — one to verify the token, one to load the profile. Accepted for now and recorded as a scaling concern rather than optimised prematurely.
+
+## Testing and validation
+
+Auth middleware exercised with a missing header, a malformed token, an expired token and a valid token, confirming 401 for the first three and correct role attachment for the last. Role guard verified by calling a teacher endpoint as a parent.
+
+## Relevant commits
+
+```
+feat(auth): add supabase jwt authentication middleware
+feat(auth): add role-based access guard
+feat(ui): add text component with typography variants
+feat(ui): add button and text input primitives
+feat(api): add global and auth rate limiting
+feat(storage): add s3 and redis client configuration
+feat(storage): add signed url and supabase storage helpers
+feat(utils): add sha-256 hashing helper
+feat(photos): add photo upload and tagging schemas
+chore(auth): reserve server-side auth validation module
+feat(photos): add multipart upload middleware
+```
+
+## End state
+
+A secured API surface ready for feature endpoints.
+
+## Next week
+
+The photo, feed and notification services.
+
+---
+
