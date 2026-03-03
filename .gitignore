@@ -1,0 +1,16 @@
+node_modules/
+.expo/
+dist/
+*.tsbuildinfo
+.turbo/
+.env
+.env.local
+.env.*.local
+ios/
+android/
+.claude/
+demo/
+projectidea.md
+System Architecture & Technical Design.md
+packages/backend/uploads/photos/*
+!packages/backend/uploads/photos/.gitkeep
