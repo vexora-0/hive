@@ -251,3 +251,54 @@ The photo, feed and notification services.
 
 ---
 
+# Week 5 — Photo, Feed & Notification Services
+
+**Dates:** 1 March 2026 – 7 March 2026
+**Commits:** 12 — Ruthwik 3, Bhargav 4, Srujan 2, Nagachaitanya 2
+
+## Phase objective
+
+Build the two services that carry the product: photo upload with tagging, and the parent feed that enforces the privacy boundary.
+
+## Individual contributions
+
+**Ruthwik** implemented the photo service handling the full lifecycle — creating a record scoped to the teacher's school, persisting the file, and tagging students with school-boundary verification — plus the feed service, which resolves a parent's children first and only then finds photos tagged with those students. Added controllers and routes for both. **Nagachaitanya** built the notification service with unread-first ordering and unread counts, plus its controller and routes. **Bhargav** added the card, avatar and badge components and the layout wrappers.
+
+## Important technical implementation
+
+The feed applies the privacy boundary at the start of the query rather than filtering afterwards. Both list endpoints paginate on `(created_at, id)` encoded base64url rather than by offset, so a page cannot shift or duplicate rows when new uploads arrive mid-scroll.
+
+## Issues and challenges
+
+A photo tagged with two siblings appeared twice in a parent's feed. Deduplicating by photo ID after the tag join fixed the visible symptom, though the interaction between deduplication and page-size accounting remained imperfect and is recorded as known work.
+
+## Testing and validation
+
+Feed verified with two parent accounts at the same school: each saw only their own child's photos, with no overlap. Tagging verified to reject students from another school.
+
+## Relevant commits
+
+```
+chore(storage): add local uploads directory
+feat(ui): add card component with elevation variants
+feat(ui): add avatar and badge components
+feat(photos): implement photo service with tagging and cursor pagination
+feat(photos): add photo controller and routes
+feat(layout): add safe area and screen container
+feat(layout): add keyboard avoiding wrapper
+feat(feed): implement parent feed service scoped to tagged children
+feat(notifications): implement notification service with unread counts
+feat(feed): add feed controller and routes
+feat(notifications): add notification controller and routes
+```
+
+## End state
+
+The core product loop working at the API level.
+
+## Next week
+
+Ordering, idempotency and demo data.
+
+---
+
