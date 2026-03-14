@@ -302,3 +302,54 @@ Ordering, idempotency and demo data.
 
 ---
 
+# Week 6 — Ordering, Idempotency & Seed Data
+
+**Dates:** 8 March 2026 – 14 March 2026
+**Commits:** 12 — Ruthwik 2, Bhargav 3, Srujan 4, Nagachaitanya 2
+
+## Phase objective
+
+Build the ordering flow with server-owned pricing, and protect it against duplicate submission.
+
+## Individual contributions
+
+**Ruthwik** built the Redis-backed idempotency middleware and the order service, which prices every line item server-side from a fixed table and verifies that every referenced photo is tagged with one of the requesting parent's children. **Srujan** wrote the order and admin validation schemas, produced the migration guide and combined migration script, and wrote the development seed data. **Bhargav** completed the feedback component set — skeleton shimmer, empty state, offline banner and error boundary.
+
+## Important technical implementation
+
+Order creation requires an `X-Idempotency-Key`. The middleware takes a Redis lock, caches the response for 24 hours and returns the cached result on retry, so a network retry cannot produce a duplicate order. A concurrent request with the same key receives 409 rather than racing.
+
+## Issues and challenges
+
+The original design had no protection against a client retrying a request that had actually succeeded. The idempotency middleware was added specifically for this and became the most involved piece of the week. Separately, the seed script inserts `profiles` rows directly, but those reference `auth.users`, which Supabase Auth owns — so it could not run end to end. Recorded as outstanding.
+
+## Testing and validation
+
+Idempotency verified by replaying an identical order request and confirming a single row in `orders`. Cross-parent order attempts confirmed rejected with 403.
+
+## Relevant commits
+
+```
+feat(feedback): add skeleton shimmer and empty state
+feat(feedback): add offline banner
+feat(feedback): add top-level error boundary
+feat(orders): add order validation schemas and product types
+docs(db): add migration guide for hosted supabase
+chore(db): add combined migration script and cli config
+feat(db): add development seed data
+feat(orders): add redis-backed idempotency middleware
+feat(orders): implement order service with server-side pricing
+feat(admin): add admin validation schemas
+feat(orders): add order controller and routes
+```
+
+## End state
+
+An ordering API that cannot be double-charged or used to order another family's photos.
+
+## Next week
+
+The admin console API and server assembly.
+
+---
+
