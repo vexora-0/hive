@@ -353,3 +353,54 @@ The admin console API and server assembly.
 
 ---
 
+# Week 7 — Admin API, Workers & Server Assembly
+
+**Dates:** 15 March 2026 – 21 March 2026
+**Commits:** 12 — Ruthwik 3, Bhargav 3, Srujan 2, Nagachaitanya 3
+
+## Phase objective
+
+Complete the API surface with the admin endpoints, add background workers, and bring the backend up as a running process.
+
+## Individual contributions
+
+**Nagachaitanya** built the admin service covering dashboard statistics, user search and role management, school and class creation, student management and parent-to-student mapping by email lookup, plus the controller and routes. **Ruthwik** built the school endpoints, both background workers — image processing with Sharp for thumbnails, blurhash and dimensions, and notification dispatch — and assembled the Express application with Helmet, CORS, body limits, rate limiting, request logging and a health check. **Srujan** built the mobile Supabase client with its `expo-secure-store` adapter and generated the database types from the live schema. **Bhargav** built the authenticated API client and the React Query configuration.
+
+## Important technical implementation
+
+Supabase sessions persist through a `SecureStore` adapter, so refresh tokens live in the iOS Keychain or Android Keystore rather than plain AsyncStorage. The API client attaches the current access token to every request and signs the user out on a 401.
+
+## Issues and challenges
+
+The image processing and notification workers were written and start correctly on boot, but connecting them to the upload flow was not completed. Photos therefore reach `ready` without thumbnails. Recorded as outstanding work.
+
+## Testing and validation
+
+Backend started against the live Supabase project; `/health` confirmed responsive and all route modules mounted without collision. Admin endpoints exercised with curl across school creation, class creation, teacher assignment and parent mapping.
+
+## Relevant commits
+
+```
+feat(admin): implement admin service for schools, users and students
+feat(admin): add admin controller and routes
+feat(lib): add supabase client with secure store adapter
+feat(types): add generated database and environment types
+feat(schools): add school class and student endpoints
+feat(jobs): add image processing worker for thumbnails and blurhash
+feat(jobs): add notification dispatch worker
+feat(lib): add authenticated api client
+feat(lib): configure react query defaults
+feat(api): assemble express application with security middleware and routes
+feat(utils): add client logger and retry with backoff
+```
+
+## End state
+
+A complete, running API across five domains — 22 endpoints.
+
+## Next week
+
+Client infrastructure and shared hooks.
+
+---
+
