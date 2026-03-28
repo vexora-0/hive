@@ -404,3 +404,54 @@ Client infrastructure and shared hooks.
 
 ---
 
+# Week 8 — Client Infrastructure & Shared Hooks
+
+**Dates:** 22 March 2026 – 28 March 2026
+**Commits:** 12 — Ruthwik 3, Bhargav 2, Srujan 2, Nagachaitanya 4
+
+## Phase objective
+
+Give the mobile application the shared foundations every screen would need: utilities, hooks, global state and a bootstrapped administrator.
+
+## Individual contributions
+
+**Bhargav** built the client logging and retry helpers, the input validators and date formatting, the client-side file hashing helper, and the global application store. **Ruthwik** built the shared hooks — network status backed by NetInfo, app-state foreground detection, debounce and a double-submit guard — and the server bootstrap with graceful shutdown. **Srujan** added the admin seeding script. **Nagachaitanya** began the client auth layer with the auth store holding session, profile and role.
+
+## Important technical implementation
+
+The server closes connections in order on shutdown — HTTP first to stop accepting work, then workers, then Redis — so an in-flight image job is not killed mid-write on deploy. The retry helper uses exponential backoff and is applied to every read-only API call, so a flaky connection recovers rather than surfacing an error.
+
+## Issues and challenges
+
+`expo-secure-store` throws in the web target. The storage adapter wraps every call in try/catch so the web build degrades rather than crashing.
+
+## Testing and validation
+
+Session persistence verified by force-quitting and relaunching the app. Retry behaviour verified by toggling airplane mode mid-request.
+
+## Relevant commits
+
+```
+feat(utils): add input validators and date formatting
+feat(utils): add client-side file hashing
+feat(api): add server bootstrap with graceful shutdown
+feat(hooks): add network status and app state hooks
+feat(hooks): add debounce and double-submit guard hooks
+feat(stores): add global application store
+chore(scripts): add admin user seeding script
+feat(auth): add auth store with session and role state
+feat(auth): add supabase auth service
+feat(auth): add session listener hook
+feat(auth): add otp lifecycle hook with lockout
+```
+
+## End state
+
+A client with its shared infrastructure in place, ready for the authentication flow.
+
+## Next week
+
+Authentication UI and onboarding.
+
+---
+
