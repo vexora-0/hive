@@ -455,3 +455,54 @@ Authentication UI and onboarding.
 
 ---
 
+# Week 9 — Authentication UI & Onboarding
+
+**Dates:** 29 March 2026 – 4 April 2026
+**Commits:** 12 — Ruthwik 2, Bhargav 5, Srujan 2, Nagachaitanya 2
+
+## Phase objective
+
+Build the sign-in journey end to end: OTP entry, session handling, role-based routing and first-run onboarding.
+
+## Individual contributions
+
+**Nagachaitanya** built the auth service wrapping OTP send, OTP verify and password sign-in, the session hook that listens for Supabase auth state changes and routes by role, and the login and OTP verification screens. **Srujan** built the `OTPInput` component with its six-cell layout, auto-advance, paste handling and shake-on-error. **Bhargav** built the onboarding carousel and its persisted completion state. **Ruthwik** wired the entry-point state resolution.
+
+## Important technical implementation
+
+On `SIGNED_IN` the session hook fetches the user's profile and redirects to the route for their role. If no profile exists yet the user is sent to onboarding instead, which handles the window between auth user creation and the trigger completing. The OTP hook enforces a resend cooldown and a lockout after three failed attempts, with countdown timers cleaned up on unmount.
+
+## Issues and challenges
+
+An early version left a stale session in memory after sign-out, so the next launch briefly rendered an authenticated screen. Clearing the store explicitly in the `SIGNED_OUT` branch fixed it. Keyboard occlusion on smaller Android screens was resolved with the shared `KeyboardAvoid` wrapper.
+
+## Testing and validation
+
+Full auth walkthrough on a physical Android device: signup with a real email, OTP received and verified, profile created by the trigger, redirect to the correct role route. Wrong OTP confirmed to shake and decrement attempts, with lockout after three failures.
+
+## Relevant commits
+
+```
+feat(ui): add six-digit otp input component
+feat(auth): add auth stack layout and login screen
+feat(auth): add otp verification and onboarding screens
+feat(onboarding): add onboarding slide component and content
+feat(onboarding): persist onboarding completion state
+feat(nav): add custom tab bar
+feat(nav): add header bar and typed route map
+feat(media): add blurhash-backed image component
+feat(media): add polaroid card and masonry grid
+feat(media): add full-screen photo viewer
+feat(animation): add lottie wrapper and shake animation
+```
+
+## End state
+
+A user can sign in and be routed to the right place.
+
+## Next week
+
+Navigation, media and animation components.
+
+---
+
