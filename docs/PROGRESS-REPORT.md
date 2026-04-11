@@ -506,3 +506,54 @@ Navigation, media and animation components.
 
 ---
 
+# Week 10 — Navigation, Media & Animation
+
+**Dates:** 5 April 2026 – 11 April 2026
+**Commits:** 12 — Ruthwik 3, Bhargav 3, Srujan 3, Nagachaitanya 2
+
+## Phase objective
+
+Build the navigation shell and the media components the photo feed depends on.
+
+## Individual contributions
+
+**Bhargav** built the custom tab bar and header, the typed route map, and the media components — `HiveImage`, which shows a blurhash placeholder while the network image loads; `PolaroidCard`; `MasonryGrid`, the two-column FlashList arrangement the feed uses; and the full-screen photo viewer. **Srujan** built the animation set: Lottie wrapper, shake animation, confetti overlay, animated counter, honeycomb FAB and background pattern. **Nagachaitanya** and **Ruthwik** integrated the navigation shell against the auth routing from the previous week.
+
+## Important technical implementation
+
+`MasonryGrid` wraps FlashList in a two-column layout that sizes cells from each photo's stored aspect ratio, so the grid does not reflow as images load. `HiveImage` wraps `expo-image` and passes the stored blurhash as its placeholder, so a photo fades in from a recognisable blur rather than a blank box.
+
+## Issues and challenges
+
+The media components expect a blurhash on every photo, but the image worker that generates it was not yet connected to the upload flow. The placeholder path is implemented but currently inactive — photos load without the progressive blur.
+
+## Testing and validation
+
+Navigation verified across all three role groups on a physical device. Media components checked with portrait and landscape photos to confirm the masonry layout handles mixed aspect ratios.
+
+## Relevant commits
+
+```
+feat(animation): add confetti overlay and animated counter
+feat(animation): add honeycomb fab and background pattern
+feat(teacher): add class selector dropdown
+feat(teacher): add searchable student tagger
+feat(teacher): add teacher api service
+feat(teacher): add class and photo listing hooks
+feat(teacher): add upload pipeline state machine hook
+feat(teacher): add upload preview grid
+feat(teacher): add upload progress indicator
+feat(teacher): add dashboard screen with class photo grid
+feat(teacher): add multi-image upload screen
+```
+
+## End state
+
+A navigable application shell with the components the feed needs.
+
+## Next week
+
+The teacher upload experience.
+
+---
+
