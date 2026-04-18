@@ -557,3 +557,55 @@ The teacher upload experience.
 
 ---
 
+# Week 11 — Teacher Upload Experience
+
+**Dates:** 12 April 2026 – 18 April 2026
+**Commits:** 13 — Ruthwik 5, Bhargav 2, Srujan 2, Nagachaitanya 3
+
+## Phase objective
+
+Build the teacher journey: select a class, pick photos, tag the children in them, and upload.
+
+## Individual contributions
+
+**Srujan** built the class selector dropdown and the searchable student tagger — the surfaces where client-side validation mirrors the server rules he wrote earlier. **Ruthwik** built the teacher API service, the class and photo listing hooks, and the upload pipeline hook. **Bhargav** built the upload preview grid, the progress indicator, and the dashboard and upload screens.
+
+## Important technical implementation
+
+The upload hook is a state machine moving each image independently through `idle → requesting-url → uploading → tagging → complete`, with its own progress and error state. A failed image can be retried individually without disturbing the rest of the batch.
+
+## Issues and challenges
+
+The upload uses `fetch`, which exposes no byte-level progress, so the progress bar advances in discrete steps rather than continuously. Recorded as known work. More significantly, tagging happens after the upload marks a photo `ready`, which means the database trigger that notifies parents fires before any tags exist — identified but not resolved.
+
+## Testing and validation
+
+Full teacher walkthrough on a physical Android device: class selection, picking five images, tagging two students, upload to completion with confetti. Airplane mode mid-upload confirmed to surface a clear error and retry successfully.
+
+## Relevant commits
+
+```
+feat(parent): add child switcher component
+feat(parent): add parent feed api service
+feat(parent): add children and feed query hooks
+feat(parent): add photo action hook
+feat(parent): add feed loading skeleton
+feat(parent): add photo action sheet
+feat(parent): add masonry photo feed screen
+feat(parent): add photo detail screen
+feat(orders): add cart store with pricing
+feat(orders): add order api service
+feat(orders): add order query and mutation hooks
+feat(orders): add product picker grid
+```
+
+## End state
+
+Teachers can upload and tag photos end to end.
+
+## Next week
+
+The parent feed and ordering interface.
+
+---
+
