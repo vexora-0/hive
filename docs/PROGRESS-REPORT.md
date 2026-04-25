@@ -609,3 +609,55 @@ The parent feed and ordering interface.
 
 ---
 
+# Week 12 — Parent Feed & Ordering Interface
+
+**Dates:** 19 April 2026 – 25 April 2026
+**Commits:** 13 — Ruthwik 3, Bhargav 1, Srujan 5, Nagachaitanya 3
+
+## Phase objective
+
+Build the parent journey: a feed scoped to their own children, and the flow to order prints from it.
+
+## Individual contributions
+
+**Ruthwik** built the parent feed and children hooks, the photo action hook, the masonry feed screen, the photo detail screen, the cart store and the order API service. **Srujan** built the child switcher and the parent feed service, plus the product picker and the three-step order bottom sheet. **Nagachaitanya** built the feed loading skeleton, the photo action sheet and the order query and mutation hooks. **Bhargav** built the order history screen.
+
+## Important technical implementation
+
+A parent with several children gets a horizontal avatar switcher that re-keys the feed query, so switching child refetches cleanly rather than mutating a shared cache entry. Every list screen implements the same four states — loading skeleton, empty, error and content — using the shared feedback components.
+
+## Issues and challenges
+
+`@gorhom/bottom-sheet` behaved inconsistently on Android in Expo Go, so the photo action sheet was built on React Native's own `Modal` instead. Less elegant, but reliable on the devices used for testing. A mismatch between the client order payload and the server's expected schema was identified late and remained unresolved.
+
+## Testing and validation
+
+Full parent walkthrough on a physical device: feed loaded with the correct child's photos, child switcher changed the feed, photo detail opened with pinch-zoom. Cross-account check confirmed a second parent did not see the first child's photos.
+
+## Relevant commits
+
+```
+feat(orders): add three-step order bottom sheet
+feat(orders): add order detail and history cards
+feat(orders): add order history screen
+feat(notifications): add notification service and query hooks
+feat(notifications): add notification card
+feat(notifications): add notification centre list
+feat(admin): add admin api service
+feat(admin): add dashboard and user management hooks
+feat(admin): add school and class detail hooks
+feat(admin): add stat card and user list item
+feat(admin): add student and school cards
+feat(admin): add school and class creation sheets
+```
+
+## End state
+
+Parents can browse their own child's photos and reach the ordering flow.
+
+## Next week
+
+Notifications, the admin console and final assembly.
+
+---
+
