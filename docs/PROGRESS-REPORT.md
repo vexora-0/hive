@@ -661,3 +661,55 @@ Notifications, the admin console and final assembly.
 
 ---
 
+# Week 13 — Notifications, Admin Console & Application Assembly
+
+**Dates:** 26 April 2026 – 2 May 2026
+**Commits:** 13 — Ruthwik 1, Bhargav 2, Srujan 3, Nagachaitanya 6
+
+## Phase objective
+
+Complete the third role's interface, build the notification centre, and assemble everything into a running application.
+
+## Individual contributions
+
+**Nagachaitanya** built the notification card and centre components, and the admin dashboard, user management, school and class detail screens, plus the role tab layouts and profile screens. **Srujan** built the admin display components and the management sheets for schools, classes, students, teacher assignment, parent mapping and role editing. **Ruthwik** built the admin API service and its dashboard, user and school hooks, and the role-based entry redirect. **Bhargav** built the root layout with providers, font loading and splash handling, and the project README.
+
+## Important technical implementation
+
+`app/index.tsx` resolves three states in order — not onboarded, not authenticated, authenticated — keeping the routing decision in one place. The root layout holds the splash screen until both fonts and the auth session have resolved, so the user never sees an unstyled or wrongly-routed frame.
+
+## Issues and challenges
+
+The notification centre, card, hooks and service were all completed, but connecting them to the three role screens was not finished — those screens carry a placeholder. Several components also drifted out of sync with library updates, leaving the mobile package failing `tsc --noEmit`.
+
+## Testing and validation
+
+Full admin walkthrough: school creation, class creation, teacher assignment, student addition and parent mapping all persisted correctly. All three roles signed in and reached their own tab layouts. Photos uploaded by a teacher appeared in the correct parent's feed and were absent from other parents' feeds.
+
+## Relevant commits
+
+```
+feat(admin): add student creation and teacher assignment sheets
+feat(admin): add parent mapping and listing sheets
+feat(admin): add user role editing sheet
+feat(admin): add dashboard screen with statistics
+feat(admin): add user management screen with search
+feat(admin): add school list and class detail screens
+feat(app): add root layout with providers, fonts and splash handling
+feat(app): add role-based entry redirect and not-found screen
+feat(app): add parent tab layout and profile screen
+feat(app): add teacher tab layout and profile screen
+feat(app): add admin tab layout and profile screen
+docs: add project readme
+```
+
+## End state
+
+A complete application across all three roles. 217 files, roughly 36,000 lines.
+
+## Next week
+
+Phase 2 — resolving the known defects and hardening the application for release.
+
+---
+
