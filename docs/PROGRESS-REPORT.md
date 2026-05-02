@@ -713,3 +713,55 @@ Phase 2 — resolving the known defects and hardening the application for releas
 
 ---
 
+# Phase 1 Summary
+
+| Week | Phase | Dates |
+|---|---|---|
+| 1 | Project foundations & first tables | 1 – 7 Feb |
+| 2 | Core schema & privacy model | 8 – 14 Feb |
+| 3 | Data security & backend configuration | 15 – 21 Feb |
+| 4 | Authentication, access control & storage layer | 22 – 28 Feb |
+| 5 | Photo, feed & notification services | 1 – 7 Mar |
+| 6 | Ordering, idempotency & seed data | 8 – 14 Mar |
+| 7 | Admin API, workers & server assembly | 15 – 21 Mar |
+| 8 | Client infrastructure & shared hooks | 22 – 28 Mar |
+| 9 | Authentication UI & onboarding | 29 Mar – 4 Apr |
+| 10 | Navigation, media & animation | 5 – 11 Apr |
+| 11 | Teacher upload experience | 12 – 18 Apr |
+| 12 | Parent feed & ordering interface | 19 – 25 Apr |
+| 13 | Notifications, admin console & assembly | 26 Apr – 1 May |
+
+## Delivered
+
+| Area | Status |
+|---|---|
+| Database schema, RLS, triggers, indexes | Complete |
+| Backend API — 22 endpoints across 5 domains | Complete |
+| Authentication with OTP and role-based access | Complete |
+| Teacher photo upload and student tagging | Complete |
+| Parent privacy-scoped photo feed | Complete |
+| Admin console — schools, classes, students, users | Complete |
+| Design system and component library | Complete |
+| Ordering | Built, with a known contract defect |
+| In-app notifications | Backend and components complete; screens not wired |
+| Image processing workers | Written, not connected to the upload path |
+
+## Known outstanding work
+
+Carried into Phase 2:
+
+1. **Order submission contract mismatch** — the client payload shape does not match the server's expected schema, so orders cannot currently be placed. The most significant defect in the codebase.
+2. **Notification screens not wired** — the service, hooks and components are complete, but all three role screens still render a placeholder.
+3. **Image processing workers not invoked** — thumbnails, blurhash and dimensions are never generated, so the feed serves full-resolution originals.
+4. **Mobile package fails `tsc --noEmit`** — 22 type errors from library drift and stale state definitions.
+5. **Photo storage and access control** — uploads are served from local disk without authentication and need hardening.
+6. **No automated test suite.**
+7. **No deployment pipeline.**
+
+## Phase 2
+
+Phase 2 begins with a full codebase audit, then addresses the items above in dependency order: type errors first (the application must compile before anything can be verified), then the order contract, storage and access control, upload correctness, demo data, interface completion, testing, deployment and documentation.
+
+---
+
+*Hive · Ruthwik, Bhargav, Srujan, Nagachaitanya*
