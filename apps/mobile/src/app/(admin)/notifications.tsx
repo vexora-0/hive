@@ -2,25 +2,23 @@ import React from 'react';
 
 import { ScreenContainer } from '@/components/layout/ScreenContainer';
 import { HeaderBar } from '@/components/navigation/HeaderBar';
-import { EmptyState } from '@/components/feedback/EmptyState';
+import { NotificationCenter } from '@/features/notifications/components/NotificationCenter';
 
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
 /**
- * Admin notifications screen -- placeholder for future implementation.
+ * Admin notifications screen.
  *
- * Currently displays an empty state with a descriptive message.
+ * Renders the shared `<NotificationCenter />`, which handles its own loading,
+ * empty and pagination states.
  */
 export default function NotificationsScreen() {
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
       <HeaderBar title="Notifications" />
-      <EmptyState
-        title="Coming Soon"
-        message="Notifications are coming soon. Stay tuned!"
-      />
+      <NotificationCenter />
     </ScreenContainer>
   );
 }

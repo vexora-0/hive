@@ -2,23 +2,23 @@ import React from 'react';
 
 import { ScreenContainer } from '@/components/layout';
 import { HeaderBar } from '@/components/navigation';
-import { EmptyState } from '@/components/feedback';
+import { NotificationCenter } from '@/features/notifications/components/NotificationCenter';
 
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
 /**
- * Teacher notifications screen — coming soon placeholder.
+ * Teacher notifications screen.
+ *
+ * Renders the shared `<NotificationCenter />`, which handles its own loading,
+ * empty and pagination states.
  */
 export default function NotificationsScreen() {
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
       <HeaderBar title="Notifications" />
-      <EmptyState
-        title="Coming Soon"
-        message="Notifications are coming soon. Stay tuned!"
-      />
+      <NotificationCenter />
     </ScreenContainer>
   );
 }
