@@ -17,8 +17,13 @@ import schoolsRoutes from './routes/schools.routes';
 
 const app: Express = express();
 
-// Trust proxy (ngrok, reverse proxies) so req.protocol / req.hostname are correct
-app.set('trust proxy', true);
+// Trust exactly one proxy hop (ngrok in development, the platform load balancer
+// in production) so req.protocol / req.hostname are correct.
+//
+// Must NOT be `true`. That trusts every hop, which means req.ip is taken from a
+// client-controlled X-Forwarded-For header — and the rate limiter keys on req.ip,
+// so a client could rotate that header to bypass rate limiting entirely.
+app.set('trust proxy', 1);
 
 // Security headers
 app.use(helmet());
