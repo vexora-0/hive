@@ -17,7 +17,7 @@ router.use(authenticate);
 // POST /photos/upload-url - Request presigned upload URL (teacher only)
 router.post(
   '/upload-url',
-  roleGuard('teacher', 'school_admin'),
+  roleGuard('teacher', 'admin'),
   validate(requestUploadSchema, 'body'),
   photoController.requestUpload,
 );
@@ -25,7 +25,7 @@ router.post(
 // POST /photos/:id/file - Upload photo file to local storage (teacher only)
 router.post(
   '/:id/file',
-  roleGuard('teacher', 'school_admin'),
+  roleGuard('teacher', 'admin'),
   photoUpload.single('file'),
   photoController.uploadFile,
 );
@@ -33,21 +33,21 @@ router.post(
 // POST /photos/:id/confirm - Confirm upload complete (teacher only)
 router.post(
   '/:id/confirm',
-  roleGuard('teacher', 'school_admin'),
+  roleGuard('teacher', 'admin'),
   photoController.confirmUpload,
 );
 
 // POST /photos/:id/tag - Tag students in a photo (teacher only)
 router.post(
   '/:id/tag',
-  roleGuard('teacher', 'school_admin'),
+  roleGuard('teacher', 'admin'),
   photoController.tagStudents,
 );
 
 // GET /photos - Get photos for a class (teacher only)
 router.get(
   '/',
-  roleGuard('teacher', 'school_admin'),
+  roleGuard('teacher', 'admin'),
   validate(getPhotosSchema, 'query'),
   photoController.getPhotos,
 );
