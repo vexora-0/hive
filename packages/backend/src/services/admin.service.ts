@@ -92,9 +92,16 @@ export async function getUsers(
     .limit(limit + 1);
 
   if (search) {
-    query = query.or(
-      `full_name.ilike.%${search}%,email.ilike.%${search}%`,
-    );
+    // PostgREST's or() takes a comma-separated filter DSL, so any of , ( ) . *
+    // % or \ in raw user input escapes the intended expression and injects a
+    // new filter clause — e.g. searching "x,role.eq.admin" would widen the
+    // result set rather than narrow it. Strip the metacharacters before
+    // interpolating. Length is already capped at 100 by getUsersSchema.
+    const safe = search.replace(/[,()\\.*%]/g, '').trim();
+
+    if (safe) {
+      query = query.or(`full_name.ilike.%${safe}%,email.ilike.%${safe}%`);
+    }
   }
 
   if (role) {
