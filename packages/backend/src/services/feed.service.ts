@@ -153,6 +153,7 @@ export async function getFeed(
 
 export async function getPhotoDetails(
   photoId: string,
+  userId: string,
   baseUrl?: string,
 ) {
   const { data: photo, error } = await supabaseAdmin
@@ -163,6 +164,53 @@ export async function getPhotoDetails(
     .single();
 
   if (error || !photo) {
+    throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
+  }
+
+  // Authorization. The backend queries through supabaseAdmin, which holds the
+  // service-role key and is exempt from RLS by design, so ownership has to be
+  // checked explicitly here. The caller may read this photo only if one of
+  // their own children is tagged in it.
+  //
+  // A caller who is not entitled to the photo gets 404, never 403: a 403 would
+  // confirm that the photo exists, which is itself an information leak when the
+  // ID space is enumerable.
+  const { data: links, error: linksError } = await supabaseAdmin
+    .from('parent_student_mappings')
+    .select('student_id')
+    .eq('parent_id', userId);
+
+  if (linksError) {
+    logger.error('Failed to fetch parent-student links', {
+      error: linksError.message,
+      userId,
+    });
+    throw new AppError('Failed to fetch student links', 500, 'QUERY_FAILED');
+  }
+
+  const ownStudentIds = links?.map((l) => l.student_id) ?? [];
+
+  if (ownStudentIds.length === 0) {
+    throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
+  }
+
+  const { data: ownTags, error: ownTagsError } = await supabaseAdmin
+    .from('photo_student_tags')
+    .select('student_id')
+    .eq('photo_id', photoId)
+    .in('student_id', ownStudentIds);
+
+  if (ownTagsError) {
+    logger.error('Failed to verify photo ownership', {
+      error: ownTagsError.message,
+      photoId,
+      userId,
+    });
+    throw new AppError('Failed to fetch photo', 500, 'QUERY_FAILED');
+  }
+
+  if (!ownTags || ownTags.length === 0) {
+    logger.warn('Blocked photo detail access', { photoId, userId });
     throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
   }
 

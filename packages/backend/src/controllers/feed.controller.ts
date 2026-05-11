@@ -39,9 +39,10 @@ export async function getPhotoDetails(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const userId = req.user!.id;
     const { id } = req.params;
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const photo = await feedService.getPhotoDetails(id, baseUrl);
+    const photo = await feedService.getPhotoDetails(id, userId, baseUrl);
 
     res.json(success(photo));
   } catch (err) {
