@@ -227,12 +227,6 @@ export async function getPhotoDetails(
     ? `${origin}/uploads/${photo.thumbnail_s3_key}`
     : null;
 
-  // Get tagged student IDs
-  const { data: tags } = await supabaseAdmin
-    .from('photo_student_tags')
-    .select('student_id')
-    .eq('photo_id', photoId);
-
   return {
     id: photo.id,
     url,
@@ -248,6 +242,9 @@ export async function getPhotoDetails(
     file_size_bytes: photo.file_size_bytes,
     className: (classData as any)?.name ?? null,
     schoolName: (classData as any)?.schools?.name ?? null,
-    taggedStudentIds: tags?.map((t) => t.student_id) ?? [],
+    // Only this parent's own children, never the full tag list. Authorisation
+    // is not binary: a parent entitled to see the photo is still not entitled
+    // to learn which other children appear in it.
+    taggedStudentIds: ownTags.map((t) => t.student_id),
   };
 }
