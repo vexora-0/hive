@@ -92,12 +92,10 @@ export async function getPhotos(
       return;
     }
 
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
     const result = await photoService.getPhotosByClass(
       query.classId,
       query.cursor,
       query.limit,
-      baseUrl,
     );
 
     res.json(paginated(result.photos, result.nextCursor));

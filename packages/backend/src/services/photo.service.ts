@@ -1,13 +1,15 @@
-import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
-import { env } from '../config/env';
-import type { RequestUploadInput, GetPhotosInput } from '../validators/photo.validator';
-
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
+import { processAndUploadPhoto } from '../utils/imageProcessor';
+import {
+  getSignedPhotoUrls,
+  fileExistsInStorage,
+  deletePhotoObjects,
+} from '../utils/supabaseStorage';
+import type { RequestUploadInput } from '../validators/photo.validator';
 
 const CONTENT_TYPE_TO_EXT: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -17,7 +19,6 @@ const CONTENT_TYPE_TO_EXT: Record<string, string> = {
 
 interface UploadResult {
   photoId: string;
-  uploadUrl: string;
   s3Key: string;
 }
 
@@ -104,57 +105,100 @@ export async function requestUpload(
     throw new AppError('Failed to create photo record', 500, 'INSERT_FAILED');
   }
 
-  logger.info('Upload requested (Supabase Storage)', { photoId, storagePath, userId });
+  logger.info('Photo record created', { photoId, storagePath, userId });
 
-  return { photoId, uploadUrl: '', s3Key: storagePath };
+  return { photoId, s3Key: storagePath };
 }
 
+/**
+ * Receive the uploaded file, process it and store it.
+ *
+ * The photo stays in 'processing' after this returns. It only becomes 'ready'
+ * in confirmUpload(), which the client calls *after* tagging — the
+ * notify_parents_on_photo trigger fires on the transition to 'ready' and loops
+ * over photo_student_tags, so tags must already exist or no parent is ever
+ * notified. See G-07.
+ */
 export async function saveUploadedFile(
   photoId: string,
   tempFilePath: string,
 ): Promise<void> {
-  // 1. Get photo record
-  const { data: photo, error: photoError } = await supabaseAdmin
-    .from('photos')
-    .select('s3_key, status')
-    .eq('id', photoId)
-    .single();
+  try {
+    const { data: photo, error: photoError } = await supabaseAdmin
+      .from('photos')
+      .select('s3_key, status, mime_type')
+      .eq('id', photoId)
+      .single();
 
-  if (photoError || !photo) {
-    fs.unlinkSync(tempFilePath);
-    throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
+    if (photoError || !photo) {
+      throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
+    }
+
+    if (photo.status !== 'processing') {
+      throw new AppError(
+        `Photo is already in '${photo.status}' state`,
+        400,
+        'INVALID_STATE',
+      );
+    }
+
+    const buffer = fs.readFileSync(tempFilePath);
+
+    // Validates magic bytes, converts HEIC, uploads original + thumbnail,
+    // and computes the blurhash. Throws on anything that isn't a real image.
+    let processed;
+    try {
+      processed = await processAndUploadPhoto(buffer, photo.s3_key, photo.mime_type);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Image processing failed';
+      throw new AppError(message, 400, 'INVALID_IMAGE');
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from('photos')
+      .update({
+        s3_key: processed.storagePath,
+        thumbnail_s3_key: processed.thumbnailPath,
+        mime_type: processed.mimeType,
+        width: processed.width,
+        height: processed.height,
+        blurhash: processed.blurhash,
+        processed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', photoId);
+
+    if (updateError) {
+      // The objects are already in storage; drop them so a retry starts clean.
+      await deletePhotoObjects([processed.storagePath, processed.thumbnailPath]);
+      logger.error('Failed to record processed photo', {
+        error: updateError.message,
+        photoId,
+      });
+      throw new AppError('Failed to save photo', 500, 'UPDATE_FAILED');
+    }
+
+    logger.info('Photo uploaded and processed', {
+      photoId,
+      storagePath: processed.storagePath,
+    });
+  } finally {
+    // Always remove the multer temp file, on success or failure.
+    try {
+      fs.unlinkSync(tempFilePath);
+    } catch {
+      // Already gone — nothing to do.
+    }
   }
-
-  if (photo.status !== 'processing') {
-    fs.unlinkSync(tempFilePath);
-    throw new AppError(
-      `Photo is already in '${photo.status}' state`,
-      400,
-      'INVALID_STATE',
-    );
-  }
-
-  // 2. Move temp file to final path based on s3_key
-  const finalPath = path.join(UPLOADS_DIR, photo.s3_key);
-  fs.mkdirSync(path.dirname(finalPath), { recursive: true });
-  fs.renameSync(tempFilePath, finalPath);
-
-  // 3. Mark as ready
-  const { error: updateError } = await supabaseAdmin
-    .from('photos')
-    .update({ status: 'ready', updated_at: new Date().toISOString() })
-    .eq('id', photoId);
-
-  if (updateError) {
-    logger.error('Failed to confirm photo', { error: updateError.message, photoId });
-    throw new AppError('Failed to confirm upload', 500, 'UPDATE_FAILED');
-  }
-
-  logger.info('Photo file saved locally', { photoId, path: photo.s3_key });
 }
 
+/**
+ * Mark a photo ready and make it visible to parents.
+ *
+ * Called after tagging. This is the write that fires both database triggers:
+ * notify_parents_on_photo and notify_teacher_on_upload_complete.
+ */
 export async function confirmUpload(photoId: string): Promise<void> {
-  // 1. Get photo record
   const { data: photo, error: photoError } = await supabaseAdmin
     .from('photos')
     .select('s3_key, status')
@@ -173,9 +217,8 @@ export async function confirmUpload(photoId: string): Promise<void> {
     );
   }
 
-  // 2. Verify photo exists locally
-  const localPath = path.join(UPLOADS_DIR, photo.s3_key);
-  if (!fs.existsSync(localPath)) {
+  const exists = await fileExistsInStorage(photo.s3_key);
+  if (!exists) {
     throw new AppError(
       'Photo file not found in storage. Please upload the file first.',
       404,
@@ -183,7 +226,6 @@ export async function confirmUpload(photoId: string): Promise<void> {
     );
   }
 
-  // 3. Mark as ready (no server-side thumbnail for now; thumbnail_s3_key stays null)
   const { error: updateError } = await supabaseAdmin
     .from('photos')
     .update({ status: 'ready', updated_at: new Date().toISOString() })
@@ -194,7 +236,7 @@ export async function confirmUpload(photoId: string): Promise<void> {
     throw new AppError('Failed to confirm upload', 500, 'UPDATE_FAILED');
   }
 
-  logger.info('Upload confirmed (Supabase Storage)', { photoId });
+  logger.info('Upload confirmed, photo is now visible to tagged parents', { photoId });
 }
 
 export async function tagStudents(
@@ -283,7 +325,6 @@ export async function getPhotosByClass(
   classId: string,
   cursor?: string,
   limit: number = 20,
-  baseUrl?: string,
 ): Promise<PaginatedPhotos> {
   let query = supabaseAdmin
     .from('photos')
@@ -315,15 +356,19 @@ export async function getPhotosByClass(
   const hasNext = (photos?.length ?? 0) > limit;
   const results = photos?.slice(0, limit) ?? [];
 
-  // Build URLs using the request origin so they work via ngrok/tunnel
-  const origin = baseUrl ?? env.BACKEND_URL;
-  const photosWithUrls: PhotoWithUrl[] = results.map((photo) => {
-    const url = `${origin}/uploads/${photo.s3_key}`;
-    const thumbnailUrl = photo.thumbnail_s3_key
-      ? `${origin}/uploads/${photo.thumbnail_s3_key}`
-      : null;
-    return { ...photo, url, thumbnailUrl };
-  });
+  // The bucket is private, so every URL is signed. One batch call rather than
+  // two per photo.
+  const signed = await getSignedPhotoUrls(
+    results.flatMap((p) => [p.s3_key, p.thumbnail_s3_key].filter(Boolean) as string[]),
+  );
+
+  const photosWithUrls: PhotoWithUrl[] = results.map((photo) => ({
+    ...photo,
+    url: signed.get(photo.s3_key) ?? '',
+    thumbnailUrl: photo.thumbnail_s3_key
+      ? (signed.get(photo.thumbnail_s3_key) ?? null)
+      : null,
+  }));
 
   const nextCursor = hasNext && results.length > 0
     ? Buffer.from(
@@ -333,117 +378,6 @@ export async function getPhotosByClass(
         }),
       ).toString('base64url')
     : null;
-
-  return { photos: photosWithUrls, nextCursor };
-}
-
-export async function getParentFeed(
-  parentId: string,
-  childId?: string,
-  cursor?: string,
-  limit: number = 20,
-  baseUrl?: string,
-): Promise<PaginatedPhotos> {
-  // 1. Get parent's student IDs
-  let studentQuery = supabaseAdmin
-    .from('parent_student_mappings')
-    .select('student_id')
-    .eq('parent_id', parentId);
-
-  if (childId) {
-    studentQuery = studentQuery.eq('student_id', childId);
-  }
-
-  const { data: links, error: linksError } = await studentQuery;
-
-  if (linksError) {
-    throw new AppError('Failed to fetch student links', 500, 'QUERY_FAILED');
-  }
-
-  const studentIds = links?.map((l) => l.student_id) ?? [];
-
-  if (studentIds.length === 0) {
-    return { photos: [], nextCursor: null };
-  }
-
-  // 2. Query photos tagged with those students
-  let query = supabaseAdmin
-    .from('photo_student_tags')
-    .select(
-      'photo_id, photos!inner(id, s3_key, thumbnail_s3_key, blurhash, width, height, status, created_at, uploaded_by, class_id)',
-    )
-    .in('student_id', studentIds)
-    .eq('photos.status', 'ready')
-    .order('photos(created_at)', { ascending: false })
-    .limit(limit + 1);
-
-  if (cursor) {
-    try {
-      const decoded = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-      query = query.or(
-        `photos.created_at.lt.${decoded.createdAt},and(photos.created_at.eq.${decoded.createdAt},photos.id.lt.${decoded.id})`,
-      );
-    } catch {
-      throw new AppError('Invalid cursor', 400, 'INVALID_CURSOR');
-    }
-  }
-
-  const { data: tags, error } = await query;
-
-  if (error) {
-    logger.error('Failed to fetch parent feed', {
-      error: error.message,
-      parentId,
-    });
-    throw new AppError('Failed to fetch feed', 500, 'QUERY_FAILED');
-  }
-
-  // Deduplicate photos (a photo may be tagged with multiple children)
-  const seenIds = new Set<string>();
-  const uniquePhotos: Array<Record<string, unknown>> = [];
-
-  for (const tag of tags ?? []) {
-    const photo = tag.photos as unknown as Record<string, unknown>;
-    if (photo && !seenIds.has(photo.id as string)) {
-      seenIds.add(photo.id as string);
-      uniquePhotos.push(photo);
-    }
-  }
-
-  const hasNext = uniquePhotos.length > limit;
-  const results = uniquePhotos.slice(0, limit);
-
-  const origin = baseUrl ?? env.BACKEND_URL;
-  const photosWithUrls: PhotoWithUrl[] = results.map((photo) => {
-    const url = `${origin}/uploads/${photo.s3_key as string}`;
-    const thumbnailUrl = photo.thumbnail_s3_key
-      ? `${origin}/uploads/${photo.thumbnail_s3_key as string}`
-      : null;
-    return {
-      id: photo.id as string,
-      s3_key: photo.s3_key as string,
-      thumbnail_s3_key: photo.thumbnail_s3_key as string | null,
-      blurhash: photo.blurhash as string | null,
-      width: photo.width as number | null,
-      height: photo.height as number | null,
-      status: photo.status as string,
-      created_at: photo.created_at as string,
-      uploaded_by: photo.uploaded_by as string,
-      class_id: photo.class_id as string,
-      url,
-      thumbnailUrl,
-    };
-  });
-
-  const nextCursor =
-    hasNext && results.length > 0
-      ? Buffer.from(
-          JSON.stringify({
-            createdAt: results[results.length - 1].created_at,
-            id: results[results.length - 1].id,
-          }),
-        ).toString('base64url')
-      : null;
 
   return { photos: photosWithUrls, nextCursor };
 }

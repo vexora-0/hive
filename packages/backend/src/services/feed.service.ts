@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
-import { env } from '../config/env';
 import { AppError } from '../middleware/errorHandler';
+import { getSignedPhotoUrls } from '../utils/supabaseStorage';
 
 interface FeedPhoto {
   id: string;
@@ -29,7 +29,6 @@ export async function getFeed(
   studentId?: string,
   cursor?: string,
   limit: number = 20,
-  baseUrl?: string,
 ): Promise<FeedResult> {
   // 1. Get student IDs for parent
   let studentQuery = supabaseAdmin
@@ -59,7 +58,7 @@ export async function getFeed(
 
   // 2. Build query: photos tagged with parent's students, status='ready'
   //    Using a subquery approach: get photo IDs from tags, then fetch photos
-  let tagQuery = supabaseAdmin
+  const tagQuery = supabaseAdmin
     .from('photo_student_tags')
     .select('photo_id, student_id')
     .in('student_id', studentIds);
@@ -122,20 +121,20 @@ export async function getFeed(
   const hasNext = (photos?.length ?? 0) > limit;
   const results = photos?.slice(0, limit) ?? [];
 
-  // 4. Build URLs using the request origin so they work via ngrok/tunnel
-  const origin = baseUrl ?? env.BACKEND_URL;
-  const feedPhotos: FeedPhoto[] = results.map((photo) => {
-    const url = `${origin}/uploads/${photo.s3_key}`;
-    const thumbnailUrl = photo.thumbnail_s3_key
-      ? `${origin}/uploads/${photo.thumbnail_s3_key}`
-      : null;
-    return {
-      ...photo,
-      url,
-      thumbnailUrl,
-      taggedStudentIds: photoStudentMap.get(photo.id) ?? [],
-    };
-  });
+  // 4. The bucket is private, so every URL is signed. One batch call covers the
+  //    whole page rather than two round trips per photo.
+  const signed = await getSignedPhotoUrls(
+    results.flatMap((p) => [p.s3_key, p.thumbnail_s3_key].filter(Boolean) as string[]),
+  );
+
+  const feedPhotos: FeedPhoto[] = results.map((photo) => ({
+    ...photo,
+    url: signed.get(photo.s3_key) ?? '',
+    thumbnailUrl: photo.thumbnail_s3_key
+      ? (signed.get(photo.thumbnail_s3_key) ?? null)
+      : null,
+    taggedStudentIds: photoStudentMap.get(photo.id) ?? [],
+  }));
 
   // 5. Build next cursor
   const nextCursor =
@@ -151,10 +150,7 @@ export async function getFeed(
   return { photos: feedPhotos, nextCursor };
 }
 
-export async function getPhotoDetails(
-  photoId: string,
-  baseUrl?: string,
-) {
+export async function getPhotoDetails(photoId: string) {
   const { data: photo, error } = await supabaseAdmin
     .from('photos')
     .select('id, s3_key, thumbnail_s3_key, blurhash, width, height, status, created_at, uploaded_by, class_id, original_filename, mime_type, file_size_bytes')
@@ -173,10 +169,12 @@ export async function getPhotoDetails(
     .eq('id', photo.class_id)
     .single();
 
-  const origin = baseUrl ?? env.BACKEND_URL;
-  const url = `${origin}/uploads/${photo.s3_key}`;
+  const signed = await getSignedPhotoUrls(
+    [photo.s3_key, photo.thumbnail_s3_key].filter(Boolean) as string[],
+  );
+  const url = signed.get(photo.s3_key) ?? '';
   const thumbnailUrl = photo.thumbnail_s3_key
-    ? `${origin}/uploads/${photo.thumbnail_s3_key}`
+    ? (signed.get(photo.thumbnail_s3_key) ?? null)
     : null;
 
   // Get tagged student IDs
