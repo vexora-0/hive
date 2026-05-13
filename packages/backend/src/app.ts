@@ -1,4 +1,3 @@
-import path from 'path';
 import express, { Express } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -57,9 +56,6 @@ app.use((req, _res, next) => {
   });
   next();
 });
-
-// Serve uploaded photos as static files
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // Health check
 app.get('/health', (_req, res) => {
