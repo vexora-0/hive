@@ -4,8 +4,6 @@ import { env } from './config/env';
 import { logger } from './config/logger';
 import app from './app';
 import { redis } from './config/redis';
-import { startImageProcessingWorker } from './jobs/imageProcessor.job';
-import { startNotificationWorker } from './jobs/notificationSender.job';
 
 const server = app.listen(env.PORT, () => {
   logger.info(`Hive backend started`, {
@@ -14,10 +12,6 @@ const server = app.listen(env.PORT, () => {
     pid: process.pid,
   });
 });
-
-// Start background workers
-const imageWorker = startImageProcessingWorker();
-const notificationWorker = startNotificationWorker();
 
 // Graceful shutdown
 async function shutdown(signal: string): Promise<void> {
@@ -29,14 +23,7 @@ async function shutdown(signal: string): Promise<void> {
   });
 
   try {
-    // Close workers
-    await imageWorker.close();
-    logger.info('Image processing worker closed');
-
-    await notificationWorker.close();
-    logger.info('Notification worker closed');
-
-    // Close Redis connection
+    // Close Redis connection (still used by the order idempotency middleware)
     await redis.quit();
     logger.info('Redis connection closed');
 

@@ -17,14 +17,6 @@ const envSchema = z.object({
     .string()
     .min(1, 'SUPABASE_SERVICE_KEY is required'),
 
-  AWS_REGION: z.string().default('us-east-1'),
-
-  AWS_ACCESS_KEY_ID: z.string().optional().default(''),
-
-  AWS_SECRET_ACCESS_KEY: z.string().optional().default(''),
-
-  S3_BUCKET: z.string().default('hive-photos'),
-
   REDIS_URL: z.string().url('REDIS_URL must be a valid URL').default('redis://localhost:6379'),
 
   BACKEND_URL: z.string().default('http://localhost:4000'),
