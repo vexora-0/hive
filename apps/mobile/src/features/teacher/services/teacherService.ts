@@ -17,7 +17,6 @@ export interface UploadUrlRequest {
 
 export interface UploadUrlResponse {
   photoId: string;
-  uploadUrl: string;
   s3Key: string;
 }
 

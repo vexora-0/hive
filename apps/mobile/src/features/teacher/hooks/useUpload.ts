@@ -170,7 +170,7 @@ export function useUpload(): UseUploadReturn {
       try {
         // Step 1: Request photo slot
         updateImage(id, { state: 'requesting-url', progress: 0.1 });
-        const { photoId, uploadUrl, s3Key } = await retryWithBackoff(
+        const { photoId, s3Key } = await retryWithBackoff(
           () =>
             requestUploadUrl({
               classId,
