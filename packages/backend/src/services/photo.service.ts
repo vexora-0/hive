@@ -5,7 +5,8 @@ import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
 import { env } from '../config/env';
-import type { RequestUploadInput, GetPhotosInput } from '../validators/photo.validator';
+import type { AuthUser } from '../middleware/auth';
+import type { RequestUploadInput } from '../validators/photo.validator';
 
 const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
 
@@ -281,10 +282,40 @@ export async function tagStudents(
 
 export async function getPhotosByClass(
   classId: string,
+  user: AuthUser,
   cursor?: string,
   limit: number = 20,
   baseUrl?: string,
 ): Promise<PaginatedPhotos> {
+  // The class ID arrives from the query string, so confirm it belongs to the
+  // caller's school before listing anything. Same shape as the check
+  // requestUpload already performs. Takes the whole AuthUser rather than a
+  // school ID because platform admins have school_id = null and must still be
+  // able to read any class.
+  if (user.role !== 'admin') {
+    const { data: classRecord, error: classError } = await supabaseAdmin
+      .from('classes')
+      .select('school_id')
+      .eq('id', classId)
+      .single();
+
+    if (classError || !classRecord) {
+      throw new AppError('Class not found', 404, 'CLASS_NOT_FOUND');
+    }
+
+    if (classRecord.school_id !== user.schoolId) {
+      logger.warn('Blocked cross-school photo listing', {
+        classId,
+        userId: user.id,
+      });
+      throw new AppError(
+        'You do not have permission to view photos for this class',
+        403,
+        'FORBIDDEN',
+      );
+    }
+  }
+
   let query = supabaseAdmin
     .from('photos')
     .select('id, s3_key, thumbnail_s3_key, blurhash, width, height, status, created_at, uploaded_by, class_id')

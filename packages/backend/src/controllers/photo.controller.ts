@@ -95,6 +95,7 @@ export async function getPhotos(
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const result = await photoService.getPhotosByClass(
       query.classId,
+      req.user!,
       query.cursor,
       query.limit,
       baseUrl,
