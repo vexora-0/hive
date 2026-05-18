@@ -33,7 +33,7 @@ export async function uploadFile(
       return;
     }
 
-    await photoService.saveUploadedFile(id, req.file.path);
+    await photoService.saveUploadedFile(id, req.file.path, req.user!);
 
     res.json(success(null, 'File uploaded and confirmed'));
   } catch (err) {
@@ -49,7 +49,7 @@ export async function confirmUpload(
   try {
     const { id } = req.params;
 
-    await photoService.confirmUpload(id);
+    await photoService.confirmUpload(id, req.user!);
 
     res.json(success(null, 'Upload confirmed, processing started'));
   } catch (err) {
@@ -63,11 +63,10 @@ export async function tagStudents(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const userId = req.user!.id;
     const { id } = req.params;
     const { studentIds } = req.body as Pick<TagStudentsInput, 'studentIds'>;
 
-    await photoService.tagStudents(userId, id, studentIds);
+    await photoService.tagStudents(id, studentIds, req.user!);
 
     res.json(success(null, 'Students tagged successfully'));
   } catch (err) {

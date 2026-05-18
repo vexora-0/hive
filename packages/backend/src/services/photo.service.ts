@@ -110,20 +110,82 @@ export async function requestUpload(
   return { photoId, uploadUrl: '', s3Key: storagePath };
 }
 
-export async function saveUploadedFile(
+interface PhotoOwnershipRow {
+  s3_key: string;
+  status: string;
+  school_id: string;
+  uploaded_by: string;
+}
+
+/**
+ * Load a photo and assert that `user` is entitled to mutate it.
+ *
+ * Every route below takes a photo ID straight from the URL. Without this,
+ * checking only `status` — as all three of them did — lets any teacher
+ * overwrite, confirm or tag any other teacher's photo.
+ *
+ * - `admin` may act on any photo.
+ * - `teacher` must be the uploader **and** at the photo's school.
+ * - anything else is refused.
+ *
+ * Tagging is held to the same uploader rule as upload and confirm rather than
+ * the looser school rule it used before. A colleague at the same school tagging
+ * someone else's photo is a plausible product decision, but it is not one this
+ * codebase needs, and a single guard across all three routes is easier to
+ * reason about than two similar ones that differ in a way nobody remembers.
+ */
+async function assertPhotoOwnership(
   photoId: string,
-  tempFilePath: string,
-): Promise<void> {
-  // 1. Get photo record
-  const { data: photo, error: photoError } = await supabaseAdmin
+  user: AuthUser,
+): Promise<PhotoOwnershipRow> {
+  const { data: photo, error } = await supabaseAdmin
     .from('photos')
-    .select('s3_key, status')
+    .select('s3_key, status, school_id, uploaded_by')
     .eq('id', photoId)
     .single();
 
-  if (photoError || !photo) {
-    fs.unlinkSync(tempFilePath);
+  if (error || !photo) {
     throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
+  }
+
+  if (user.role === 'admin') {
+    return photo as PhotoOwnershipRow;
+  }
+
+  const isOwner =
+    user.role === 'teacher' &&
+    photo.uploaded_by === user.id &&
+    photo.school_id === user.schoolId;
+
+  if (!isOwner) {
+    logger.warn('Blocked photo mutation', {
+      photoId,
+      userId: user.id,
+      role: user.role,
+    });
+    throw new AppError(
+      'You do not have permission to modify this photo',
+      403,
+      'FORBIDDEN',
+    );
+  }
+
+  return photo as PhotoOwnershipRow;
+}
+
+export async function saveUploadedFile(
+  photoId: string,
+  tempFilePath: string,
+  user: AuthUser,
+): Promise<void> {
+  // 1. Load the photo and verify ownership. The temp file has already landed
+  //    on disk by this point, so it has to be cleaned up on every refusal.
+  let photo: PhotoOwnershipRow;
+  try {
+    photo = await assertPhotoOwnership(photoId, user);
+  } catch (err) {
+    fs.unlinkSync(tempFilePath);
+    throw err;
   }
 
   if (photo.status !== 'processing') {
@@ -154,17 +216,12 @@ export async function saveUploadedFile(
   logger.info('Photo file saved locally', { photoId, path: photo.s3_key });
 }
 
-export async function confirmUpload(photoId: string): Promise<void> {
-  // 1. Get photo record
-  const { data: photo, error: photoError } = await supabaseAdmin
-    .from('photos')
-    .select('s3_key, status')
-    .eq('id', photoId)
-    .single();
-
-  if (photoError || !photo) {
-    throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
-  }
+export async function confirmUpload(
+  photoId: string,
+  user: AuthUser,
+): Promise<void> {
+  // 1. Load the photo and verify ownership
+  const photo = await assertPhotoOwnership(photoId, user);
 
   if (photo.status !== 'processing') {
     throw new AppError(
@@ -199,37 +256,16 @@ export async function confirmUpload(photoId: string): Promise<void> {
 }
 
 export async function tagStudents(
-  userId: string,
   photoId: string,
   studentIds: string[],
+  user: AuthUser,
 ): Promise<void> {
-  // 1. Verify photo exists
-  const { data: photo, error: photoError } = await supabaseAdmin
-    .from('photos')
-    .select('school_id')
-    .eq('id', photoId)
-    .single();
+  // 1. Load the photo and verify ownership. This supersedes the separate
+  //    profile/school lookup that used to live here: ownership already implies
+  //    the caller is at the photo's school.
+  const photo = await assertPhotoOwnership(photoId, user);
 
-  if (photoError || !photo) {
-    throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
-  }
-
-  // 2. Verify user (teacher) is at the same school
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('school_id')
-    .eq('id', userId)
-    .single();
-
-  if (!profile || profile.school_id !== photo.school_id) {
-    throw new AppError(
-      'You can only tag students in photos from your school',
-      403,
-      'FORBIDDEN',
-    );
-  }
-
-  // 3. Verify all students belong to the same school
+  // 2. Verify all students belong to the same school
   const { data: students, error: studentsError } = await supabaseAdmin
     .from('students')
     .select('id')
@@ -251,11 +287,11 @@ export async function tagStudents(
     );
   }
 
-  // 4. Insert photo_student_tags (upsert to avoid duplicates)
+  // 3. Insert photo_student_tags (upsert to avoid duplicates)
   const tags = studentIds.map((studentId) => ({
     photo_id: photoId,
     student_id: studentId,
-    tagged_by: userId,
+    tagged_by: user.id,
   }));
 
   const { error: tagError } = await supabaseAdmin
@@ -276,7 +312,7 @@ export async function tagStudents(
   logger.info('Students tagged', {
     photoId,
     studentCount: studentIds.length,
-    userId,
+    userId: user.id,
   });
 }
 
