@@ -56,46 +56,34 @@ export async function getFeed(
     return { photos: [], nextCursor: null };
   }
 
-  // 2. Build query: photos tagged with parent's students, status='ready'
-  //    Using a subquery approach: get photo IDs from tags, then fetch photos
-  const tagQuery = supabaseAdmin
-    .from('photo_student_tags')
-    .select('photo_id, student_id')
-    .in('student_id', studentIds);
+  // 2. Fetch a page of photos directly, filtered to those tagged with one of
+  //    this parent's children.
+  //
+  //    The previous implementation fetched EVERY photo_student_tags row for the
+  //    parent's children with no limit, collected the photo IDs, and passed them
+  //    all back in as `.in('id', [...])`. For a child with a couple of thousand
+  //    tagged photos that builds a URL containing thousands of UUIDs, and
+  //    PostgREST returns 414 URI Too Long. The feed did not degrade as data grew
+  //    — it stopped working. (G-14)
+  //
+  //    `photo_student_tags!inner` pushes the tag filter into the same query, so
+  //    pagination happens in the database and the response size is bounded by
+  //    `limit` regardless of how many photos exist.
+  //
+  //    A photo tagged with two of the parent's children matches twice, so we
+  //    over-fetch and deduplicate below.
+  const OVERFETCH = limit * 2 + 1;
 
-  const { data: allTags, error: tagsError } = await tagQuery;
-
-  if (tagsError) {
-    logger.error('Failed to fetch photo tags', {
-      error: tagsError.message,
-      userId,
-    });
-    throw new AppError('Failed to fetch feed', 500, 'QUERY_FAILED');
-  }
-
-  if (!allTags || allTags.length === 0) {
-    return { photos: [], nextCursor: null };
-  }
-
-  // Group student IDs by photo
-  const photoStudentMap = new Map<string, string[]>();
-  for (const tag of allTags) {
-    const existing = photoStudentMap.get(tag.photo_id) ?? [];
-    existing.push(tag.student_id);
-    photoStudentMap.set(tag.photo_id, existing);
-  }
-
-  const photoIds = Array.from(photoStudentMap.keys());
-
-  // 3. Fetch photos with cursor pagination (created_at DESC, id DESC)
   let photosQuery = supabaseAdmin
     .from('photos')
-    .select('id, s3_key, thumbnail_s3_key, blurhash, width, height, status, created_at, uploaded_by, class_id')
-    .in('id', photoIds)
+    .select(
+      'id, s3_key, thumbnail_s3_key, blurhash, width, height, status, created_at, uploaded_by, class_id, photo_student_tags!inner(student_id)',
+    )
+    .in('photo_student_tags.student_id', studentIds)
     .eq('status', 'ready')
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
-    .limit(limit + 1);
+    .limit(OVERFETCH);
 
   if (cursor) {
     try {
@@ -118,8 +106,44 @@ export async function getFeed(
     throw new AppError('Failed to fetch feed', 500, 'QUERY_FAILED');
   }
 
-  const hasNext = (photos?.length ?? 0) > limit;
-  const results = photos?.slice(0, limit) ?? [];
+  // 3. Deduplicate. The inner join emits one row per matching tag, so a photo
+  //    containing two of this parent's children arrives twice.
+  //
+  //    hasNext is computed from the DEDUPLICATED count against `limit`, not from
+  //    the raw row count. The dead getParentFeed removed in Plan 03 got this
+  //    backwards and truncated the feed early whenever siblings appeared
+  //    together in a photo.
+  type TaggedRow = (typeof photos extends (infer R)[] | null ? R : never) & {
+    photo_student_tags?: Array<{ student_id: string }>;
+  };
+
+  const seen = new Set<string>();
+  const unique: TaggedRow[] = [];
+  const photoStudentMap = new Map<string, string[]>();
+
+  for (const row of (photos ?? []) as TaggedRow[]) {
+    // Only this parent's children — never reveal which other children appear.
+    const tagged = (row.photo_student_tags ?? [])
+      .map((t) => t.student_id)
+      .filter((id) => studentIds.includes(id));
+
+    if (seen.has(row.id)) {
+      const existing = photoStudentMap.get(row.id) ?? [];
+      photoStudentMap.set(row.id, [...new Set([...existing, ...tagged])]);
+      continue;
+    }
+    seen.add(row.id);
+    photoStudentMap.set(row.id, [...new Set(tagged)]);
+    unique.push(row);
+  }
+
+  // If the database returned the full over-fetch, it had more rows to give, so
+  // there may be further photos even when dedup leaves us at exactly `limit`.
+  // Erring towards `true` costs at most one empty page; erring towards `false`
+  // silently truncates a parent's feed, which is the failure mode that matters.
+  const hitFetchCeiling = (photos?.length ?? 0) >= OVERFETCH;
+  const hasNext = unique.length > limit || (hitFetchCeiling && unique.length >= limit);
+  const results = unique.slice(0, limit);
 
   // 4. The bucket is private, so every URL is signed. One batch call covers the
   //    whole page rather than two round trips per photo.
@@ -127,14 +151,18 @@ export async function getFeed(
     results.flatMap((p) => [p.s3_key, p.thumbnail_s3_key].filter(Boolean) as string[]),
   );
 
-  const feedPhotos: FeedPhoto[] = results.map((photo) => ({
-    ...photo,
-    url: signed.get(photo.s3_key) ?? '',
-    thumbnailUrl: photo.thumbnail_s3_key
-      ? (signed.get(photo.thumbnail_s3_key) ?? null)
-      : null,
-    taggedStudentIds: photoStudentMap.get(photo.id) ?? [],
-  }));
+  const feedPhotos: FeedPhoto[] = results.map((photo) => {
+    // photo_student_tags is a query artefact, not part of the API contract.
+    const { photo_student_tags: _tags, ...rest } = photo;
+    return {
+      ...rest,
+      url: signed.get(photo.s3_key) ?? '',
+      thumbnailUrl: photo.thumbnail_s3_key
+        ? (signed.get(photo.thumbnail_s3_key) ?? null)
+        : null,
+      taggedStudentIds: photoStudentMap.get(photo.id) ?? [],
+    };
+  });
 
   // 5. Build next cursor
   const nextCursor =
