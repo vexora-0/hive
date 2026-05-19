@@ -9,6 +9,7 @@ import {
   requestUploadUrl,
   uploadPhotoFile,
   tagStudents,
+  confirmUpload,
 } from '@/features/teacher/services/teacherService';
 
 // ---------------------------------------------------------------------------
@@ -21,6 +22,7 @@ export type ImageUploadState =
   | 'uploading'
   | 'saving'
   | 'tagging'
+  | 'confirming'
   | 'complete'
   | 'error';
 
@@ -83,6 +85,9 @@ export interface PickedAsset {
 // Retry config: 1s -> 2s -> 4s, max 3 attempts
 // ---------------------------------------------------------------------------
 
+/** Images uploaded simultaneously. Keeps total in-flight bytes reasonable on mobile data. */
+const UPLOAD_CONCURRENCY = 3;
+
 const RETRY_OPTIONS = {
   maxAttempts: 3,
   baseDelayMs: 1000,
@@ -118,6 +123,11 @@ export function useUpload(): UseUploadReturn {
   // Ref to track if upload is in progress (avoid stale closures)
   const isUploadingRef = useRef(false);
 
+  // Mirrors `images` so callbacks can read the current list without depending
+  // on it, which would recreate them on every progress tick.
+  const imagesRef = useRef<UploadImage[]>([]);
+  imagesRef.current = images;
+
   // ── Image mutation helpers ──────────────────────────────────────────
 
   const updateImage = useCallback(
@@ -133,6 +143,14 @@ export function useUpload(): UseUploadReturn {
 
   const addImages = useCallback(
     (assets: PickedAsset[]): number => {
+      // Counted from a ref, not from the `images` closure.
+      //
+      // The closure value is stale if addImages is called twice before React
+      // re-renders, and the setImages updater cannot be used to compute the
+      // return value either — React may run it after this function returns.
+      const remainingNow = MAX_UPLOAD_IMAGES - imagesRef.current.length;
+      const added = Math.max(0, Math.min(assets.length, remainingNow));
+
       setImages((prev) => {
         const remaining = MAX_UPLOAD_IMAGES - prev.length;
         const toAdd = assets.slice(0, remaining);
@@ -150,9 +168,9 @@ export function useUpload(): UseUploadReturn {
         return [...prev, ...newImages];
       });
 
-      return Math.min(assets.length, MAX_UPLOAD_IMAGES - images.length);
+      return added;
     },
-    [images.length],
+    [],
   );
 
   // ── Remove image ────────────────────────────────────────────────────
@@ -192,12 +210,26 @@ export function useUpload(): UseUploadReturn {
 
         // Step 5: Tag students (skip if none selected)
         if (studentIds.length > 0) {
-          updateImage(id, { state: 'tagging', progress: 0.9 });
+          updateImage(id, { state: 'tagging', progress: 0.88 });
           await retryWithBackoff(
             () => tagStudents(photoId, studentIds),
             RETRY_OPTIONS,
           );
         }
+
+        // Step 6: Confirm — flips the photo to 'ready'.
+        //
+        // This MUST come after tagging. The notify_parents_on_photo database
+        // trigger fires on the transition to 'ready' and loops over
+        // photo_student_tags; if no tags exist yet the loop body never runs and
+        // parents are never notified about the photo. (G-07)
+        //
+        // A failure here leaves the photo in 'processing' — invisible but
+        // recoverable via retryImage. That is strictly better than a 'ready'
+        // photo with no tags, which is invisible to parents AND generates no
+        // notification, with nothing to signal that anything went wrong.
+        updateImage(id, { state: 'confirming', progress: 0.95 });
+        await retryWithBackoff(() => confirmUpload(photoId), RETRY_OPTIONS);
 
         // Done
         updateImage(id, { state: 'complete', progress: 1 });
@@ -225,10 +257,19 @@ export function useUpload(): UseUploadReturn {
       const idleImages = images.filter((img) => img.state === 'idle');
       if (idleImages.length === 0) return;
 
-      // Process all images concurrently
-      await Promise.allSettled(
-        idleImages.map((img) => processImage(img, classId, studentIds)),
-      );
+      // Process in small batches rather than all at once.
+      //
+      // MAX_UPLOAD_IMAGES is 20 and the size cap is 25 MB, so an unbounded
+      // Promise.allSettled could put half a gigabyte in flight simultaneously.
+      // On mobile data that stalls the connection and tends to time out every
+      // request at once instead of failing one. (G-35)
+      for (let i = 0; i < idleImages.length; i += UPLOAD_CONCURRENCY) {
+        await Promise.allSettled(
+          idleImages
+            .slice(i, i + UPLOAD_CONCURRENCY)
+            .map((img) => processImage(img, classId, studentIds)),
+        );
+      }
 
       isUploadingRef.current = false;
 

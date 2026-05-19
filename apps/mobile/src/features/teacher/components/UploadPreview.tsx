@@ -41,6 +41,7 @@ const STATE_BADGE_VARIANT: Record<
   uploading: 'warning',
   saving: 'warning',
   tagging: 'warning',
+  confirming: 'warning',
   complete: 'success',
   error: 'error',
 };
@@ -52,6 +53,7 @@ const STATE_BADGE_LABEL: Record<ImageUploadState, string> = {
   uploading: 'Uploading',
   saving: 'Saving',
   tagging: 'Tagging',
+  confirming: 'Finishing',
   complete: 'Done',
   error: 'Error',
 };

@@ -32,6 +32,7 @@ const STATE_LABELS: Record<ImageUploadState, string> = {
   uploading: 'Uploading...',
   saving: 'Saving...',
   tagging: 'Tagging...',
+  confirming: 'Finishing...',
   complete: 'Done',
   error: 'Failed',
 };
