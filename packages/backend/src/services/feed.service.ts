@@ -152,8 +152,11 @@ export async function getFeed(
   );
 
   const feedPhotos: FeedPhoto[] = results.map((photo) => {
-    // photo_student_tags is a query artefact, not part of the API contract.
-    const { photo_student_tags: _tags, ...rest } = photo;
+    // photo_student_tags is a join artefact, not part of the API contract —
+    // strip it so it never reaches the client.
+    const rest = { ...photo } as Omit<TaggedRow, 'photo_student_tags'> &
+      Partial<Pick<TaggedRow, 'photo_student_tags'>>;
+    delete rest.photo_student_tags;
     return {
       ...rest,
       url: signed.get(photo.s3_key) ?? '',
