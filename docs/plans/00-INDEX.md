@@ -78,19 +78,26 @@ Every plan follows the same loop:
 
 ## Progress tracker
 
-| Plan | Branch | Status | Merged |
+| Plan | Owner | Status | Merged |
 |---|---|---|---|
-| 01 | `fix/quick-wins` | ☐ Not started | ☐ |
-| 02 | `fix/order-contract` | ☐ Not started | ☐ |
-| 03 | `security/private-photo-storage` | ☐ Not started | ☐ |
-| 04 | `security/authorization` | ☐ Not started | ☐ |
-| 05 | `fix/upload-and-feed` | ☐ Not started | ☐ |
-| 06 | `feat/demo-seed` | ☐ Not started | ☐ |
-| 07 | `feat/ux-completion` | ☐ Not started | ☐ |
-| 08 | `test/suite` | ☐ Not started | ☐ |
-| 09 | `ci/deploy` | ☐ Not started | ☐ |
-| 10 | `docs/submission` | ☐ Not started | ☐ |
-| 11 | `chore/qa` | ☐ Not started | ☐ |
+| 00 | Bhargav | ◐ Group B done by Srujan — 7 of 8 cleared, `ClassItem` mismatch remains | ☐ |
+| 01 | shared | ◐ Steps 4, 6, 7 done (Ruthwik). Steps 1, 2, 3, 5, 8 outstanding | ◐ |
+| 02 | Srujan | ☐ Not started | ☐ |
+| 03 | Ruthwik | ✔ Done — **runtime unverified, no `.env`** | ✔ |
+| 04 | Nagachaitanya | ☐ Not started | ☐ |
+| 05 | Ruthwik | ◐ Steps 1, 2, 3, 5 done. **Step 4 (G-34) reassigned to Nagachaitanya** | ✔ |
+| 06 | Srujan | ☐ Not started | ☐ |
+| 07 | Bhargav | ☐ Not started | ☐ |
+| 08 | all four | ☐ Not started | ☐ |
+| 09 | Ruthwik | ☐ Not started — **raised in priority**, creates the first `.env` | ☐ |
+| 10 | all four | ☐ Not started | ☐ |
+| 11 | all four | ☐ Not started | ☐ |
+
+### Open items needing an owner
+
+- **G-34** (`getSchools` N+1) — dropped from Plan 05 because `admin.service.ts` is Nagachaitanya's file. Needs adding to his Plan 04 or a follow-up.
+- **Nothing is runtime-verified.** No `.env` exists, so Plans 03 and 05 compile but have never run. Migration `00020` is not applied. Plan 09 should be pulled forward.
+- **`ClassItem` mismatch** — residual after Srujan's type regeneration; see Plan 00 Deviations.
 
 ---
 
@@ -109,14 +116,16 @@ Sequential execution means no range reservation is needed, but numbers must not 
 
 ---
 
-## Setup required before Plan 01
+## Setup
 
 ```bash
-cd /home/ruthwikchikoti/Documents/bits/major-project/hive
-pnpm install                 # node_modules is currently absent
-git checkout -b develop      # develop does not yet exist
-git push -u origin develop
+git checkout main && git pull
+pnpm install
 ```
+
+**We work on `main`.** A `develop` branch was created in W14 and abandoned the
+same week — half the team was committing to `main` directly and the two
+diverged. Short-lived per-plan branches are fine; merge them back the same day.
 
 Confirm the baseline builds before changing anything:
 ```bash

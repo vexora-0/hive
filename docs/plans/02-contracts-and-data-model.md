@@ -47,8 +47,8 @@ Per **DEC-6**, integer cents everywhere; format to dollars only at render.
 ## Prerequisites
 
 ```bash
-git checkout develop && git pull
-git checkout -b fix/order-contract develop
+git checkout main && git pull
+git checkout -b fix/order-contract main
 ```
 
 ---
@@ -293,7 +293,7 @@ fix(db): make policy migrations idempotent
 - [ ] `grep -rn "school_admin\|total_amount"` clean outside migrations
 - [ ] All migrations apply cleanly to a **fresh** database
 - [ ] Typecheck, lint, build all pass
-- [ ] Merged into `develop`
+- [ ] Merged into `main`
 - [ ] Index progress tracker updated
 
 ---

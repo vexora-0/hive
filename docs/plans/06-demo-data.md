@@ -43,8 +43,8 @@ Replace `seed.sql` with a TypeScript script that uses `supabase.auth.admin.creat
 ## Prerequisites
 
 ```bash
-git checkout develop && git pull
-git checkout -b feat/demo-seed develop
+git checkout main && git pull
+git checkout -b feat/demo-seed main
 ```
 
 You need `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` in `packages/backend/.env`, plus `ADMIN_EMAIL`/`ADMIN_PASSWORD` from Plan 01 Step 4.
@@ -228,7 +228,7 @@ docs(seed): document demo accounts and the recommended demo path
 - [ ] Both notification types exist in the database
 - [ ] All three roles have a rich, demo-ready experience
 - [ ] `DEMO_USERS.md` written and verified against the real data
-- [ ] Merged into `develop`
+- [ ] Merged into `main`
 
 ---
 

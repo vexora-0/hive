@@ -208,10 +208,49 @@ fix(upload): compute added image count from current state
 - [ ] Admin schools list issues 3 queries, not 2N+1
 - [ ] Uploads run 3 at a time
 - [ ] Typecheck, lint, build pass
-- [ ] Merged into `develop`
+- [ ] Merged into `main`
 
 ---
 
 ## Deviations
 
-*Record here anything that differed from this plan, and why.*
+### Partially completed by Ruthwik, W16 (18–20 May)
+
+| Step | Status |
+|---|---|
+| 1 — tag before ready (G-07) | **Done.** Backend half landed in Plan 03; the mobile pipeline now adds a `confirming` state and calls `confirmUpload` after tagging. |
+| 2 — feed query rewrite (G-14) | **Done.** |
+| 3 — delete dead `getParentFeed` (G-15) | **Done in Plan 03.** |
+| 4 — `getSchools` N+1 (G-34) | **NOT DONE — belongs to Nagachaitanya.** |
+| 5 — upload concurrency (G-35) | **Done**, plus the `addImages` stale-closure count. |
+
+**Step 4 was not done deliberately.** It lives in `services/admin.service.ts`,
+which is Nagachaitanya's file under the ownership map. Editing it would have
+collided with his Plan 01 and Plan 04 work. **G-34 needs reassigning to him.**
+
+**Step 2 differs from the plan's sketch.** The plan suggested a Postgres RPC as
+the fallback if PostgREST cursor syntax proved unreliable through a join. The
+PostgREST version works — `photo_student_tags!inner` with the filter on
+`photo_student_tags.student_id`. No RPC needed.
+
+Two details the plan did not anticipate:
+
+- **`hasNext` needs a fetch-ceiling check.** Over-fetching `limit * 2 + 1` and
+  deduplicating can leave exactly `limit` unique photos while more exist, which
+  would silently truncate the feed. `hasNext` is now true when the raw row count
+  hits the ceiling, even at exactly `limit`. A spurious empty page is a far
+  better failure than a truncated feed.
+- **The join artefact must be stripped.** `photo_student_tags` comes back on
+  every row and is not part of the API contract.
+
+**Step 5's `addImages` fix is not what the plan described.** The plan says to
+compute the count inside the `setImages` updater. React may run that updater
+after the function returns, so the count would be `0` — worse than the stale
+value it replaces. It reads from a ref mirroring `images` instead.
+
+### Not verified — no `.env` exists
+
+The feed rewrite is the highest-risk change here and has **not been run against
+real data**. Specifically untested: pagination across pages, the sibling-dedup
+path, and the 414 case the rewrite exists to fix. The plan's suggested load
+sanity check — 500 tag rows on one student — has not been done.

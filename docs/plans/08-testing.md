@@ -224,7 +224,7 @@ ci: add test task to the turbo pipeline
 - [ ] Each of the four sabotage checks fails the expected test
 - [ ] `pnpm test` works from the repo root
 - [ ] `.env.test` is gitignored; `.env.test.example` is committed
-- [ ] Merged into `develop`
+- [ ] Merged into `main`
 
 ---
 

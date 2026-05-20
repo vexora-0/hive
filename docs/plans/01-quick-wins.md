@@ -19,7 +19,7 @@ The headline item is **G-03**: three screens say "Coming Soon" while ~700 lines 
 
 ```bash
 pnpm install
-git checkout -b fix/quick-wins develop
+git checkout -b fix/quick-wins main
 ```
 
 ---
@@ -200,7 +200,7 @@ Step 8 has no commit — it is a dashboard change. Note it in the PR description
 - [ ] Zero occurrences of `school_admin` or `Admin@123` in the repo
 - [ ] No screen in the app reads "Coming Soon"
 - [ ] A real OTP email arrives within 30 seconds
-- [ ] Merged into `develop`
+- [ ] Merged into `main`
 - [ ] `docs/plans/00-INDEX.md` progress tracker updated
 
 ---

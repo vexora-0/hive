@@ -78,9 +78,16 @@ Work is parallel, but three things are sequenced:
 ## 5. How to work
 
 ```bash
-git checkout develop && git pull
-git checkout -b <branch-from-your-plan> develop
+git checkout main && git pull
 ```
+
+**We work on `main`.** There is no long-lived `develop` branch — it was tried
+and dropped, because half the team was committing to `main` directly and the
+two diverged.
+
+A short-lived branch for your own plan is fine and encouraged if you want one —
+create it, do the work, merge it back to `main` the same day, delete it. What
+matters is that nothing sits unmerged for days where the others cannot see it.
 
 Then, for your plan:
 
@@ -88,7 +95,7 @@ Then, for your plan:
 2. **Follow the steps in order.**
 3. **Run every check** in the plan's Verification section. All must pass.
 4. **Commit using the plan's commit sequence** — the messages are already written.
-5. **Open a PR into `develop`.** One approval from another team member.
+5. **Merge to `main` the same day** and push. Ask someone to look over anything touching auth, storage or orders.
 6. **Tick the plan's Done-when checklist.**
 
 Always verify before committing:
@@ -157,7 +164,7 @@ A task is not finished because the code is written. All of these must hold:
 - Loading, error and empty states present in any UI
 - `pnpm typecheck` and `pnpm lint` pass with no new warnings
 - No console errors during the flow
-- Conventional commit message, reviewed, merged into `develop`
+- Conventional commit message, reviewed, merged to `main` and pushed
 
 ---
 

@@ -208,7 +208,7 @@ chore(scripts): add database migration and reset commands
 - [ ] Sentry receiving scrubbed events from both apps
 - [ ] APK installable and working against the deployed backend
 - [ ] Rollback procedure written
-- [ ] Merged into `develop`, then `develop` → `main`, tagged `v0.9.0`
+- [ ] Merged into `main`, then `develop` → `main`, tagged `v0.9.0`
 
 ---
 

@@ -155,7 +155,7 @@ fix(ui): flatten nested style prop typing in text input
 
 - [ ] `pnpm typecheck` passes across the whole monorepo
 - [ ] App runs with no visual or behavioural regression on the checklist above
-- [ ] Merged into `develop`
+- [ ] Merged into `main`
 - [ ] **Announce it** — this unblocks all three other developers
 
 ---
