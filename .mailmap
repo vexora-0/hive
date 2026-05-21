@@ -1,0 +1,10 @@
+# Canonical names. Git config differs across the team's machines, so without
+# this `git shortlog` splits one person into several contributors.
+Ruthwik <chikotiruthwik@gmail.com> <chikotiruthwik@gmail.com>
+Ruthwik <chikotiruthwik@gmail.com> ruthwikchikoti <chikotiruthwik@gmail.com>
+Bhargav <bhargav4g13132@gmail.com> <bhargav4g13132@gmail.com>
+Bhargav <bhargav4g13132@gmail.com> vexora-0 <bhargav4g13132@gmail.com>
+Srujan <dharmassr@gmail.com> <dharmassr@gmail.com>
+Srujan <dharmassr@gmail.com> srujan0404 <dharmassr@gmail.com>
+Nagachaitanya <vanapalachaitanya@gmail.com> <vanapalachaitanya@gmail.com>
+Nagachaitanya <vanapalachaitanya@gmail.com> chay2203 <vanapalachaitanya@gmail.com>
