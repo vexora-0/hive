@@ -42,9 +42,11 @@ export async function authenticate(
     } = await supabaseAdmin.auth.getUser(token);
 
     if (error || !user) {
+      // No req.ip — it is PII, and an invalid token is not worth storing an
+      // identifiable address for.
       logger.warn('Invalid auth token', {
+        requestId: req.requestId,
         error: error?.message,
-        ip: req.ip,
       });
       res.status(401).json({
         success: false,
@@ -82,7 +84,12 @@ export async function authenticate(
 
     next();
   } catch (err) {
-    logger.error('Authentication error', { error: err });
+    // err.message only — a Supabase error object can embed request context
+    // including the bearer token.
+    logger.error('Authentication error', {
+      requestId: req.requestId,
+      error: err instanceof Error ? err.message : String(err),
+    });
     res.status(500).json({
       success: false,
       message: 'Internal authentication error',

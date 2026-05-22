@@ -4,6 +4,8 @@ import cors from 'cors';
 import { env } from './config/env';
 import { globalRateLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
+import { requestId } from './middleware/requestId';
+import { supabaseAdmin } from './config/supabase';
 import { logger } from './config/logger';
 
 // Import route modules
@@ -23,6 +25,9 @@ const app: Express = express();
 // client-controlled X-Forwarded-For header — and the rate limiter keys on req.ip,
 // so a client could rotate that header to bypass rate limiting entirely.
 app.set('trust proxy', 1);
+
+// Correlation ID first, so every later log line and error carries it.
+app.use(requestId);
 
 // Security headers
 app.use(helmet());
@@ -48,22 +53,52 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 // Global rate limiter
 app.use(globalRateLimiter);
 
-// Request logging
-app.use((req, _res, next) => {
-  logger.debug(`${req.method} ${req.path}`, {
-    ip: req.ip,
-    userAgent: req.headers['user-agent'],
+// Request logging.
+//
+// Logged at `info`, not `debug` — the production level is `info`, so the
+// previous debug call meant production had no request log at all. Emitted on
+// response finish so status and duration are known.
+app.use((req, res, next) => {
+  const startedAt = process.hrtime.bigint();
+  res.on('finish', () => {
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+    logger.info(`${req.method} ${req.path}`, {
+      requestId: req.requestId,
+      status: res.statusCode,
+      durationMs: Math.round(durationMs),
+      userAgent: req.headers['user-agent'],
+    });
   });
   next();
 });
 
-// Health check
-app.get('/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
+// Health check.
+//
+// Actually verifies the database, so a backend that cannot reach Supabase
+// reports unhealthy instead of letting the platform keep routing traffic to it.
+// Deliberately returns a boolean only — this endpoint is public and must not
+// leak connection details.
+app.get('/health', async (_req, res) => {
+  let database: 'ok' | 'error' = 'error';
+  try {
+    const { error } = await Promise.race([
+      supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true }),
+      new Promise<{ error: Error }>((resolve) =>
+        setTimeout(() => resolve({ error: new Error('timeout') }), 2000),
+      ),
+    ]);
+    if (!error) database = 'ok';
+  } catch {
+    database = 'error';
+  }
+
+  res.status(database === 'ok' ? 200 : 503).json({
+    status: database === 'ok' ? 'ok' : 'degraded',
     service: 'hive-backend',
     version: '1.0.0',
+    uptimeSeconds: Math.round(process.uptime()),
+    timestamp: new Date().toISOString(),
+    checks: { database },
   });
 });
 
