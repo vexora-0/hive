@@ -16,7 +16,6 @@ import {
 
 import { queryClient } from '@/lib/queryClient';
 import { ErrorBoundary } from '@/components/feedback';
-import { useAuthStore } from '@/features/auth/stores/authStore';
 import { useSession } from '@/features/auth/hooks/useSession';
 
 // ---------------------------------------------------------------------------
@@ -39,9 +38,10 @@ export default function RootLayout() {
   });
 
   // ── Auth ────────────────────────────────────────────────────────────
+  // Only the loading flag is needed here — it gates the splash screen. Which
+  // group a user may enter is decided by <RoleGate> inside each group layout,
+  // so that deep links are covered too.
   const { isLoading: authLoading } = useSession();
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const role = useAuthStore((s) => s.role);
 
   // ── Hide splash when ready ─────────────────────────────────────────
   const isReady = (fontsLoaded || !!fontError) && !authLoading;
