@@ -80,10 +80,10 @@ Every plan follows the same loop:
 
 | Plan | Branch | Status | Merged |
 |---|---|---|---|
-| 01 | `fix/quick-wins` | ☐ Not started | ☐ |
+| 01 | *(committed to `main`)* | ◐ Steps 1, 3, 5 done — 2, 4, 6, 7, 8 outstanding | n/a |
 | 02 | `fix/order-contract` | ☐ Not started | ☐ |
 | 03 | `security/private-photo-storage` | ☐ Not started | ☐ |
-| 04 | `security/authorization` | ☐ Not started | ☐ |
+| 04 | *(committed to `main`)* | ◐ Code complete, unverified — see Deviations | n/a |
 | 05 | `fix/upload-and-feed` | ☐ Not started | ☐ |
 | 06 | `feat/demo-seed` | ☐ Not started | ☐ |
 | 07 | `feat/ux-completion` | ☐ Not started | ☐ |
@@ -102,6 +102,7 @@ Sequential execution means no range reservation is needed, but numbers must not 
 |---|---|
 | 02 | `00017_align_product_types.sql`, `00018_order_totals_cents.sql`, `00019_fix_fk_constraints.sql` |
 | 03 | `00020_photos_bucket_private.sql` |
+| 04 | none — every fix is in the service layer, so `00022` stays unallocated |
 | 05 | — (no schema change) |
 | 06 | — (seeding is a TS script, not a migration) |
 | 07 | — |

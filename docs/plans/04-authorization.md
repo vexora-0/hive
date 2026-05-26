@@ -215,4 +215,72 @@ This plan produces good viva material. Record for Plan 10's security document:
 
 ## Deviations
 
-*Record here anything that differed from this plan, and why.*
+**Step 1 — one filtered query instead of a count plus a filter.** The plan asks
+for a `head: true` count for the ownership check and, separately, filtering
+`taggedStudentIds` afterwards. Both requirements are satisfied by a single
+query: fetch the caller's own student IDs, then select `photo_student_tags` for
+this photo `.in('student_id', ownStudentIds)`. Empty means not entitled;
+non-empty *is* the filtered tag list. One round trip fewer, and it avoids
+relying on a PostgREST embed between `photo_student_tags` and
+`parent_student_mappings`, which have no direct foreign key between them — the
+join the plan sketches would have had to route through `students`.
+
+A parent with no children mapped at all short-circuits to 404 before the tag
+query runs.
+
+**Step 2b — `getPhotosByClass` takes `AuthUser`, not a school ID.** The plan
+offers "a `userId` (or `schoolId`) parameter". Neither works alone: platform
+admins carry `school_id = null`, so a bare school comparison locks them out of
+every class. Passing the whole `AuthUser` lets the admin bypass sit next to the
+check it bypasses, and matches the shape the plan already chose for
+`assertPhotoOwnership`.
+
+**Step 2a — `assertSchoolAccess` is used on all three handlers**, including
+`POST /schools/:id/classes`. That route is already `roleGuard('admin')`, so the
+call is a no-op today; it is there so the route stays correct if the guard is
+ever widened.
+
+**Step 3 — tagging is uploader-scoped.** The plan explicitly leaves this open
+and asks for a decision. Decided: `tagStudents` uses the same
+`assertPhotoOwnership` guard as `/file` and `/confirm`, so a teacher may tag
+only photos they uploaded. Letting a colleague at the same school tag your photo
+is a defensible product choice, but nothing in the app needs it, and one guard
+across three routes is easier to keep correct than two that differ subtly. The
+reasoning is in the guard's doc comment.
+
+`saveUploadedFile` unlinks the temp file when the ownership check refuses —
+multer has already written it to disk by the time the service runs, so without
+this a rejected upload leaves the file behind.
+
+**Step 5 — verified, no change, as predicted.** Every `401` in the backend is an
+authentication failure: `auth.ts:29` (missing header), `:49` (invalid token),
+`:68` (no profile row), and two defensive `!req.user` branches in `roleGuard.ts`.
+Every authorization failure returns `403`. So `lib/api.ts`'s sign-out-on-401
+stays correct now that a role mismatch yields 403.
+
+**Migration `00022` was reserved for this plan but not used.** Plan 04 contains
+no schema change — every fix is in the service layer, which is the point. The
+number stays unallocated rather than being consumed.
+
+**Plan 03 has not been started, and this plan nominally depends on it.** The
+overlap is `feed.service.getPhotoDetails`, which both plans edit. The
+authorization block added here sits above the URL construction and does not
+touch it, so Plan 03 can replace the `/uploads/...` strings with signed Supabase
+Storage URLs without conflict.
+
+### Not verified
+
+The repository contains no `.env`, so the backend cannot boot, the app cannot
+run, and no Supabase call can be made. **None of the Verification section above
+has been executed** — not one curl, not one device check. The four IDOR fixes
+and the route guards are reviewed code, not observed behaviour.
+
+What was verified: `pnpm typecheck` (backend clean throughout), `pnpm lint` (8
+problems, down from 9, all pre-existing), and a per-commit diff of the mobile
+typecheck output against the 22-error Plan 00 baseline — identical after every
+mobile change, with no error in `RoleGate.tsx`, any `_layout.tsx`, or any
+`notifications.tsx`.
+
+The Done-when boxes are deliberately left unticked. They should be ticked by
+whoever first runs this against a real backend with two accounts at different
+schools.

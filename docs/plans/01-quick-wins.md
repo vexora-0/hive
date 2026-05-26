@@ -207,4 +207,32 @@ Step 8 has no commit — it is a dashboard change. Note it in the PR description
 
 ## Deviations
 
-*Record here anything that differed from this plan, and why.*
+**Only Steps 1, 3 and 5 were done, by Nagachaitanya.** Plan 01 is eight independent
+tasks split across the team (`PHASE-2-EXECUTION-PLAN.md` §4): Steps 2 and 7 are
+Srujan's, Steps 6 and 7 Ruthwik's. Step 8 is a Supabase dashboard task requiring
+account access. The Done-when checklist above therefore cannot be ticked as a
+whole yet — the `Admin@123` grep and the `.env.example` items belong to Step 4/7.
+
+**Step 3 was already partly done.** `UserEditSheet.tsx` offers no role picker
+containing `school_admin`, and `types/supabase.ts` already declares
+`UserRole = 'teacher' | 'parent' | 'admin'`. Only the three backend files needed
+changing. `grep -rn "school_admin" packages apps supabase` now returns nothing.
+
+**A note was added to `notifyAdminsOfNewOrder` rather than left implicit.** The
+plan flags that platform admins have `school_id = null` and so will not receive
+the notification; that is now stated in the code, so the next reader does not
+rediscover it as a bug.
+
+**Step 5's regex is the plan's, unchanged.** `/[,()\\.*%]/g`. The guard also
+skips the filter entirely when nothing survives stripping, so a search of `...`
+returns the unfiltered list rather than matching `%%`.
+
+### Not verified
+
+The repository contains no `.env` — only `.env.example` — so the backend cannot
+boot and the app cannot run. Every manual check in the Verification section
+above is untested: the three Alerts tabs have not been seen on a device, and the
+search behaviour has not been exercised against a live PostgREST. What was
+verified is static: `pnpm typecheck` (backend clean, mobile unchanged at its 22
+pre-existing Plan 00 errors), `pnpm lint` (no new problems; one pre-existing
+warning removed), and the `school_admin` grep.
