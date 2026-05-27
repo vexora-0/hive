@@ -40,7 +40,32 @@ Match it against the table. **This determines what you work on.** If the email d
 
 ---
 
-## 3. Current state
+## 3. Progress — updated 21 May (W16)
+
+| Plan | Owner | Status |
+|---|---|---|
+| **00** typecheck | Bhargav | ◐ Group B done by Srujan. **15 of 22 errors remain** — Groups A, C, D, E. |
+| **01** quick wins | shared | ◐ Steps 4, 6, 7 done (Ruthwik). **Steps 1, 2, 3, 5, 8 outstanding.** |
+| **02** order contract | Srujan | ☐ Not started |
+| **03** storage & media | Ruthwik | ✔ Done — **runtime unverified** |
+| **04** authorization | Nagachaitanya | ☐ Not started |
+| **05** upload & feed perf | Ruthwik | ✔ Done except Step 4 → reassigned |
+| **06** demo seed | Srujan | ☐ Not started |
+| **07** UX completion | Bhargav | ☐ Not started |
+| **08** tests | all four | ☐ Blocked — needs a test Supabase project |
+| **09** deployment | Ruthwik | ◐ Docker, CI, health check, request IDs done. **Render deploy needs an account.** |
+| **10** docs · **11** QA | all four | ☐ Not started |
+
+### Blocking right now
+
+1. **The app still does not compile** — 15 mobile type errors. Bhargav's Plan 00, Groups A, C, D, E. Everything else is unverifiable until this clears.
+2. **Nothing has been run.** There is no `.env`, migration `00020` is not applied, and no photo has ever been uploaded to the private bucket. Plans 03 and 05 compile and that is the whole claim. **Creating a working `.env` is the single highest-value action available.**
+3. **Three "Coming Soon" screens are still live** — Plan 01 Step 1, Nagachaitanya. About an hour of work; ~700 lines of finished code sit unimported.
+4. **G-34** (`getSchools` N+1) has no owner. Dropped from Plan 05 because `admin.service.ts` is Nagachaitanya's file.
+
+---
+
+## 3a. Current state
 
 **Phase 1 is complete** — the application is built: database schema with row level security, a 22-endpoint API, teacher upload with student tagging, a privacy-scoped parent feed, an admin console, and a full design system.
 
