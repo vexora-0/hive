@@ -14,7 +14,10 @@
     "build:backend": "pnpm --filter @hive/backend build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "clean": "turbo run clean"
+    "clean": "turbo run clean",
+    "db:migrate": "supabase db push",
+    "db:reset": "supabase db reset",
+    "db:diff": "supabase db diff"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.3.0",
