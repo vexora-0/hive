@@ -764,4 +764,78 @@ Phase 2 begins with a full codebase audit, then addresses the items above in dep
 
 ---
 
+# Phase 2
+
+# Week 17 — Authorization & Access Control
+
+**Dates:** 24 May 2026 – 30 May 2026
+**Commits:** 12 — Nagachaitanya 12
+**Covers:** Plan 01 (Steps 1, 3, 5) and Plan 04, worked across Weeks 14–17
+
+## Phase objective
+
+Close the four IDOR findings in the API, stop the app rendering screens the signed-in user has no right to see, and wire up the notification centre that Phase 1 left unimported.
+
+## Individual contributions
+
+**Nagachaitanya** did all twelve commits in this window. Weeks 14 to 17 were scheduled as four people working in parallel on Plans 00, 02, 03 and 04; in practice only Plan 01's authorization and notification items and Plan 04 were started. Plan 00 (Bhargav), Plan 02 (Srujan) and Plan 03 (Ruthwik) have not begun, so the mobile package still fails `tsc --noEmit` with the same 22 errors it carried out of Phase 1, and photo storage is still local disk served without authentication.
+
+The commit split above is not a four-way split, and this report does not present it as one.
+
+## Important technical implementation
+
+The root cause of all four IDORs is one architectural fact: the backend queries exclusively through `supabaseAdmin`, built with `SUPABASE_SERVICE_KEY`, and the service-role key is exempt from row level security by design. The 505-line policy set in migration `00011` therefore never sees an API request — it protects only the four places the mobile app talks to Supabase directly. Every endpoint has to re-implement authorization by hand, and in four places it did not.
+
+`feed.service.getPhotoDetails` accepted no user ID at all and filtered only on `status='ready'`, so any parent iterating photo UUIDs could retrieve any photo in the system together with its full tagged-student list — a cross-school child roster. It now requires that one of the caller's own children is tagged in the photo, and returns 404 rather than 403 on refusal: a 403 confirms the photo exists, which is itself a leak when IDs are enumerable. It also returns only the caller's own children in `taggedStudentIds`, because authorization is not binary — a parent entitled to the photo is still not entitled to know who else is in it.
+
+`assertSchoolAccess` in `middleware/roleGuard.ts` and `assertPhotoOwnership` in `photo.service.ts` are the two new guards. Both allow platform admins through explicitly, which matters because admins carry `school_id = null` and a plain equality check would lock them out of everything.
+
+On the client, `RoleGate` wraps each group's navigator. `app/index.tsx` already redirected by role, but it is only consulted when entering through the root, and `hive://` is a registered scheme — so `hive://(admin)/dashboard` mounted the admin console for a parent. The component's doc comment states that it is a UX control and not a security control, so that nobody later mistakes it for the boundary.
+
+## Issues and challenges
+
+**Nothing could be run.** The repository has no `.env`, only `.env.example`, so the backend cannot boot, the app cannot start, and no Supabase call can be made. Plan 04's Verification section is eight curl checks across two accounts at different schools plus six device checks, and not one of them has been executed. The fixes are reviewed code, not observed behaviour, and the Done-when boxes have been left unticked to say so.
+
+Verification was therefore static: `pnpm typecheck`, `pnpm lint`, and a per-commit diff of the mobile typecheck output against the 22-error baseline captured before any change. That baseline held identical after every mobile commit, with no error in `RoleGate.tsx`, any `_layout.tsx`, or any `notifications.tsx`.
+
+Plan 04 is documented as depending on Plan 03, which has not started. The overlap is `getPhotoDetails`, which both plans edit. The authorization block sits above the URL construction and does not touch it, so Plan 03 can swap `/uploads/...` for signed Storage URLs without conflict.
+
+One decision was left open by the plan and had to be made: whether tagging a student requires being the photo's uploader or merely a teacher at the same school. Uploader, matching `/file` and `/confirm`, so a single guard covers all three routes.
+
+## Testing and validation
+
+No automated tests exist yet — Plan 08 has not started. Static checks only:
+
+- `pnpm --filter @hive/backend typecheck` — clean after every commit
+- `pnpm lint` — 8 problems, down from 9; all remaining are pre-existing and none are in code touched this week
+- `pnpm --filter @hive/mobile typecheck` — 22 errors, byte-identical to the pre-work baseline
+- `grep -rn "school_admin" packages apps supabase` — no matches
+
+## Relevant commits
+
+```
+feat(notifications): wire notification centre into all three role screens
+refactor(rbac): remove unsupported school_admin role across API and app
+security(admin): sanitise user search to prevent PostgREST filter injection
+security(feed): enforce parent ownership on the photo detail endpoint
+security(feed): return only the requesting parent's tagged children
+security(schools): scope class and student listings to the caller's school
+security(photos): scope class photo listing to the caller's school
+security(photos): verify photo ownership on file upload, confirm and tag
+feat(auth): add RoleGate component for route-level access control
+security(app): guard parent, teacher and admin route groups by role
+refactor(app): remove unused auth state reads from the root layout
+docs(plans): record plan 01 and 04 deviations and update the tracker
+```
+
+## End state
+
+G-03, G-04, G-05, G-08, G-09, G-16 and G-17 are addressed in code and unverified in practice. No screen in the app reads "Coming Soon". Checkpoint CP-2 is not met: it also requires an order to be placeable (Plan 02) and photos in private storage with thumbnails (Plan 03), neither of which has been started.
+
+## Next week
+
+Plan 08's backend test harness — Vitest and Supertest, with a guard that refuses to run against the demo database. Writing the auth and RBAC tests is the only way the authorization work above stops being unverified, and T-6 and T-7 exist precisely to catch a regression of this week's two worst findings.
+
+---
+
 *Hive · Ruthwik, Bhargav, Srujan, Nagachaitanya*
