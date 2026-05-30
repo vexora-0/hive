@@ -40,28 +40,45 @@ Match it against the table. **This determines what you work on.** If the email d
 
 ---
 
-## 3. Progress — updated 21 May (W16)
+## 3. Progress — updated 30 May (end of W17)
 
 | Plan | Owner | Status |
 |---|---|---|
 | **00** typecheck | Bhargav | ◐ Group B done by Srujan. **15 of 22 errors remain** — Groups A, C, D, E. |
-| **01** quick wins | shared | ◐ Steps 4, 6, 7 done (Ruthwik). **Steps 1, 2, 3, 5, 8 outstanding.** |
+| **01** quick wins | shared | ◐ Steps 4, 6, 7 done. **Steps 1, 2, 3, 5, 8 outstanding.** |
 | **02** order contract | Srujan | ☐ Not started |
-| **03** storage & media | Ruthwik | ✔ Done — **runtime unverified** |
+| **03** storage & media | Ruthwik | ✔ Done — **never executed** |
 | **04** authorization | Nagachaitanya | ☐ Not started |
 | **05** upload & feed perf | Ruthwik | ✔ Done except Step 4 → reassigned |
 | **06** demo seed | Srujan | ☐ Not started |
 | **07** UX completion | Bhargav | ☐ Not started |
 | **08** tests | all four | ☐ Blocked — needs a test Supabase project |
-| **09** deployment | Ruthwik | ◐ Docker, CI, health check, request IDs done. **Render deploy needs an account.** |
-| **10** docs · **11** QA | all four | ☐ Not started |
+| **09** deployment | Ruthwik | ◐ Docker, CI, health check, request IDs, db scripts done. **Render deploy needs an account.** |
+| **10** docs | all four | ☐ Not started |
+| **11** QA & load | all four | ◐ k6 suite written, cannot run without a deployment |
 
-### Blocking right now
+**Weeks 14–17 complete.** 35 commits. See `docs/PROGRESS-REPORT.md`.
 
-1. **The app still does not compile** — 15 mobile type errors. Bhargav's Plan 00, Groups A, C, D, E. Everything else is unverifiable until this clears.
-2. **Nothing has been run.** There is no `.env`, migration `00020` is not applied, and no photo has ever been uploaded to the private bucket. Plans 03 and 05 compile and that is the whole claim. **Creating a working `.env` is the single highest-value action available.**
-3. **Three "Coming Soon" screens are still live** — Plan 01 Step 1, Nagachaitanya. About an hour of work; ~700 lines of finished code sit unimported.
-4. **G-34** (`getSchools` N+1) has no owner. Dropped from Plan 05 because `admin.service.ts` is Nagachaitanya's file.
+### Blocking right now, in priority order
+
+1. **No `.env` exists.** Migration `00020` is unapplied and no photo has ever
+   been uploaded to the private bucket. Roughly 25 commits — the storage
+   rewrite, the feed query, the upload pipeline, observability — compile and
+   have **never executed**. Creating a working environment is the single
+   highest-value action available and unblocks Plans 08, 09 and 11.
+2. **The app still does not compile** — 15 mobile type errors. Bhargav's Plan 00,
+   Groups A, C, D, E.
+3. **Three "Coming Soon" screens are live** — Plan 01 Step 1, Nagachaitanya.
+   About an hour; ~700 lines of finished code sit unimported.
+4. **G-34** (`getSchools` N+1) has no owner — dropped from Plan 05 because
+   `admin.service.ts` belongs to Nagachaitanya.
+
+### Verified vs written
+
+Be precise about this when reporting progress. **Verified:** backend typecheck,
+build and lint; mobile error count. **Written but never run:** private storage,
+signed URLs, thumbnail generation, HEIC conversion, the feed join, the upload
+confirm step, the Docker image, the CI workflow, the k6 suite.
 
 ---
 
