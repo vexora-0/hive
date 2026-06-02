@@ -12,3 +12,4 @@ android/
 demo/
 projectidea.md
 System Architecture & Technical Design.md
+.env.test

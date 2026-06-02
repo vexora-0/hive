@@ -19,7 +19,7 @@ Match it against the table. **This determines what you work on.** If the email d
 | Email | Name | Owns | Current plan |
 |---|---|---|---|
 | `chikotiruthwik@gmail.com` | **Ruthwik** | Backend APIs, storage, jobs, server assembly | `docs/plans/03-storage-and-media.md` |
-| `bhargav4g13132@gmail.com` | **Bhargav** | Mobile UI, design system, components, screens | `docs/plans/00-typecheck-fixes.md` |
+| `bhargav4g13132@gmail.com` | **Bhargav** | Mobile UI, design system, components, screens · **environment setup, Docker, deployment** | `docs/plans/00-typecheck-fixes.md`, then `docs/environment-setup.md` |
 | `dharmassr@gmail.com` | **Srujan** | Database schema, migrations, validation, data | `docs/plans/02-contracts-and-data-model.md` |
 | `vanapalachaitanya@gmail.com` | **Nagachaitanya** | Auth, authorization, notifications, admin | `docs/plans/04-authorization.md` |
 
@@ -53,7 +53,7 @@ Match it against the table. **This determines what you work on.** If the email d
 | **06** demo seed | Srujan | ☐ Not started |
 | **07** UX completion | Bhargav | ☐ Not started |
 | **08** tests | all four | ☐ Blocked — needs a test Supabase project |
-| **09** deployment | Ruthwik | ◐ Docker, CI, health check, request IDs, db scripts done. **Render deploy needs an account.** |
+| **09** deployment | **Bhargav** | ◐ Docker, CI, health check, request IDs, db scripts written. **Env setup and Render deploy outstanding — see `docs/environment-setup.md`.** |
 | **10** docs | all four | ☐ Not started |
 | **11** QA & load | all four | ◐ k6 suite written, cannot run without a deployment |
 
@@ -61,11 +61,12 @@ Match it against the table. **This determines what you work on.** If the email d
 
 ### Blocking right now, in priority order
 
-1. **No `.env` exists.** Migration `00020` is unapplied and no photo has ever
-   been uploaded to the private bucket. Roughly 25 commits — the storage
-   rewrite, the feed query, the upload pipeline, observability — compile and
-   have **never executed**. Creating a working environment is the single
-   highest-value action available and unblocks Plans 08, 09 and 11.
+1. **No `.env` exists — Bhargav owns this.** Migration `00020` is unapplied and
+   no photo has ever been uploaded to the private bucket. Roughly 25 commits —
+   the storage rewrite, the feed query, the upload pipeline, observability —
+   compile and have **never executed**. Follow `docs/environment-setup.md`; it
+   ends with the verification checklist nobody has been able to run. This is the
+   single highest-value action available and unblocks Plans 08, 09 and 11.
 2. **The app still does not compile** — 15 mobile type errors. Bhargav's Plan 00,
    Groups A, C, D, E.
 3. **Three "Coming Soon" screens are live** — Plan 01 Step 1, Nagachaitanya.
