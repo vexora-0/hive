@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as photoService from '../services/photo.service';
+import { AppError } from '../middleware/errorHandler';
 import { success, paginated } from '../utils/apiResponse';
 import type { RequestUploadInput, TagStudentsInput, GetPhotosInput } from '../validators/photo.validator';
 
@@ -29,8 +30,7 @@ export async function uploadFile(
     const { id } = req.params;
 
     if (!req.file) {
-      res.status(400).json({ success: false, message: 'No file provided', code: 'NO_FILE' });
-      return;
+      throw new AppError('No file provided', 400, 'NO_FILE');
     }
 
     await photoService.saveUploadedFile(id, req.file.path);
@@ -84,12 +84,11 @@ export async function getPhotos(
     const query = req.query as unknown as GetPhotosInput;
 
     if (!query.classId) {
-      res.status(400).json({
-        success: false,
-        message: 'classId query parameter is required',
-        code: 'VALIDATION_ERROR',
-      });
-      return;
+      throw new AppError(
+        'classId query parameter is required',
+        400,
+        'VALIDATION_ERROR',
+      );
     }
 
     const result = await photoService.getPhotosByClass(

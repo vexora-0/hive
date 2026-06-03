@@ -194,11 +194,15 @@ export async function getPhotoDetails(photoId: string) {
   }
 
   // Get class and school names
+  // PostgREST types an embedded to-one relation as an array, so it is narrowed
+  // here rather than cast away with `any`.
+  type ClassRow = { name: string | null; schools: { name: string | null } | null };
   const { data: classData } = await supabaseAdmin
     .from('classes')
     .select('name, schools(name)')
     .eq('id', photo.class_id)
     .single();
+  const classRow = classData as ClassRow | null;
 
   const signed = await getSignedPhotoUrls(
     [photo.s3_key, photo.thumbnail_s3_key].filter(Boolean) as string[],
@@ -227,8 +231,8 @@ export async function getPhotoDetails(photoId: string) {
     original_filename: photo.original_filename,
     mime_type: photo.mime_type,
     file_size_bytes: photo.file_size_bytes,
-    className: (classData as any)?.name ?? null,
-    schoolName: (classData as any)?.schools?.name ?? null,
+    className: classRow?.name ?? null,
+    schoolName: classRow?.schools?.name ?? null,
     taggedStudentIds: tags?.map((t) => t.student_id) ?? [],
   };
 }
