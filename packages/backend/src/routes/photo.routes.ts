@@ -5,6 +5,7 @@ import { validate } from '../middleware/validate';
 import {
   requestUploadSchema,
   getPhotosSchema,
+  tagStudentsBodySchema,
 } from '../validators/photo.validator';
 import * as photoController from '../controllers/photo.controller';
 import { photoUpload } from '../middleware/upload';
@@ -41,6 +42,7 @@ router.post(
 router.post(
   '/:id/tag',
   roleGuard('teacher', 'school_admin'),
+  validate(tagStudentsBodySchema, 'body'),
   photoController.tagStudents,
 );
 

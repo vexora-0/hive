@@ -24,11 +24,20 @@ export const requestUploadSchema = z.object({
     .optional(),
 });
 
-export const tagStudentsSchema = z.object({
-  photoId: z.string().uuid('photoId must be a valid UUID'),
+/**
+ * Body of POST /photos/:id/tag.
+ *
+ * The photo ID comes from the URL, so it is deliberately absent here — the
+ * previous schema required it in the body, which is why it could never be
+ * wired to the route and the endpoint ran with no validation at all.
+ *
+ * The 50-item cap bounds the `.in()` filter the service builds from this list.
+ */
+export const tagStudentsBodySchema = z.object({
   studentIds: z
     .array(z.string().uuid('Each studentId must be a valid UUID'))
-    .min(1, 'At least one studentId is required'),
+    .min(1, 'At least one studentId is required')
+    .max(50, 'Cannot tag more than 50 students in one photo'),
 });
 
 export const getPhotosSchema = z.object({
@@ -43,5 +52,5 @@ export const getPhotosSchema = z.object({
 });
 
 export type RequestUploadInput = z.infer<typeof requestUploadSchema>;
-export type TagStudentsInput = z.infer<typeof tagStudentsSchema>;
+export type TagStudentsInput = z.infer<typeof tagStudentsBodySchema>;
 export type GetPhotosInput = z.infer<typeof getPhotosSchema>;
