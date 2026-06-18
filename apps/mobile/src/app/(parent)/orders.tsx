@@ -193,7 +193,6 @@ export default function OrdersScreen() {
             data={orders}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
-            estimatedItemSize={130}
             ListHeaderComponent={renderListHeader}
             ListEmptyComponent={renderEmpty}
             ListFooterComponent={renderFooter}

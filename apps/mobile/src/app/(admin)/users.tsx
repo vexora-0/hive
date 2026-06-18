@@ -171,7 +171,6 @@ export default function UsersScreen() {
         <FlashList
           data={users}
           renderItem={renderItem}
-          estimatedItemSize={72}
           keyExtractor={(item) => item.id}
           ItemSeparatorComponent={renderSeparator}
           ListFooterComponent={renderFooter}
