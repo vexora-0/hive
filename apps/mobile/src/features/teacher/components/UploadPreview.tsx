@@ -36,7 +36,6 @@ const STATE_BADGE_VARIANT: Record<
   'default' | 'success' | 'warning' | 'error'
 > = {
   idle: 'default',
-  hashing: 'warning',
   'requesting-url': 'warning',
   uploading: 'warning',
   saving: 'warning',
@@ -48,7 +47,6 @@ const STATE_BADGE_VARIANT: Record<
 
 const STATE_BADGE_LABEL: Record<ImageUploadState, string> = {
   idle: 'Ready',
-  hashing: 'Hashing',
   'requesting-url': 'Preparing',
   uploading: 'Uploading',
   saving: 'Saving',
