@@ -77,7 +77,6 @@ export const AnimatedCounter: React.FC<AnimatedCounterProps> = ({
     <AnimatedTextInput
       editable={false}
       underlineColorAndroid="transparent"
-      // @ts-expect-error — animatedProps typing with TextInput is imprecise
       animatedProps={animatedProps}
       style={[styles.text, style]}
     />

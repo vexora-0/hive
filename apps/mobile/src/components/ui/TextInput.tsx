@@ -6,6 +6,7 @@ import {
   StyleSheet,
   type StyleProp,
   type ViewStyle,
+  type TextStyle as RNTextStyle,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -163,7 +164,7 @@ export const TextInput = forwardRef<RNTextInput, TextInputProps>(function TextIn
           selectionColor={colors.primary.amber}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          style={[styles.input, inputStyle]}
+          style={[styles.input, inputStyle] as StyleProp<RNTextStyle>}
           {...rest}
         />
 
