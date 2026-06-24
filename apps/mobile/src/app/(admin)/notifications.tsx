@@ -1,26 +1,25 @@
 import React from 'react';
 
-import { ScreenContainer } from '@/components/layout/ScreenContainer';
-import { HeaderBar } from '@/components/navigation/HeaderBar';
-import { EmptyState } from '@/components/feedback/EmptyState';
+import { ScreenContainer } from '@/components/layout';
+import { HeaderBar } from '@/components/navigation';
+import { NotificationCenter } from '@/features/notifications/components/NotificationCenter';
 
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
 /**
- * Admin notifications screen -- placeholder for future implementation.
+ * Notifications screen.
  *
- * Currently displays an empty state with a descriptive message.
+ * `NotificationCenter` is role-agnostic — the API returns whatever
+ * notifications belong to the authenticated user, so the same component serves
+ * all three roles.
  */
 export default function NotificationsScreen() {
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
       <HeaderBar title="Notifications" />
-      <EmptyState
-        title="Coming Soon"
-        message="Notifications are coming soon. Stay tuned!"
-      />
+      <NotificationCenter />
     </ScreenContainer>
   );
 }
