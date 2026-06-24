@@ -17,6 +17,14 @@ import {
 import { queryClient } from '@/lib/queryClient';
 import { ErrorBoundary } from '@/components/feedback';
 import { useSession } from '@/features/auth/hooks/useSession';
+import { initSentry, Sentry } from '@/lib/sentry';
+
+// ---------------------------------------------------------------------------
+// Error reporting — before the tree mounts, so start-up crashes are captured.
+// No-op unless EXPO_PUBLIC_SENTRY_DSN is set.
+// ---------------------------------------------------------------------------
+
+initSentry();
 
 // ---------------------------------------------------------------------------
 // Keep the splash screen visible until fonts are loaded and auth is resolved.
@@ -28,7 +36,7 @@ SplashScreen.preventAutoHideAsync();
 // Root Layout
 // ---------------------------------------------------------------------------
 
-export default function RootLayout() {
+function RootLayout() {
   // ── Fonts ───────────────────────────────────────────────────────────
   const [fontsLoaded, fontError] = useFonts({
     Baloo2_700Bold,
@@ -112,3 +120,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
+
+// ---------------------------------------------------------------------------
+// Export
+// ---------------------------------------------------------------------------
+
+/**
+ * Wrapped so that React render errors escaping <ErrorBoundary> — and errors in
+ * the boundary itself — still reach Sentry. Without a DSN, Sentry.wrap is a
+ * pass-through.
+ */
+export default Sentry.wrap(RootLayout);

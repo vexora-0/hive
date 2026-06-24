@@ -29,6 +29,18 @@ const envSchema = z.object({
 
   BACKEND_URL: z.string().default('http://localhost:4000'),
 
+  // Optional. Unset means error reporting is off, which is what local
+  // development and the test suite want.
+  //
+  // The preprocess step matters: .env.example ships `SENTRY_DSN=` with no
+  // value, so a copied file yields an empty string rather than undefined, and
+  // an empty string is not a valid URL. Without this, following the setup
+  // instructions would fail startup validation.
+  SENTRY_DSN: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().url('SENTRY_DSN must be a valid URL').optional(),
+  ),
+
   CORS_ORIGINS: z
     .string()
     .default('*')
