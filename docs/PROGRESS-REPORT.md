@@ -838,4 +838,77 @@ Plan 08's backend test harness — Vitest and Supertest, with a guard that refus
 
 ---
 
+# Week 21 — Test Harness & Observability
+
+**Dates:** 21 June 2026 – 27 June 2026
+**Commits:** 8 — Nagachaitanya 8
+**Covers:** Plan 08 (harness, auth tests, error tests) and Plan 09 Step 3, worked across Weeks 18–21
+
+## Phase objective
+
+Give the project a test runner it never had, cover the authentication and error paths, and make production failures visible without shipping children's data to a third party.
+
+## Individual contributions
+
+**Nagachaitanya** did all eight commits. Plans 02, 03, 05, 06 and 07 remain unstarted, so the schedule's W18–W21 split across four people did not happen; the other three test files in Plan 08 (photos, feed, orders, admin) belong to Ruthwik and Srujan and are not written.
+
+## Important technical implementation
+
+The harness is Vitest plus Supertest against a real Supabase project. The piece worth describing is the guard in `tests/setup.ts`: the suite deletes every row in every domain table and deletes the auth users it creates, so it refuses to start unless `.env.test` exists, and refuses outright if `SUPABASE_URL` contains the demo project ref. That ref is hard-coded rather than read from configuration — a guard that reads the value it is guarding against is not a guard.
+
+`createTestUser` signs the user in for real and returns the Supabase-issued access token. A hand-built JWT would defeat the point: the tests exist to prove `authenticate` verifies tokens against Supabase and reads role and school from the `profiles` row, which is the only thing standing between the API and an unauthenticated caller, since `supabaseAdmin` bypasses RLS.
+
+T-4 asserts 403 and specifically *not* 401 for a wrong-role caller, because `lib/api.ts` signs the user out on any 401 — a `roleGuard` returning 401 would present as a mysterious logout rather than an error. T-34 throws an error whose message embeds a database password and asserts the response body contains neither it nor the connection string under `NODE_ENV=production`, then asserts the opposite outside production so both sides of the branch are exercised.
+
+On observability, Sentry is off unless a DSN is set. `beforeSend` walks the entire event — request, extra, contexts, exception values, stack frame variables, breadcrumbs — redacting sensitive keys and regex-matching bearer tokens, JWTs, email addresses and storage URLs. `http`/`fetch` breadcrumbs are dropped wholesale because they record full request URLs, and on mobile `attachScreenshot` and `attachViewHierarchy` are disabled: a screenshot of this app is, by definition, a photograph of a child.
+
+Backend initialisation had to move into `config/instrument.ts`, imported first for its side effect. A bare `initSentry()` placed between import statements does not run first — imports are hoisted, so it would execute after every module in the file had already loaded, including the ones Sentry patches.
+
+Reporting hooks into `errorHandler` instead of `Sentry.setupExpressErrorHandler`, so only unexpected errors are sent. `AppError` is excluded on purpose: a 403 on a cross-school request is the authorization layer working as designed, and reporting those would bury genuine failures.
+
+## Issues and challenges
+
+**The 36-test suite has never been run.** There is no `.env.test` and no test Supabase project, so `pnpm test` cannot reach a database. Twelve of the thirty-six tests are written; none have executed. Plan 08's sabotage exercise — reverting each fix and confirming the matching test fails — has not been done either, and until it is, there is no evidence these tests test anything.
+
+Two things *were* executed, and both passed:
+
+- **The database guard**, in both branches. With no `.env.test` the suite refuses with a message naming the file to create; with `SUPABASE_URL` pointed at the demo project ref it refuses with an explicit warning that it would wipe the demo data.
+- **The Sentry scrubber**, against a synthetic event carrying a JWT, two email addresses, a client IP, a signed storage URL, an `/uploads` URL, a password field and a hostname. None survived; a user-agent string and a student's first name did, confirming it redacts rather than blanks.
+
+One bug was found and fixed while writing this: `.env.example` ships `SENTRY_DSN=` with no value, which dotenv turns into an empty string, and an empty string fails `z.string().url()`. Anyone following the setup instructions would have hit a startup validation failure. The schema now preprocesses empty to undefined.
+
+Incidentally, `require('sharp')` loads on this machine — the check CLAUDE.md flags as the gate on Plan 03's synchronous-thumbnail approach. The fixture JPEG was generated with it.
+
+## Testing and validation
+
+- `pnpm --filter @hive/backend typecheck` — clean, now covering `tests/` through a second `tsconfig.test.json` pass
+- `pnpm lint` — 8 problems, unchanged and all pre-existing
+- `pnpm --filter @hive/mobile typecheck` — 22 errors, still identical to the Plan 00 baseline
+- Test-database guard — executed, refuses correctly in both branches
+- Sentry `beforeSend` — executed, no sensitive value survived
+- `pnpm test` — **not run.** No test project exists.
+
+## Relevant commits
+
+```
+test(setup): add Vitest and Supertest harness with test database guard
+test(helpers): add fixtures and factory helpers for test data
+test(auth): cover authentication and role-based access control
+test(errors): cover validation and error handler behaviour
+ci: add test task to the turbo pipeline
+security(obs): stop logging client IPs and raw error objects on auth failures
+feat(obs): integrate Sentry with PII scrubbing on backend and mobile
+docs(report): add week 21 progress report
+```
+
+## End state
+
+A working test harness with 12 of Plan 08's 36 tests written and none executed. Error reporting wired on both apps, scrubbed and verified in isolation, but never confirmed end to end against a live Sentry project. Checkpoint CP-4 (36 tests green, CI on every PR) is not met — CI is Ruthwik's Plan 09 Step 5 and does not exist yet.
+
+## Next week
+
+Plan 10's security document and the auth sequence diagram. The threat model, the three authorization layers and the remediation table are all things this stream now has real material for.
+
+---
+
 *Hive · Ruthwik, Bhargav, Srujan, Nagachaitanya*
