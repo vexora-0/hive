@@ -261,7 +261,7 @@ async function notifyAdminsOfNewOrder(
     .from('profiles')
     .select('id')
     .eq('school_id', schoolId)
-    .eq('role', 'school_admin');
+    .eq('role', 'admin');
 
   if (!admins || admins.length === 0) return;
 
