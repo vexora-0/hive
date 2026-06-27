@@ -76,8 +76,13 @@ Match it against the table. **This determines what you work on.** If the email d
 
 ### Still blocking
 
-1. **No `.env` exists.** Migrations `00017` and `00020` are unapplied. **Nothing
-   below has ever executed** — it compiles, and that is the whole claim.
+1. **No usable `.env`.** The files now exist — `packages/backend/.env`,
+   `apps/mobile/.env` and `packages/backend/.env.test`, copied from the tracked
+   examples and gitignored — but they still hold placeholder values. A real
+   Supabase project URL, service-role key and anon key have to be filled in;
+   see `docs/environment-setup.md`. Until then migrations `00017` and `00020`
+   are unapplied and **nothing below has ever executed** — it compiles, and that
+   is the whole claim.
 2. **Plan 06** demo seed and **Plan 07** UX polish are unstarted.
 3. **G-34** (`getSchools` N+1) still has no owner.
 

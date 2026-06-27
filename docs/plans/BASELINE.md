@@ -5,10 +5,12 @@ baseline fails, record the failures in `docs/plans/BASELINE.md` first. You need
 to know which errors you inherited versus which you introduced."*
 
 Measured on `main` at **`bcc9731`**, macOS, Node v26.4.0, pnpm 9.1.0.
+**Re-measured 27 Jun at `19bd5c4`** (Plan 00 done), macOS, Node v22.21.1,
+pnpm 9.1.0. The numbers below are the re-measured ones.
 
 **Re-measure when main moves.** These numbers shifted three times across
-W15–W17 as Plans 03, 05 and the deployment work landed. Treat them as a
-snapshot, not a contract.
+W15–W17 as Plans 03, 05 and the deployment work landed, and twice more in
+W20–W21. Treat them as a snapshot, not a contract.
 
 ---
 
@@ -35,45 +37,64 @@ snapshot, not a contract.
 |---|---|
 | `pnpm --filter @hive/backend typecheck` | **passes** — 0 errors |
 | `pnpm build:backend` | **passes** |
-| `pnpm --filter @hive/mobile typecheck` | **fails — 15 errors** |
-| `pnpm --filter @hive/backend lint` | **fails — 7 problems (2 errors, 5 warnings)** |
-| `pnpm --filter @hive/mobile lint` | passes — 37 warnings, 0 errors |
+| `pnpm --filter @hive/mobile typecheck` | **passes** — 0 errors *(was 15; Plan 00 done 27 Jun)* |
+| `pnpm --filter @hive/backend lint` | **fails — 4 problems (1 error, 3 warnings)** |
+| `pnpm --filter @hive/mobile lint` | passes — 38 warnings, 0 errors |
+| `npx expo export --platform ios` | **passes** — bundles clean, 5.52 MB |
 
-### CI is red, and will stay red until Plan 00 lands
+### CI: one failing gate left, and it is one rule
 
 `.github/workflows/ci.yml` runs `pnpm lint`, both typechecks and
-`pnpm build:backend`. Two of those four currently fail on `main` — mobile
-typecheck (15 errors) and lint (2 backend errors). **A red run does not mean
-your change broke something.** Check the failing step against the table above
-before investigating; only counts *higher* than these are yours.
+`pnpm build:backend`. Three of those four now pass. **The only remaining
+failure is `pnpm lint`, on the single backend error below.** Fix it and the
+gate goes green.
 
-Two things would turn CI green, in this order:
+**A red `pnpm lint` run does not mean your change broke something** — check the
+failing rule against the table below before investigating; only counts *higher*
+than 4 problems are yours.
 
-1. **Plan 00** — clears the 15 mobile typecheck errors.
-2. **The 2 backend lint errors below** — unowned, small, and the only thing
-   between `pnpm lint` and a passing gate.
+Once lint is green, the `continue-on-error` markers on the mobile typecheck and
+lint steps should come off, so the pipeline starts actually gating.
 
-### Mobile typecheck — 15 errors
+### Mobile typecheck — 0 errors
 
-Was 22. The regenerated `apps/mobile/src/types/supabase.ts` (`8e4fc50`) cleared
-seven of Plan 00's eight Group B errors; see that plan's `## Deviations` for why
-the root cause was not what the plan assumed.
+Was 22, then 15, now clean.
 
-The 15 that remain are Plan 00's Groups A (6), C (3), D (2) and E (3), plus one
-real `ClassItem` nullability mismatch that the `never` collapse had been masking.
-All are described in `00-typecheck-fixes.md`, with a suggested order of work.
+- `8e4fc50` (Srujan) regenerated `apps/mobile/src/types/supabase.ts`, clearing
+  seven of Plan 00's eight Group B errors — 22 → 15.
+- `6c9078d`, `61a541b`, `732714a`, `edb3d2b` (Plan 00) cleared the rest — 15 → 0.
+- `7e38b5c`, `7cbd74d`, `21510fa`, `19bd5c4` were the residual pass: green
+  typecheck, wrong behaviour in four places. See `00-typecheck-fixes.md`
+  `## Deviations`.
 
-### Backend lint — 2 errors, 5 warnings
+Two of the original errors were **real defects that broken types had been
+masking**, not cosmetic: `ClassItem.grade` was declared non-null against a
+nullable column, and `TabBar`'s `navigate()` carried `as never` casts that only
+typechecked while the module was unresolvable.
 
-Inherited. The two errors are what make lint exit non-zero:
+### Backend lint — 1 error, 3 warnings
+
+Inherited. One error is what makes lint exit non-zero:
 
 | File | Line | Rule |
 |---|---|---|
-| `src/types/express.d.ts` | 13:3 | `@typescript-eslint/no-namespace` |
-| `src/services/feed.service.ts` | 62:7 | `prefer-const` (`tagQuery`) |
+| `src/middleware/auth.ts` | 13:3 | `@typescript-eslint/no-namespace` |
 
-Both are unowned by any current plan and neither is risky. Worth folding into
-Plan 01 so the CI lint gate can start passing.
+*(This file has moved and shrunk since the baseline was written. It was
+originally recorded as 2 errors / 5 warnings at `src/types/express.d.ts:13` and
+`src/services/feed.service.ts:62`. The `AppError` refactor removed two
+`no-explicit-any` warnings, and the dashboard revenue fix removed the
+`prefer-const` error in `admin.service.ts`. Re-measured 27 Jun.)*
+
+Unowned by any current plan and not risky. Worth folding into Plan 01 so the CI
+lint gate can start passing — it is now a one-line fix away.
+
+### Mobile lint — 38 warnings, 0 errors
+
+Down one from 39: removing the dead `estimatedItemSize` prop from
+`MasonryGrid` also removed the unused-variable warning its destructured default
+was producing. The remaining 38 are inherited unused imports and `any` uses —
+none of them block anything, and `pnpm --filter @hive/mobile lint` still exits 0.
 
 ### Formatting
 
@@ -110,9 +131,12 @@ Anything above them is yours.
 pnpm install                                                             # REQUIRED after any pull
 pnpm --filter @hive/backend typecheck                                    # expect clean
 pnpm build:backend                                                       # expect clean
-pnpm --filter @hive/mobile  typecheck 2>&1 | grep -cE "^src/.*error TS"  # expect 15
-pnpm --filter @hive/mobile  lint      2>&1 | grep -oE "[0-9]+ problems"  # expect 37 problems
-pnpm --filter @hive/backend lint      2>&1 | grep -oE "[0-9]+ problems"  # expect 7 problems
+pnpm --filter @hive/mobile  typecheck 2>&1 | grep -cE "^src/.*error TS"  # expect 0
+pnpm --filter @hive/mobile  lint      2>&1 | grep -oE "[0-9]+ problems"  # expect 38 problems
+pnpm --filter @hive/backend lint      2>&1 | grep -oE "[0-9]+ problems"  # expect 4 problems
 ```
+
+Both typechecks are now clean, so **any** typecheck error is yours. Lint is the
+only check still expected to fail, and only on the one inherited backend error.
 
 Update the expected numbers here as plans land.
