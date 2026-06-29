@@ -1,7 +1,12 @@
 /**
  * Seed an admin user with email + password via the Supabase Admin API.
  *
- * Usage:  npm run seed:admin   (from packages/backend)
+ * Usage:
+ *   ADMIN_EMAIL=… ADMIN_PASSWORD=… pnpm seed:admin   (from packages/backend)
+ *
+ * or set both in `.env`. There is no default — a default admin password is a
+ * default admin account, and every environment the script has ever run against
+ * would share it.
  *
  * This is idempotent — safe to run multiple times.
  */
@@ -21,9 +26,19 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-const ADMIN_EMAIL = 'admin@hive.app';
-const ADMIN_PASSWORD = 'Admin@123';
-const ADMIN_NAME = 'Hive Admin';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const ADMIN_NAME = process.env.ADMIN_NAME ?? 'Hive Admin';
+
+if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+  console.error(
+    'Missing ADMIN_EMAIL or ADMIN_PASSWORD.\n' +
+      'Set both in packages/backend/.env or pass them on the command line.\n' +
+      'There is deliberately no fallback: a default password would be shared ' +
+      'by every environment this script has been run against.',
+  );
+  process.exit(1);
+}
 
 async function seedAdmin() {
   console.log(`Seeding admin user: ${ADMIN_EMAIL}`);
@@ -90,9 +105,10 @@ async function seedAdmin() {
     process.exit(1);
   }
 
+  // The password is never echoed. Whoever ran this set it, so they know it;
+  // printing it puts it into shell history, CI logs and terminal scrollback.
   console.log('Admin user seeded successfully.');
-  console.log('  Email:    %s', ADMIN_EMAIL);
-  console.log('  Password: %s', ADMIN_PASSWORD);
+  console.log('  Email: %s', ADMIN_EMAIL);
 }
 
 seedAdmin()
