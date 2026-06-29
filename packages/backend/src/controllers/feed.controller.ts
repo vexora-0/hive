@@ -38,7 +38,7 @@ export async function getPhotoDetails(
 ): Promise<void> {
   try {
     const { id } = req.params;
-    const photo = await feedService.getPhotoDetails(id);
+    const photo = await feedService.getPhotoDetails(id, req.user!.id);
 
     res.json(success(photo));
   } catch (err) {

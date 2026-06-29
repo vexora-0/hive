@@ -181,7 +181,32 @@ export async function getFeed(
   return { photos: feedPhotos, nextCursor };
 }
 
-export async function getPhotoDetails(photoId: string) {
+export async function getPhotoDetails(photoId: string, userId: string) {
+  // Ownership first. Without this any authenticated parent could read any
+  // photo by UUID — its URL, filename, class, school and the full list of
+  // tagged children, including families at other schools. (G-04)
+  const { data: ownLinks } = await supabaseAdmin
+    .from('parent_student_mappings')
+    .select('student_id')
+    .eq('parent_id', userId);
+
+  const ownStudentIds = ownLinks?.map((l) => l.student_id) ?? [];
+  if (ownStudentIds.length === 0) {
+    throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
+  }
+
+  const { count: visible } = await supabaseAdmin
+    .from('photo_student_tags')
+    .select('id', { count: 'exact', head: true })
+    .eq('photo_id', photoId)
+    .in('student_id', ownStudentIds);
+
+  // 404 rather than 403 — a 403 confirms the photo exists, which is itself a
+  // disclosure.
+  if (!visible) {
+    throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
+  }
+
   const { data: photo, error } = await supabaseAdmin
     .from('photos')
     .select('id, s3_key, thumbnail_s3_key, blurhash, width, height, status, created_at, uploaded_by, class_id, original_filename, mime_type, file_size_bytes')
@@ -233,6 +258,10 @@ export async function getPhotoDetails(photoId: string) {
     file_size_bytes: photo.file_size_bytes,
     className: classRow?.name ?? null,
     schoolName: classRow?.schools?.name ?? null,
-    taggedStudentIds: tags?.map((t) => t.student_id) ?? [],
+    // Only this parent's children — an authorised viewer still must not learn
+    // which other children appear in the frame.
+    taggedStudentIds: (tags ?? [])
+      .map((t) => t.student_id)
+      .filter((id) => ownStudentIds.includes(id)),
   };
 }
