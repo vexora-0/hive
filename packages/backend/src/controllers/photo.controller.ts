@@ -33,7 +33,7 @@ export async function uploadFile(
       throw new AppError('No file provided', 400, 'NO_FILE');
     }
 
-    await photoService.saveUploadedFile(id, req.file.path);
+    await photoService.saveUploadedFile(id, req.file.path, req.user!);
 
     res.json(success(null, 'File uploaded and confirmed'));
   } catch (err) {
@@ -49,7 +49,7 @@ export async function confirmUpload(
   try {
     const { id } = req.params;
 
-    await photoService.confirmUpload(id);
+    await photoService.confirmUpload(id, req.user!);
 
     res.json(success(null, 'Upload confirmed, processing started'));
   } catch (err) {
@@ -95,6 +95,7 @@ export async function getPhotos(
       query.classId,
       query.cursor,
       query.limit,
+      { role: req.user!.role, schoolId: req.user!.schoolId },
     );
 
     res.json(paginated(result.photos, result.nextCursor));

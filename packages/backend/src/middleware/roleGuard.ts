@@ -1,3 +1,4 @@
+import { AppError } from './errorHandler';
 import { Request, Response, NextFunction } from 'express';
 
 export function roleGuard(...allowedRoles: string[]) {
@@ -22,4 +23,24 @@ export function roleGuard(...allowedRoles: string[]) {
 
     next();
   };
+}
+
+/**
+ * Verify the caller may act on a given school.
+ *
+ * Admins are cross-school by design. Everyone else is confined to their own —
+ * without this, any teacher could enumerate another school's classes and its
+ * complete student roster including dates of birth. (G-08)
+ */
+export function assertSchoolAccess(
+  user: { role: string; schoolId: string | null } | undefined,
+  schoolId: string,
+): void {
+  if (!user) {
+    throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
+  }
+  if (user.role === 'admin') return;
+  if (user.schoolId !== schoolId) {
+    throw new AppError('You do not have access to this school', 403, 'FORBIDDEN');
+  }
 }

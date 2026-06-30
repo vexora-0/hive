@@ -122,17 +122,10 @@ export async function requestUpload(
 export async function saveUploadedFile(
   photoId: string,
   tempFilePath: string,
+  user: { id: string; role: string; schoolId: string | null },
 ): Promise<void> {
   try {
-    const { data: photo, error: photoError } = await supabaseAdmin
-      .from('photos')
-      .select('s3_key, status, mime_type')
-      .eq('id', photoId)
-      .single();
-
-    if (photoError || !photo) {
-      throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
-    }
+    const photo = await assertPhotoAccess(photoId, user);
 
     if (photo.status !== 'processing') {
       throw new AppError(
@@ -198,16 +191,11 @@ export async function saveUploadedFile(
  * Called after tagging. This is the write that fires both database triggers:
  * notify_parents_on_photo and notify_teacher_on_upload_complete.
  */
-export async function confirmUpload(photoId: string): Promise<void> {
-  const { data: photo, error: photoError } = await supabaseAdmin
-    .from('photos')
-    .select('s3_key, status')
-    .eq('id', photoId)
-    .single();
-
-  if (photoError || !photo) {
-    throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
-  }
+export async function confirmUpload(
+  photoId: string,
+  user: { id: string; role: string; schoolId: string | null },
+): Promise<void> {
+  const photo = await assertPhotoAccess(photoId, user);
 
   if (photo.status !== 'processing') {
     throw new AppError(
@@ -321,11 +309,53 @@ export async function tagStudents(
   });
 }
 
+/**
+ * Verify the caller may act on this photo.
+ *
+ * Admins may act anywhere. A teacher must be at the photo's school; the file
+ * and confirm endpoints previously checked nothing, so any teacher could
+ * overwrite any other teacher's photo by ID. (G-17)
+ */
+async function assertPhotoAccess(
+  photoId: string,
+  user: { id: string; role: string; schoolId: string | null },
+): Promise<{ s3_key: string; status: string; mime_type: string }> {
+  const { data: photo, error } = await supabaseAdmin
+    .from('photos')
+    .select('s3_key, status, mime_type, school_id, uploaded_by')
+    .eq('id', photoId)
+    .single();
+
+  if (error || !photo) {
+    throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
+  }
+  if (user.role !== 'admin' && photo.school_id !== user.schoolId) {
+    throw new AppError('You do not have access to this photo', 403, 'FORBIDDEN');
+  }
+  return photo;
+}
+
 export async function getPhotosByClass(
   classId: string,
-  cursor?: string,
-  limit: number = 20,
+  cursor: string | undefined,
+  limit: number,
+  user: { role: string; schoolId: string | null },
 ): Promise<PaginatedPhotos> {
+  // Scope to the caller's school — previously any teacher could list any
+  // class's photos by ID. (G-08)
+  const { data: cls, error: clsError } = await supabaseAdmin
+    .from('classes')
+    .select('school_id')
+    .eq('id', classId)
+    .single();
+
+  if (clsError || !cls) {
+    throw new AppError('Class not found', 404, 'CLASS_NOT_FOUND');
+  }
+  if (user.role !== 'admin' && cls.school_id !== user.schoolId) {
+    throw new AppError('You do not have access to this class', 403, 'FORBIDDEN');
+  }
+
   let query = supabaseAdmin
     .from('photos')
     .select('id, s3_key, thumbnail_s3_key, blurhash, width, height, status, created_at, uploaded_by, class_id')
