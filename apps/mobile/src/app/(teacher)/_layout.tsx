@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '@/theme';
+import { RoleGate } from '@/features/auth/components/RoleGate';
 import { TabBar } from '@/components/navigation';
 
 // ---------------------------------------------------------------------------
@@ -18,6 +19,7 @@ import { TabBar } from '@/components/navigation';
  */
 export default function TeacherLayout() {
   return (
+    <RoleGate allow={['teacher']}>
     <Tabs
       tabBar={(props) => <TabBar {...props} />}
       screenOptions={{
@@ -67,5 +69,6 @@ export default function TeacherLayout() {
         }}
       />
     </Tabs>
+    </RoleGate>
   );
 }
