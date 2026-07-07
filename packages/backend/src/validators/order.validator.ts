@@ -1,26 +1,16 @@
+import { PRODUCT_TYPES } from '../constants/products';
 import { z } from 'zod';
 
-export const productTypes = [
-  '4x6',
-  '5x7',
-  '8x10',
-  '11x14',
-  '16x20',
-  'digital',
-  'photo_book',
-  'magnet',
-  'mug',
-  'canvas',
-] as const;
+
 
 export const createOrderSchema = z.object({
   items: z
     .array(
       z.object({
         photoId: z.string().uuid('photoId must be a valid UUID'),
-        productType: z.enum(productTypes, {
+        productType: z.enum(PRODUCT_TYPES, {
           errorMap: () => ({
-            message: `productType must be one of: ${productTypes.join(', ')}`,
+            message: `productType must be one of: ${PRODUCT_TYPES.join(', ')}`,
           }),
         }),
         quantity: z

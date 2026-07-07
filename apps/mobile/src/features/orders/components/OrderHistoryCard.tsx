@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { formatCents } from '../constants/products';
 import { colors, spacing, layout } from '@/theme';
 import { Text, Card, Badge, type BadgeVariant } from '@/components/ui';
 import type { OrderStatus } from '@/types/supabase';
@@ -71,9 +72,7 @@ const STATUS_MAP: Record<OrderStatus, StatusConfig> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatPrice(amount: number): string {
-  return `$${amount.toFixed(2)}`;
-}
+
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -137,7 +136,7 @@ export function OrderHistoryCard({ order, onPress }: OrderHistoryCardProps) {
           Total
         </Text>
         <Text variant="bodyBold" color={colors.text.primary}>
-          {formatPrice(order.total_amount)}
+          {formatCents(order.total_cents)}
         </Text>
       </View>
     </Card>

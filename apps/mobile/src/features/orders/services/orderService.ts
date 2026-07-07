@@ -6,15 +6,16 @@ import type { Tables } from '@/types/supabase';
 // ---------------------------------------------------------------------------
 
 export interface CreateOrderItemPayload {
-  photo_id: string;
-  product_type: string;
+  photoId: string;
+  productType: string;
   quantity: number;
-  unit_price: number;
+  // No unitPrice — the server prices from its own table so a client cannot
+  // influence what it is charged.
 }
 
 export interface CreateOrderPayload {
   items: CreateOrderItemPayload[];
-  shipping_address?: string | null;
+  shippingAddress: string;
   notes?: string | null;
 }
 
@@ -52,7 +53,7 @@ export const orderService = {
   ): Promise<CreateOrderResponse> => {
     const body: CreateOrderPayload = {
       items,
-      shipping_address: shippingAddress,
+      shippingAddress: shippingAddress ?? '',
       notes,
     };
 

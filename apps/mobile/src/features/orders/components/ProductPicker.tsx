@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, spacing, layout } from '@/theme';
 import { Text } from '@/components/ui';
 import type { ProductType } from '@/types/supabase';
-import { PRODUCT_PRICES } from '../stores/cartStore';
+import { PRODUCT_PRICES_CENTS, formatCents } from '../constants/products';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,9 +42,7 @@ const PRODUCTS: ProductMeta[] = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatPrice(price: number): string {
-  return `$${price.toFixed(2)}`;
-}
+
 
 // ---------------------------------------------------------------------------
 // Component
@@ -75,7 +73,7 @@ export function ProductPicker({ selectedType, onSelect }: ProductPickerProps) {
             onPress={() => handleSelect(product.type)}
             accessibilityRole="button"
             accessibilityState={{ selected: isSelected }}
-            accessibilityLabel={`${product.label}, ${formatPrice(PRODUCT_PRICES[product.type])}`}
+            accessibilityLabel={`${product.label}, ${formatCents(PRODUCT_PRICES_CENTS[product.type])}`}
             style={({ pressed }) => [
               styles.card,
               isSelected && styles.cardSelected,
@@ -98,7 +96,7 @@ export function ProductPicker({ selectedType, onSelect }: ProductPickerProps) {
               color={isSelected ? colors.primary.amberDark : colors.text.accent}
               center
             >
-              {formatPrice(PRODUCT_PRICES[product.type])}
+              {formatCents(PRODUCT_PRICES_CENTS[product.type])}
             </Text>
           </Pressable>
         );
