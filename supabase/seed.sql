@@ -6,9 +6,10 @@
 -- by inserting directly. The auth.users entries would need to exist first
 -- in a real Supabase instance.
 --
--- For the ADMIN user (admin@hive.app / Admin@123), run the backend script:
---   npm run seed:admin   (in packages/backend)
--- That creates the auth.users entry via the Supabase Admin API.
+-- For the ADMIN user, run the backend script:
+--   ADMIN_EMAIL=… ADMIN_PASSWORD=… pnpm seed:admin   (in packages/backend)
+-- That creates the auth.users entry via the Supabase Admin API. Both variables
+-- are required and have no default, so no credential is written down here.
 --
 -- These UUIDs are deterministic so they can be referenced in tests.
 -- =============================================================================
