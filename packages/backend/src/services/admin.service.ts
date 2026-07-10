@@ -246,42 +246,44 @@ export async function getSchools(
   const hasNext = (schools?.length ?? 0) > limit;
   const rawResults = schools?.slice(0, limit) ?? [];
 
-  // Enrich with counts
-  const enrichedResults = await Promise.all(
-    rawResults.map(async (school: any) => {
-      const [studentsCount, teachersCount] = await Promise.all([
-        supabaseAdmin
-          .from('students')
-          .select('id', { count: 'exact', head: true })
-          .eq('school_id', school.id),
-        supabaseAdmin
-          .from('profiles')
-          .select('id', { count: 'exact', head: true })
-          .eq('school_id', school.id)
-          .eq('role', 'teacher'),
-      ]);
+  // Two batched queries rather than two per school. Previously this issued
+  // 2N+1 queries — for a 20-school page, 41 round trips. (G-34)
+  const schoolIds = rawResults.map((s: { id: string }) => s.id);
 
-      return {
-        id: school.id,
-        name: school.name,
-        address: school.address,
-        phone: school.phone,
-        logo_url: school.logo_url,
-        is_active: school.is_active ?? true,
-        created_at: school.created_at,
-        _count: {
-          classes: school.classes?.length ?? 0,
-          students: studentsCount.count ?? 0,
-          teachers: teachersCount.count ?? 0,
-        },
-        classes: (school.classes ?? []).map((c: any) => ({
-          id: c.id,
-          name: c.name,
-          grade: c.grade,
-        })),
-      };
-    }),
-  );
+  const [studentRows, teacherRows] = await Promise.all([
+    supabaseAdmin.from('students').select('school_id').in('school_id', schoolIds),
+    supabaseAdmin
+      .from('profiles')
+      .select('school_id')
+      .in('school_id', schoolIds)
+      .eq('role', 'teacher'),
+  ]);
+
+  const tally = (rows: { school_id: string | null }[] | null) => {
+    const counts = new Map<string, number>();
+    for (const row of rows ?? []) {
+      if (row.school_id) counts.set(row.school_id, (counts.get(row.school_id) ?? 0) + 1);
+    }
+    return counts;
+  };
+  const studentCounts = tally(studentRows.data);
+  const teacherCounts = tally(teacherRows.data);
+
+  const enrichedResults = rawResults.map((school: any) => ({
+    id: school.id,
+    name: school.name,
+    address: school.address,
+    phone: school.phone,
+    logo_url: school.logo_url,
+    is_active: school.is_active ?? true,
+    created_at: school.created_at,
+    _count: {
+      classes: school.classes?.length ?? 0,
+      students: studentCounts.get(school.id) ?? 0,
+      teachers: teacherCounts.get(school.id) ?? 0,
+    },
+    classes: (school.classes ?? []).map((c: any) => ({ id: c.id, name: c.name, grade: c.grade })),
+  }));
 
   const nextCursor =
     hasNext && enrichedResults.length > 0
