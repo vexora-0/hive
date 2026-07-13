@@ -13,6 +13,7 @@ import { EmptyState, OfflineBanner } from '@/components/feedback';
 import { HeaderBar } from '@/components/navigation';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
+import { useAuthStore } from '@/features/auth/stores/authStore';
 import { useChildren, type ChildWithClass } from '@/features/parent/hooks/useChildren';
 import { useFeed } from '@/features/parent/hooks/useFeed';
 import { usePhotoActions } from '@/features/parent/hooks/usePhotoActions';
@@ -37,6 +38,7 @@ import type { FeedPhoto } from '@/features/parent/services/parentService';
  */
 export default function FeedScreen() {
   const { isOffline } = useNetworkStatus();
+  const userEmail = useAuthStore((s) => s.user?.email) ?? 'your email address';
   const {
     children,
     isLoading: isLoadingChildren,
@@ -172,10 +174,20 @@ export default function FeedScreen() {
         onRefresh={refetch}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={
-          <EmptyState
-            title="No photos yet"
-            message="Ask your teacher to share some moments."
-          />
+          children.length === 0 ? (
+            <EmptyState
+              title="No children linked yet"
+              message={
+                'Your school needs to link your child to your account.\n\n' +
+                `Contact them with the email you signed up with:\n${userEmail}`
+              }
+            />
+          ) : (
+            <EmptyState
+              title="No photos yet"
+              message="Ask your teacher to share some moments."
+            />
+          )
         }
       />
 

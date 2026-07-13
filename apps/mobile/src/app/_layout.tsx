@@ -15,7 +15,7 @@ import {
 } from '@expo-google-fonts/nunito';
 
 import { queryClient } from '@/lib/queryClient';
-import { ErrorBoundary } from '@/components/feedback';
+import { ErrorBoundary, ToastProvider } from '@/components/feedback';
 import { useAuthStore } from '@/features/auth/stores/authStore';
 import { useSession } from '@/features/auth/hooks/useSession';
 
@@ -63,6 +63,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <ErrorBoundary>
+            <ToastProvider>
             <Stack screenOptions={{ headerShown: false }}>
               {/* Auth group — shown when not authenticated */}
               <Stack.Screen
@@ -96,6 +97,7 @@ export default function RootLayout() {
                 options={{ headerShown: false }}
               />
             </Stack>
+            </ToastProvider>
           </ErrorBoundary>
         </QueryClientProvider>
       </SafeAreaProvider>

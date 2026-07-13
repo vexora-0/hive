@@ -14,6 +14,7 @@ import { SkeletonShimmer } from '@/components/feedback';
 import { EmptyState } from '@/components/feedback';
 import { HeaderBar } from '@/components/navigation';
 
+import { useAuthStore } from '@/features/auth/stores/authStore';
 import { useClasses } from '@/features/teacher/hooks/useClasses';
 import { useTeacherPhotos } from '@/features/teacher/hooks/useTeacherPhotos';
 import type { Photo } from '@/features/teacher/hooks/useTeacherPhotos';
@@ -65,6 +66,9 @@ export default function DashboardScreen() {
 
   // ── Class selection ─────────────────────────────────────────────────
   const { classes, isLoading: classesLoading } = useClasses();
+  // useClasses is disabled without a school, so the query never runs and the
+  // screen sat empty with no explanation.
+  const hasSchool = useAuthStore((s) => !!s.profile?.school_id);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
 
   const handleClassSelect = useCallback((cls: ClassItem) => {
@@ -152,14 +156,18 @@ export default function DashboardScreen() {
             onRefresh={handleRefresh}
             ListHeaderComponent={header}
             ListEmptyComponent={
-              <EmptyState
-                title="No photos yet"
-                message="Tap the camera button below to upload your first photos for this class."
-                action={{
-                  label: 'Upload Photos',
-                  onPress: handleFABPress,
-                }}
-              />
+              hasSchool ? (
+                <EmptyState
+                  title="No photos yet"
+                  message="Tap the camera button below to upload your first photos for this class."
+                  action={{ label: 'Upload Photos', onPress: handleFABPress }}
+                />
+              ) : (
+                <EmptyState
+                  title="No school assigned"
+                  message="An administrator needs to assign you to a school before you can upload photos."
+                />
+              )
             }
           />
 

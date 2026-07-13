@@ -5,6 +5,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 
+import { useToast } from '@/components/feedback';
 import { useCartStore } from '../stores/cartStore';
 import {
   orderService,
@@ -38,16 +39,27 @@ interface CreateOrderParams {
 export function useCreateOrder() {
   const queryClient = useQueryClient();
   const clearCart = useCartStore((s) => s.clearCart);
+  const toast = useToast();
 
   return useMutation({
     mutationFn: ({ items, shippingAddress, notes, idempotencyKey }: CreateOrderParams) =>
       orderService.createOrder(items, shippingAddress, notes, idempotencyKey),
 
     onSuccess: () => {
-      // Clear the local cart after a successful order
       clearCart();
-      // Invalidate the orders list so it refetches fresh data
       queryClient.invalidateQueries({ queryKey: orderKeys.lists() });
+      toast.success('Order placed successfully');
+    },
+
+    // There was no error handler at all, so a failed order looked identical to
+    // no interaction. Surfaces the server message where there is one — the API
+    // returns useful text for authorisation and validation failures.
+    onError: (error: unknown) => {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Could not place order. Please try again.';
+      toast.error(message);
     },
   });
 }
