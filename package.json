@@ -18,7 +18,8 @@
     "db:migrate": "supabase db push",
     "db:reset": "supabase db reset",
     "db:diff": "supabase db diff",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "seed": "pnpm --filter @hive/backend seed:demo"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.3.0",

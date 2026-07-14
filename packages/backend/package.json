@@ -11,7 +11,9 @@
     "clean": "rm -rf dist",
     "seed:admin": "tsx src/scripts/seedAdmin.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "seed:demo": "tsx src/scripts/seedDemo.ts",
+    "seed:demo:reset": "tsx src/scripts/seedDemo.ts --reset"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.43.0",
