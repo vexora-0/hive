@@ -214,4 +214,64 @@ chore(scripts): add database migration and reset commands
 
 ## Deviations
 
-*Record here anything that differed from this plan, and why.*
+**Only Step 3 and the PII fixes from Step 2 were done, by Nagachaitanya.** The
+schedule (`PHASE-2-EXECUTION-PLAN.md` §4, W21) splits this plan: Ruthwik owns
+the health check, request IDs, Dockerfile, GitHub Actions, Render deploy, EAS
+build and migration scripts. This stream owns Sentry and PII scrubbing.
+
+Done:
+
+- Step 2's G-L3/G-L4 fixes in `middleware/auth.ts` — `req.ip` removed from the
+  invalid-token warning, and the catch-all now logs `err.message` rather than
+  the whole error object.
+- All of Step 3, both apps.
+
+Not done: Steps 1, 2 (request IDs), 4, 5, 6, 7, 8.
+
+**Backend init lives in `config/instrument.ts`, imported first for its side
+effect** — not as a call at the top of `index.ts`. Imports are hoisted, so a
+bare `initSentry()` between two import statements still runs after every module
+in the file has loaded, including the ones Sentry patches. A side-effect import
+keeps the ordering honest because module evaluation follows import order. This
+is the pattern Sentry v8+ documents, and the plan's wording ("initialise in
+`index.ts` before anything else") is not achievable literally.
+
+**Reporting hooks into `errorHandler`, not `Sentry.setupExpressErrorHandler`.**
+Two reasons. First, `setupExpressErrorHandler` reports every error reaching the
+middleware, including the 403s and 404s that the authorization layer produces
+*by working correctly* — on this system that would bury real failures under
+events meaning "a cross-school request was refused". `AppError` is therefore
+excluded and only unexpected errors are captured. Second, it avoids editing
+`app.ts`, which `CLAUDE.md` §6 assigns to Ruthwik and which Plan 03 rewrites.
+
+**`SENTRY_DSN` is preprocessed to turn `''` into `undefined`.** `.env.example`
+ships the key with an empty value, dotenv yields an empty string, and an empty
+string fails `z.string().url()`. Without the preprocess step, copying
+`.env.example` — exactly what the setup instructions say to do — fails startup
+validation. Found while writing this.
+
+**Mobile scrubbing goes further than the plan asks.** `attachScreenshot` and
+`attachViewHierarchy` are explicitly disabled. A screenshot of this app is by
+definition a photograph of a child, so the default has to be overridden rather
+than relied upon.
+
+`http`/`fetch` breadcrumbs are dropped wholesale on both apps rather than
+scrubbed, because they exist to record request URLs and here that means signed
+photo URLs and Supabase calls carrying the service-role key. Nothing in them is
+worth the risk.
+
+### Not verified
+
+**No error has ever been sent to Sentry.** There is no DSN and no `.env`, so
+`initSentry()` has only ever taken its no-op path. The Verification items "a
+deliberate error appears in Sentry within a minute" and "Sentry event contains
+no tokens, emails or signed photo URLs" are both untested end to end, and the
+screenshot Plan 10 wants does not exist.
+
+What *was* executed: **`scrubEvent` run directly against a synthetic event**
+carrying a JWT, two email addresses, a client IP, a signed storage URL, an
+`/uploads` URL, a password field and a hostname. None survived. A user-agent
+string and a student's first name did, confirming it redacts targeted values
+rather than blanking the event. That is a real result, but it tests the
+scrubber in isolation — not that Sentry calls it, and not that a real event
+looks like the synthetic one.

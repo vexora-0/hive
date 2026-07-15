@@ -80,17 +80,26 @@ Every plan follows the same loop:
 
 | Plan | Branch | Status | Merged |
 |---|---|---|---|
-| 01 | *(committed to `main`)* | ◐ Steps 1, 3, 5 done — 2, 4, 6, 7, 8 outstanding | n/a |
+| 01 | *(committed to `main`)* | ◐ Steps 1, 3, 4, 5 done — 2, 6, 7, 8 outstanding | n/a |
 | 02 | `fix/order-contract` | ☐ Not started | ☐ |
 | 03 | `security/private-photo-storage` | ☐ Not started | ☐ |
 | 04 | *(committed to `main`)* | ◐ Code complete, unverified — see Deviations | n/a |
 | 05 | `fix/upload-and-feed` | ☐ Not started | ☐ |
 | 06 | `feat/demo-seed` | ☐ Not started | ☐ |
 | 07 | `feat/ux-completion` | ☐ Not started | ☐ |
-| 08 | `test/suite` | ☐ Not started | ☐ |
-| 09 | `ci/deploy` | ☐ Not started | ☐ |
-| 10 | `docs/submission` | ☐ Not started | ☐ |
-| 11 | `chore/qa` | ☐ Not started | ☐ |
+| 08 | *(committed to `main`)* | ◐ Harness + 12 of 36 tests — **never executed** | n/a |
+| 09 | *(committed to `main`)* | ◐ Step 3 + Step 2 PII fixes only — rest outstanding | n/a |
+| 10 | *(committed to `main`)* | ◐ Step 5 + diagram G-3 only — rest outstanding | n/a |
+| 11 | *(committed to `main`)* | ◐ Step 3 as a script — never run against an instance | n/a |
+
+**On the branch column.** Phase 2 was planned as one branch per plan with PRs
+into `develop`. In practice the work below was committed directly to `main`.
+The per-plan branches in this table were never created.
+
+**Every ◐ above means "written, not verified".** No `.env` exists in this
+repository, so the backend cannot boot, the app cannot run, no Supabase query
+can be made and nothing is deployed. See each plan's `## Deviations` for what
+was and was not executed.
 
 ---
 

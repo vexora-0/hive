@@ -267,4 +267,47 @@ chore(submission): add preview APK and finalise submission pack
 
 ## Deviations
 
-*Record here anything that differed from this plan, and why.*
+**Only Step 3 was done, by Nagachaitanya**, matching the W23 row in
+`PHASE-2-EXECUTION-PLAN.md` §4. Not done: k6 load testing, the full manual QA
+pass, the demo script, the video, the submission pack and the pre-demo
+checklist — those need a deployed instance and belong to the other three.
+
+**Step 3 became a script, not a checklist.** `scripts/verify-security.sh` runs
+the checks against `$BASE_URL` and exits with the failure count so CI can gate
+on it. Ten sections: G-02, G-04, G-05, G-08, G-17, the production error shape,
+HTTPS and CORS, rate limiting, and repository hygiene. Every check that needs
+a token or an ID reads it from the environment and reports **skip** when it is
+absent — skips are counted separately from passes, and the summary says
+explicitly that a run with skips does not verify `docs/security.md` §4. A
+checklist that silently passes when it checked nothing is worse than no
+checklist.
+
+**The `/uploads` check is more subtle than the plan's line suggests.** Plan 11
+lists `curl https://<backend>/uploads/photos/anything → 404`. That proves
+nothing: `express.static` returns 404 for a missing file whether or not the
+route is authenticated, so it passes today, while the route is wide open. The
+script keeps that check but adds one gated on `REAL_S3_KEY` — fetching a path
+that *does* exist — and labels it as the check that actually tests G-02.
+
+**Rate limiting is opt-in** behind `RUN_RATE_LIMIT_CHECK=1`. Sending 120
+requests at a free-tier instance is slow and consumes the limiter's window,
+which is the last thing wanted shortly before a demo.
+
+**Key rotation has not been done.** Audit S-15 — the project ref
+`fhvwsmtivwtmbdscdoyz` at `supabase/README_MIGRATIONS.md:20` — still stands.
+Rotating requires Supabase dashboard access and there is nothing deployed to
+update afterwards. It is recorded in `docs/security.md` §7 as an open item.
+
+### Not verified
+
+**The script has never been run against a real instance.** Nothing is deployed
+and there is no `.env`, so there is no backend to point it at. It has been
+syntax-checked and executed end to end against an unreachable host to confirm
+the control flow, skip handling and summary work, and its repository-hygiene
+section — the only part that needs no server — passes.
+
+That section earned its place immediately: it found `Admin@123` still
+documented in a comment at `supabase/seed.sql:9`, which the earlier manual
+grep had missed by scoping itself to `packages/` and `apps/`.
+
+Everything in Step 3's checklist that requires HTTP remains unverified.

@@ -207,11 +207,23 @@ Step 8 has no commit — it is a dashboard change. Note it in the PR description
 
 ## Deviations
 
-**Only Steps 1, 3 and 5 were done, by Nagachaitanya.** Plan 01 is eight independent
-tasks split across the team (`PHASE-2-EXECUTION-PLAN.md` §4): Steps 2 and 7 are
-Srujan's, Steps 6 and 7 Ruthwik's. Step 8 is a Supabase dashboard task requiring
-account access. The Done-when checklist above therefore cannot be ticked as a
-whole yet — the `Admin@123` grep and the `.env.example` items belong to Step 4/7.
+**Steps 1, 3, 4 and 5 were done, by Nagachaitanya.** Plan 01 is eight
+independent tasks split across the team (`PHASE-2-EXECUTION-PLAN.md` §4):
+Step 2 is Srujan's, Steps 6 and 7 Ruthwik's. Step 8 is a Supabase dashboard
+task requiring account access.
+
+**Step 4 was picked up late and was not assigned to anyone.** The W14 row
+allocates Steps 1/3/5 here, Step 2 to Srujan and Steps 6/7 to Ruthwik, leaving
+Step 4 unowned. It was taken on in W22 for two reasons: it is an admin
+credential, which falls under this stream's ownership, and `docs/security.md`
+Step 5 requires stating that no credentials are committed — which could not be
+written honestly while `Admin@123` sat in `seedAdmin.ts`.
+
+A second occurrence turned up afterwards in a comment at `supabase/seed.sql:9`,
+found by `scripts/verify-security.sh` scanning the whole repository rather than
+just `packages/` and `apps/` as the plan's grep does. Both are gone;
+`git grep "Admin@123"` now matches only the audit and plan documents that
+report the finding.
 
 **Step 3 was already partly done.** `UserEditSheet.tsx` offers no role picker
 containing `school_admin`, and `types/supabase.ts` already declares
