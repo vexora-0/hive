@@ -260,6 +260,20 @@ scrubbed, because they exist to record request URLs and here that means signed
 photo URLs and Supabase calls carrying the service-role key. Nothing in them is
 worth the risk.
 
+### After merging
+
+Ruthwik landed Steps 1, 2, 4, 5 and 8 — the real health check, request IDs and
+production logging, the Dockerfile and compose stack, the CI workflow, and the
+database scripts. His `auth.ts` PII fixes are the same as this stream's and were
+taken in preference because they also thread `requestId` through the log lines.
+
+Step 6 (Render deploy) and Step 7 (EAS build) remain outstanding, and
+`CLAUDE.md` now assigns them to Bhargav along with creating the first `.env`.
+
+The Sentry work merged without conflict; only `package.json` needed hand
+resolution, to keep `@sentry/node` and `@sentry/react-native` while accepting
+Plan 03's deletion of the AWS SDK.
+
 ### Not verified
 
 **No error has ever been sent to Sentry.** There is no DSN and no `.env`, so

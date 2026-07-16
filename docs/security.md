@@ -1,7 +1,7 @@
 # Hive — Security Design
 
 **Scope:** the whole system — Expo app, Express API, Supabase (Postgres, Auth, Storage).
-**Status:** current as of Week 22. Sections marked ⚠ describe work that is not finished.
+**Status:** current as of Week 24, after all four streams merged. Sections marked ⚠ describe work that is not finished.
 **Source material:** `docs/01-PROJECT-AUDIT-AND-COMPLETION-PLAN.md` (gap IDs `G-xx`), and the plans under `docs/plans/`.
 
 ---
@@ -128,13 +128,16 @@ From the Week 14 audit. Severity is the audit's.
 
 | ID | Finding | Severity | Owner |
 |---|---|---|---|
-| **G-02** | `/uploads` is served by `express.static` with **no authentication**. Every photo is a public URL to anyone who knows or guesses the path. | **Critical** | Plan 03 |
-| **G-12** | No thumbnails generated; the feed serves full-resolution originals. | Medium | Plan 03 |
-| **G-40** | Upload MIME check trusts the client's `Content-Type`; no magic-byte verification (`middleware/upload.ts`). | Medium | Plan 03/05 |
-| **G-20** | `app.set('trust proxy', true)` trusts every hop, so `X-Forwarded-For` is client-controlled and the rate limiter keys on it. | Medium | Plan 01 Step 6 |
-| **G-S10** | `CORS_ORIGINS` defaults to `*`. | Medium | Plan 09 |
+| **G-01** | Order submission is broken three ways; no order can be placed. Not a security issue, but the largest functional gap. | — | Plan 02 |
+| **G-45** | Supabase's default SMTP is rate-limited to a handful of emails an hour, so **OTP delivery fails under any real load** — including a live demo. Unowned. | Medium | Plan 01 Step 8 |
+| **G-S10** | `CORS_ORIGINS` defaults to `*`. Must be set explicitly at deploy time. | Medium | Plan 09 |
+| **S-15** | Supabase project ref committed at `supabase/README_MIGRATIONS.md:20`; keys not yet rotated. | Low | Plan 11 |
 
-**G-02 is the most serious open item in the system, and it is more serious than any finding this document reports as fixed.** The authorization work above controls who may read photo *metadata* through the API; it does nothing about the file itself, which is currently served unauthenticated. Until Plan 03 lands, the fixes in §4 should not be read as "photos are protected".
+**G-02 has since been closed by Plan 03** — the static `/uploads` route is gone, the bucket is private, and files are served through short-lived signed URLs. That changes the reading of this section: photo *files* and photo *metadata* are now both controlled, where previously only the metadata layer was.
+
+One ordering makes them work together, and it is easy to break: `getPhotoDetails` runs the parent-ownership check **before** minting the signed URL. A signed URL grants access to the file itself, so generating one for a caller who is then refused would hand out exactly what the check exists to prevent. Anyone reordering that function needs to know this.
+
+**Nothing in this table has been verified against a running system.** See §8, item 9.
 
 ---
 
@@ -164,10 +167,10 @@ Fixed by stripping the metacharacters before interpolation, and skipping the fil
 |---|---|
 | Size limit — 25 MB, at both the validator and multer | ✅ |
 | Extension/`Content-Type` allowlist | ✅ |
-| Magic-byte verification | ⚠ **Absent** (G-40) — `middleware/upload.ts` trusts the client's declared MIME type |
+| Magic-byte verification | ✅ `sharp` reads the header rather than trusting the declared MIME type (G-40) |
 | Path traversal | ✅ Not possible — the storage path is server-generated as `photos/{schoolId}/{classId}/{uuid}.{ext}`; the client's filename is stored as metadata only and never used to build a path |
 | Ownership on write | ✅ `assertPhotoOwnership` (G-17) |
-| Private bucket + signed URLs | ⚠ **Not implemented** (G-02) — files are on local disk behind `express.static` with no auth |
+| Private bucket + signed URLs | ✅ Bucket private, static route deleted, short-lived signed URLs (G-02) |
 | Temp file cleanup on rejection | ✅ `saveUploadedFile` unlinks when the ownership check refuses |
 
 The path-traversal property is worth calling out because it is easy to get wrong and this codebase gets it right by construction: `requestUpload` generates the key from a fresh UUID and IDs it has already validated, so no client-supplied string ever reaches `path.join`.
@@ -205,9 +208,9 @@ The scrubber has been exercised against a synthetic event carrying a JWT, two em
 
 Stated plainly. Every one of these is a real gap.
 
-1. **⚠ `/uploads` is unauthenticated (G-02).** The most serious open issue in the system. Photo files are public URLs.
+1. **⚠ Signed URLs are bearer credentials.** Anyone holding one can fetch the photo until it expires, with no further check — so their lifetime is the security parameter, and forwarding one forwards the photo. This is the residue of G-02, not a regression: it is the accepted trade-off of the private-bucket design.
 2. **OTP lockout is client-side only.** `useOTP.ts` tracks attempts and lockout in React state, which resets on remount and is absent entirely from a modified client. The real protection is Supabase's own rate limiting. The lockout UI is a courtesy to honest users, not a control.
-3. **Rate limiting is bypassable (G-20).** `trust proxy` is `true`, so `req.ip` derives from a client-controlled header and rotating it defeats the limiter.
+3. **OTP delivery is rate-limited by Supabase's default SMTP (G-45)** and no custom SMTP is configured, so codes stop arriving under load. Unowned, and it fails during a live demo.
 4. **No audit log.** There is no record of who viewed which photo, or who changed a role. For a product handling children's images this is the most significant *missing* control rather than a broken one — a breach could not be scoped after the fact.
 5. **No 2FA**, including for admin accounts.
 6. **No account lockout or breach-password checking** on the seeded password accounts.

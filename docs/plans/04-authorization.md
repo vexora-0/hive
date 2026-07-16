@@ -268,6 +268,32 @@ authorization block added here sits above the URL construction and does not
 touch it, so Plan 03 can replace the `/uploads/...` strings with signed Supabase
 Storage URLs without conflict.
 
+### After merging with Plan 03
+
+Plan 03 landed in parallel and rewrote both files this plan touches. The
+integration changed three things:
+
+**`getPhotoDetails` ownership now runs before the signed URL is minted.** Plan
+03 replaced the `/uploads/...` string with a short-lived signed Supabase Storage
+URL. A signed URL is a bearer credential for the file itself, so generating one
+for a caller who is about to be refused would hand out precisely what the check
+exists to prevent. The ordering is load-bearing and is called out in a comment
+and in `docs/security.md` §4 — this is the most likely thing for a later
+refactor to break silently.
+
+**`saveUploadedFile` no longer needs its own temp-file unlink.** Plan 03
+restructured it with a `finally` that removes the multer temp file on every
+path, so the explicit unlink this plan's Step 3 required is gone. The ownership
+check simply throws.
+
+**`assertPhotoOwnership` selects `mime_type` too**, because Plan 03's
+`processAndUploadPhoto` needs it. It is `NOT NULL DEFAULT 'image/jpeg'` per
+migration `00007` — an initial nullable typing here was a genuine bug the
+merge's typecheck caught.
+
+`getPhotosByClass` lost its `baseUrl` parameter in Plan 03; the school check is
+otherwise unchanged.
+
 ### Not verified
 
 The repository contains no `.env`, so the backend cannot boot, the app cannot

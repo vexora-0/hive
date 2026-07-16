@@ -272,6 +272,26 @@ changed a migration.
 Incidentally: `require('sharp')` loads on macOS/arm64. That is the check
 `CLAUDE.md` puts on Plan 03 before Ruthwik starts.
 
+### After merging with Ruthwik's harness
+
+Two harnesses were written independently. **Ruthwik's was kept**, because
+`feed.test.ts` and `photos.test.ts` already depended on its API. Consequences:
+
+- `auth.test.ts` and `errors.test.ts` were adapted to it — `cleanupUsers()`
+  rather than `cleanup()`, and `tagStudentsBodySchema` rather than the
+  `tagStudentsSchema` that Plan 05's payload validation renamed. T-26 gained a
+  case for the new 50-student tag cap.
+- **One guard from this stream's harness was carried across.** Ruthwik's version
+  only refuses when `DEV_SUPABASE_URL` happens to be set, which is silent on a
+  machine that never configured it — exactly the machine most likely to get this
+  wrong. The hard-coded demo project ref check now sits alongside it.
+- `vitest.config.ts`, `tsconfig.test.json` and the second typecheck pass are
+  from this stream; his fixtures replaced the duplicate ones.
+
+Coverage after the merge: `auth.test.ts` and `errors.test.ts` (Nagachaitanya),
+`feed.test.ts` and `photos.test.ts` (Ruthwik). Still missing: `orders.test.ts`,
+`admin.test.ts` and all of Step 3's mobile tests.
+
 ### Not verified
 
 **`pnpm test` has never been executed.** There is no `.env.test` and no test
