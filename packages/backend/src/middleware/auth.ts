@@ -42,11 +42,10 @@ export async function authenticate(
     } = await supabaseAdmin.auth.getUser(token);
 
     if (error || !user) {
-      // Deliberately no req.ip. A client IP is personal data under GDPR, and
-      // this line fires on every expired token — which is routine, not an
-      // attack — so it would accumulate a log of who used the app and from
-      // where, for no diagnostic benefit.
+      // No req.ip — it is PII, and an invalid token is not worth storing an
+      // identifiable address for.
       logger.warn('Invalid auth token', {
+        requestId: req.requestId,
         error: error?.message,
       });
       res.status(401).json({
@@ -85,10 +84,10 @@ export async function authenticate(
 
     next();
   } catch (err) {
-    // The message only. Logging the error object serialises whatever the
-    // thrower attached to it — for a fetch failure inside the Supabase client
-    // that can include the request, and the request carries the bearer token.
+    // err.message only — a Supabase error object can embed request context
+    // including the bearer token.
     logger.error('Authentication error', {
+      requestId: req.requestId,
       error: err instanceof Error ? err.message : String(err),
     });
     res.status(500).json({

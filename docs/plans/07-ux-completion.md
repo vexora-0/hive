@@ -243,7 +243,7 @@ feat(ux): show uploader name in feed and real thumbnails in order detail
 - [ ] Empty states tell the user what to actually do
 - [ ] No hand-rolled error responses in controllers
 - [ ] Typecheck, lint, build pass
-- [ ] Merged into `develop`
+- [ ] Merged into `main`
 
 ---
 

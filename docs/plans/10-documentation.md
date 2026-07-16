@@ -224,7 +224,7 @@ docs: add progress report and documentation index
 - [ ] All eight diagrams complete and rendering
 - [ ] README verified from a clean clone by someone else
 - [ ] Docs index links everything
-- [ ] Merged into `develop`
+- [ ] Merged into `main`
 
 ---
 

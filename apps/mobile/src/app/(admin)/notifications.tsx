@@ -1,7 +1,7 @@
 import React from 'react';
 
-import { ScreenContainer } from '@/components/layout/ScreenContainer';
-import { HeaderBar } from '@/components/navigation/HeaderBar';
+import { ScreenContainer } from '@/components/layout';
+import { HeaderBar } from '@/components/navigation';
 import { NotificationCenter } from '@/features/notifications/components/NotificationCenter';
 
 // ---------------------------------------------------------------------------
@@ -9,10 +9,11 @@ import { NotificationCenter } from '@/features/notifications/components/Notifica
 // ---------------------------------------------------------------------------
 
 /**
- * Admin notifications screen.
+ * Notifications screen.
  *
- * Renders the shared `<NotificationCenter />`, which handles its own loading,
- * empty and pagination states.
+ * `NotificationCenter` is role-agnostic — the API returns whatever
+ * notifications belong to the authenticated user, so the same component serves
+ * all three roles.
  */
 export default function NotificationsScreen() {
   return (

@@ -67,7 +67,6 @@ export function MasonryGrid<T>({
       data={data}
       renderItem={renderItem}
       numColumns={2}
-      estimatedItemSize={estimatedItemSize}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.5}
       refreshing={refreshing}

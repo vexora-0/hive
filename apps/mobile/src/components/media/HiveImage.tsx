@@ -1,6 +1,10 @@
 import React from 'react';
 import { StyleProp, ImageStyle } from 'react-native';
-import { Image, type ContentFit } from 'expo-image';
+import { Image } from 'expo-image';
+
+// expo-image stopped exporting ContentFit. Declared locally rather than
+// reaching into the package's internal types.
+type ContentFit = 'cover' | 'contain' | 'fill' | 'none' | 'scale-down';
 
 // ---------------------------------------------------------------------------
 // Types

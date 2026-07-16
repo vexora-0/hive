@@ -19,7 +19,7 @@ Match it against the table. **This determines what you work on.** If the email d
 | Email | Name | Owns | Current plan |
 |---|---|---|---|
 | `chikotiruthwik@gmail.com` | **Ruthwik** | Backend APIs, storage, jobs, server assembly | `docs/plans/03-storage-and-media.md` |
-| `bhargav4g13132@gmail.com` | **Bhargav** | Mobile UI, design system, components, screens | `docs/plans/00-typecheck-fixes.md` |
+| `bhargav4g13132@gmail.com` | **Bhargav** | Mobile UI, design system, components, screens · **environment setup, Docker, deployment** | `docs/plans/00-typecheck-fixes.md`, then `docs/environment-setup.md` |
 | `dharmassr@gmail.com` | **Srujan** | Database schema, migrations, validation, data | `docs/plans/02-contracts-and-data-model.md` |
 | `vanapalachaitanya@gmail.com` | **Nagachaitanya** | Auth, authorization, notifications, admin | `docs/plans/04-authorization.md` |
 
@@ -42,7 +42,50 @@ Match it against the table. **This determines what you work on.** If the email d
 
 ---
 
-## 3. Current state
+## 3. Progress — updated 30 May (end of W17)
+
+| Plan | Owner | Status |
+|---|---|---|
+| **00** typecheck | Bhargav | ◐ Group B done by Srujan. **15 of 22 errors remain** — Groups A, C, D, E. |
+| **01** quick wins | shared | ◐ Steps 4, 6, 7 done. **Steps 1, 2, 3, 5, 8 outstanding.** |
+| **02** order contract | Srujan | ☐ Not started |
+| **03** storage & media | Ruthwik | ✔ Done — **never executed** |
+| **04** authorization | Nagachaitanya | ☐ Not started |
+| **05** upload & feed perf | Ruthwik | ✔ Done except Step 4 → reassigned |
+| **06** demo seed | Srujan | ☐ Not started |
+| **07** UX completion | Bhargav | ☐ Not started |
+| **08** tests | all four | ☐ Blocked — needs a test Supabase project |
+| **09** deployment | **Bhargav** | ◐ Docker, CI, health check, request IDs, db scripts written. **Env setup and Render deploy outstanding — see `docs/environment-setup.md`.** |
+| **10** docs | all four | ☐ Not started |
+| **11** QA & load | all four | ◐ k6 suite written, cannot run without a deployment |
+
+**Weeks 14–17 complete.** 35 commits. See `docs/PROGRESS-REPORT.md`.
+
+### Blocking right now, in priority order
+
+1. **No `.env` exists — Bhargav owns this.** Migration `00020` is unapplied and
+   no photo has ever been uploaded to the private bucket. Roughly 25 commits —
+   the storage rewrite, the feed query, the upload pipeline, observability —
+   compile and have **never executed**. Follow `docs/environment-setup.md`; it
+   ends with the verification checklist nobody has been able to run. This is the
+   single highest-value action available and unblocks Plans 08, 09 and 11.
+2. **The app still does not compile** — 15 mobile type errors. Bhargav's Plan 00,
+   Groups A, C, D, E.
+3. **Three "Coming Soon" screens are live** — Plan 01 Step 1, Nagachaitanya.
+   About an hour; ~700 lines of finished code sit unimported.
+4. **G-34** (`getSchools` N+1) has no owner — dropped from Plan 05 because
+   `admin.service.ts` belongs to Nagachaitanya.
+
+### Verified vs written
+
+Be precise about this when reporting progress. **Verified:** backend typecheck,
+build and lint; mobile error count. **Written but never run:** private storage,
+signed URLs, thumbnail generation, HEIC conversion, the feed join, the upload
+confirm step, the Docker image, the CI workflow, the k6 suite.
+
+---
+
+## 3a. Current state
 
 **Phase 1 is complete** — the application is built: database schema with row level security, a 22-endpoint API, teacher upload with student tagging, a privacy-scoped parent feed, an admin console, and a full design system.
 
@@ -80,9 +123,16 @@ Work is parallel, but three things are sequenced:
 ## 5. How to work
 
 ```bash
-git checkout develop && git pull
-git checkout -b <branch-from-your-plan> develop
+git checkout main && git pull
 ```
+
+**We work on `main`.** There is no long-lived `develop` branch — it was tried
+and dropped, because half the team was committing to `main` directly and the
+two diverged.
+
+A short-lived branch for your own plan is fine and encouraged if you want one —
+create it, do the work, merge it back to `main` the same day, delete it. What
+matters is that nothing sits unmerged for days where the others cannot see it.
 
 Then, for your plan:
 
@@ -90,7 +140,7 @@ Then, for your plan:
 2. **Follow the steps in order.**
 3. **Run every check** in the plan's Verification section. All must pass.
 4. **Commit using the plan's commit sequence** — the messages are already written.
-5. **Open a PR into `develop`.** One approval from another team member.
+5. **Merge to `main` the same day** and push. Ask someone to look over anything touching auth, storage or orders.
 6. **Tick the plan's Done-when checklist.**
 
 Always verify before committing:
@@ -159,7 +209,7 @@ A task is not finished because the code is written. All of these must hold:
 - Loading, error and empty states present in any UI
 - `pnpm typecheck` and `pnpm lint` pass with no new warnings
 - No console errors during the flow
-- Conventional commit message, reviewed, merged into `develop`
+- Conventional commit message, reviewed, merged to `main` and pushed
 
 ---
 

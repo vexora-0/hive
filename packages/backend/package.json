@@ -11,15 +11,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "rm -rf dist",
-    "seed:admin": "tsx src/scripts/seedAdmin.ts"
+    "seed:admin": "tsx src/scripts/seedAdmin.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.577.0",
-    "@aws-sdk/s3-request-presigner": "^3.577.0",
     "@sentry/node": "^10.69.0",
     "@supabase/supabase-js": "^2.43.0",
     "blurhash": "^2.0.5",
-    "bullmq": "^5.7.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",

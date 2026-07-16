@@ -9,10 +9,11 @@ import { NotificationCenter } from '@/features/notifications/components/Notifica
 // ---------------------------------------------------------------------------
 
 /**
- * Parent notifications screen.
+ * Notifications screen.
  *
- * Renders the shared `<NotificationCenter />`, which handles its own loading,
- * empty and pagination states.
+ * `NotificationCenter` is role-agnostic — the API returns whatever
+ * notifications belong to the authenticated user, so the same component serves
+ * all three roles.
  */
 export default function NotificationsScreen() {
   return (

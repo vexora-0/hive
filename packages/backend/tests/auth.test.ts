@@ -5,7 +5,7 @@ import app from '../src/app';
 import {
   createTestUser,
   createTestSchool,
-  cleanup,
+  cleanupUsers,
   type TestUser,
 } from './helpers';
 
@@ -31,7 +31,7 @@ describe('authentication and RBAC', () => {
   });
 
   afterAll(async () => {
-    await cleanup();
+    await cleanupUsers();
   });
 
   // -------------------------------------------------------------------------

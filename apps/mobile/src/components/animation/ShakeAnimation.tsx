@@ -69,7 +69,10 @@ export const ShakeAnimation = forwardRef<
     // Return to rest
     steps.push(withTiming(0, timingConfig));
 
-    translateX.value = withSequence(...steps);
+    // withSequence returns AnimatableValue; the shared value is typed number.
+    // The runtime value is a number — Reanimated's return type is wider than
+    // what it actually produces here.
+    translateX.value = withSequence(...steps) as unknown as number;
   }, [offset, oscillations, stepDuration, translateX]);
 
   useImperativeHandle(ref, () => ({ shake }), [shake]);

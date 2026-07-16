@@ -27,11 +27,11 @@ export interface UploadProgressProps {
 
 const STATE_LABELS: Record<ImageUploadState, string> = {
   idle: 'Ready',
-  hashing: 'Verifying...',
   'requesting-url': 'Preparing...',
   uploading: 'Uploading...',
   saving: 'Saving...',
   tagging: 'Tagging...',
+  confirming: 'Finishing...',
   complete: 'Done',
   error: 'Failed',
 };

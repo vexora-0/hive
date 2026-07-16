@@ -37,7 +37,7 @@ function reportToSentry(err: Error): void {
 
 export function errorHandler(
   err: Error,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ): void {
@@ -60,6 +60,7 @@ export function errorHandler(
   // AppError (operational)
   if (err instanceof AppError) {
     logger.warn('Operational error', {
+      requestId: req.requestId,
       message: err.message,
       code: err.code,
       statusCode: err.statusCode,
@@ -93,6 +94,7 @@ export function errorHandler(
 
   // Unknown / unexpected error
   logger.error('Unhandled error', {
+    requestId: req.requestId,
     message: err.message,
     stack: err.stack,
     name: err.name,

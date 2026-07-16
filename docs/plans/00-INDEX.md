@@ -78,28 +78,43 @@ Every plan follows the same loop:
 
 ## Progress tracker
 
-| Plan | Branch | Status | Merged |
+| Plan | Owner | Status | Merged |
 |---|---|---|---|
-| 01 | *(committed to `main`)* | ◐ Steps 1, 3, 4, 5 done — 2, 6, 7, 8 outstanding | n/a |
-| 02 | `fix/order-contract` | ☐ Not started | ☐ |
-| 03 | `security/private-photo-storage` | ☐ Not started | ☐ |
-| 04 | *(committed to `main`)* | ◐ Code complete, unverified — see Deviations | n/a |
-| 05 | `fix/upload-and-feed` | ☐ Not started | ☐ |
-| 06 | `feat/demo-seed` | ☐ Not started | ☐ |
-| 07 | `feat/ux-completion` | ☐ Not started | ☐ |
-| 08 | *(committed to `main`)* | ◐ Harness + 12 of 36 tests — **never executed** | n/a |
-| 09 | *(committed to `main`)* | ◐ Step 3 + Step 2 PII fixes only — rest outstanding | n/a |
-| 10 | *(committed to `main`)* | ◐ Step 5 + diagram G-3 only — rest outstanding | n/a |
-| 11 | *(committed to `main`)* | ◐ Step 3 as a script — never run against an instance | n/a |
+| 00 | Bhargav | ✔ All 22 cleared — Group B by Srujan, A/C/D/E by Bhargav | ✔ |
+| 01 | shared | ◐ Steps 1–7 done (1, 3, 5 Nagachaitanya · 2 Srujan · 4, 6, 7 Ruthwik). **Step 8 (SMTP) outstanding** | ✔ |
+| 02 | Srujan | ☐ Not started | ☐ |
+| 03 | Ruthwik | ✔ Done — **runtime unverified, no `.env`** | ✔ |
+| 04 | Nagachaitanya | ✔ Done — **runtime unverified**, see Deviations | ✔ |
+| 05 | Ruthwik | ◐ Steps 1, 2, 3, 5 done. **Step 4 (G-34) reassigned to Nagachaitanya** | ✔ |
+| 06 | Srujan | ☐ Not started | ☐ |
+| 07 | Bhargav | ☐ Not started | ☐ |
+| 08 | all four | ◐ Harness + feed/photos (Ruthwik) + auth/errors (Nagachaitanya). **Never executed** | ◐ |
+| 09 | Bhargav | ◐ Docker, CI, health, request IDs (Ruthwik) · Sentry + PII scrubbing (Nagachaitanya). **Env setup and Render deploy outstanding** | ◐ |
+| 10 | all four | ◐ Architecture (Ruthwik) · security + auth diagram (Nagachaitanya). Rest outstanding | ◐ |
+| 11 | all four | ◐ k6 suite (Ruthwik) · `verify-security.sh` (Nagachaitanya). Neither has run | ◐ |
 
-**On the branch column.** Phase 2 was planned as one branch per plan with PRs
-into `develop`. In practice the work below was committed directly to `main`.
-The per-plan branches in this table were never created.
+**On branches.** Phase 2 was planned as one branch per plan with PRs into
+`develop`. `develop` was abandoned in W14 and the team moved to trunk-based
+work on `main`; the per-plan branches in earlier drafts of this table were
+never created.
 
-**Every ◐ above means "written, not verified".** No `.env` exists in this
-repository, so the backend cannot boot, the app cannot run, no Supabase query
-can be made and nothing is deployed. See each plan's `## Deviations` for what
-was and was not executed.
+**Every ◐ and ✔ above means "written", not "runtime-verified".** No `.env`
+exists in this repository, so the backend cannot boot, the app cannot run, no
+Supabase query can be made and nothing is deployed. See each plan's
+`## Deviations` for exactly what was and was not executed.
+
+### Open items needing an owner
+
+- **G-34** (`getSchools` N+1) — dropped from Plan 05 because `admin.service.ts`
+  is Nagachaitanya's file. Now assigned to him; still open.
+- **Plan 01 Step 8** (custom SMTP for OTP delivery) — a Supabase dashboard task.
+  Unowned. It is a demo-day failure with no code fix.
+- **No `.env` anywhere.** Plans 03, 04, 05, 08, 09 and 11 all compile and have
+  never run. Migration `00020` is not applied. This is the single highest-value
+  action available — see `docs/environment-setup.md`.
+- **G-02 is still open.** Plan 03 removed the static `/uploads` route in code,
+  but nothing has been deployed or verified, so no photo has ever been served
+  from the private bucket.
 
 ---
 
@@ -119,14 +134,16 @@ Sequential execution means no range reservation is needed, but numbers must not 
 
 ---
 
-## Setup required before Plan 01
+## Setup
 
 ```bash
-cd /home/ruthwikchikoti/Documents/bits/major-project/hive
-pnpm install                 # node_modules is currently absent
-git checkout -b develop      # develop does not yet exist
-git push -u origin develop
+git checkout main && git pull
+pnpm install
 ```
+
+**We work on `main`.** A `develop` branch was created in W14 and abandoned the
+same week — half the team was committing to `main` directly and the two
+diverged. Short-lived per-plan branches are fine; merge them back the same day.
 
 Confirm the baseline builds before changing anything:
 ```bash

@@ -21,7 +21,8 @@ import { Text } from '@/components/ui';
 export interface ClassItem {
   id: string;
   name: string;
-  grade: string;
+  /** Nullable — classes.grade is optional in the schema. */
+  grade: string | null;
 }
 
 export interface ClassSelectorProps {

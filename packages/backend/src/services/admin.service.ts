@@ -58,15 +58,31 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       supabaseAdmin
         .from('photos')
         .select('id', { count: 'exact', head: true }),
-      supabaseAdmin
-        .from('orders')
-        .select('id, total'),
+      // `total` does not exist — the column is total_amount. The error was
+      // never checked, so data came back null and both figures silently
+      // reported 0 regardless of the real data. (G-06)
+      supabaseAdmin.from('orders').select('total_amount'),
     ]);
+
+  for (const [name, result] of Object.entries({
+    schools: schoolsCount,
+    users: usersCount,
+    photos: photosCount,
+    orders: ordersResult,
+  })) {
+    if (result.error) {
+      logger.error('Dashboard statistic query failed', {
+        statistic: name,
+        error: result.error.message,
+      });
+      throw new AppError('Failed to load dashboard statistics', 500, 'QUERY_FAILED');
+    }
+  }
 
   const totalOrders = ordersResult.data?.length ?? 0;
   const totalRevenue =
     ordersResult.data?.reduce(
-      (sum, order) => sum + (order.total ?? 0),
+      (sum, order) => sum + Number(order.total_amount ?? 0),
       0,
     ) ?? 0;
 
@@ -92,13 +108,10 @@ export async function getUsers(
     .limit(limit + 1);
 
   if (search) {
-    // PostgREST's or() takes a comma-separated filter DSL, so any of , ( ) . *
-    // % or \ in raw user input escapes the intended expression and injects a
-    // new filter clause — e.g. searching "x,role.eq.admin" would widen the
-    // result set rather than narrow it. Strip the metacharacters before
-    // interpolating. Length is already capped at 100 by getUsersSchema.
-    const safe = search.replace(/[,()\\.*%]/g, '').trim();
-
+    // or() takes a comma-separated filter DSL, so an unescaped comma, bracket
+    // or dot lets a caller inject an additional filter clause. Strip the
+    // metacharacters rather than trusting the input. (G-16)
+    const safe = search.replace(/[,().*%\\]/g, '').trim();
     if (safe) {
       query = query.or(`full_name.ilike.%${safe}%,email.ilike.%${safe}%`);
     }
@@ -369,7 +382,7 @@ export async function getClassDetail(classId: string): Promise<ClassDetail> {
 
   // Count parents per student
   const studentIds = (students ?? []).map((s) => s.id);
-  let parentCounts: Record<string, number> = {};
+  const parentCounts: Record<string, number> = {};
   if (studentIds.length > 0) {
     const { data: mappings } = await supabaseAdmin
       .from('parent_student_mappings')

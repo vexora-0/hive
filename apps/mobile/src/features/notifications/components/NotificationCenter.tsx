@@ -142,7 +142,6 @@ export function NotificationCenter() {
         data={notifications}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
-        estimatedItemSize={88}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.5}
         onRefresh={refetch}

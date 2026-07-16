@@ -18,13 +18,11 @@ export async function getFeed(
     const parsedLimit = limit ? parseInt(limit, 10) : 20;
     const clampedLimit = Math.min(Math.max(parsedLimit || 20, 1), 50);
 
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
     const result = await feedService.getFeed(
       userId,
       studentId,
       cursor,
       clampedLimit,
-      baseUrl,
     );
 
     res.json(paginated(result.photos, result.nextCursor));
@@ -41,8 +39,7 @@ export async function getPhotoDetails(
   try {
     const userId = req.user!.id;
     const { id } = req.params;
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const photo = await feedService.getPhotoDetails(id, userId, baseUrl);
+    const photo = await feedService.getPhotoDetails(id, userId);
 
     res.json(success(photo));
   } catch (err) {

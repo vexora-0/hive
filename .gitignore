@@ -13,5 +13,4 @@ android/
 demo/
 projectidea.md
 System Architecture & Technical Design.md
-packages/backend/uploads/photos/*
-!packages/backend/uploads/photos/.gitkeep
+.env.test

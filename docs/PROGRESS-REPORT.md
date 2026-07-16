@@ -912,3 +912,306 @@ Plan 10's security document and the auth sequence diagram. The threat model, the
 ---
 
 *Hive · Ruthwik, Bhargav, Srujan, Nagachaitanya*
+
+# Phase 2 — Completion & Hardening
+
+**Period:** Week 14 onwards · 3 May 2026 –
+**Basis:** a full codebase audit of the Phase 1 application, which found 46 gaps
+across security, correctness, performance, testing and deployment.
+
+Unlike Phase 1, this history is not reconstructed. Every commit below is work
+done by the person credited, in the order shown.
+
+---
+
+# Week 14 — Audit, Planning & Credential Hygiene
+
+**Dates:** 3 – 9 May 2026
+**Commits:** 14 — Ruthwik 8, Srujan 2, Nagachaitanya 2, Bhargav 2
+
+## Phase objective
+
+Audit the recovered application end to end, turn the findings into executable
+plans, and close the cheapest security gaps immediately.
+
+## Work completed
+
+- Full codebase audit: 46 numbered gaps with severity, evidence and fixes
+- Twelve implementation plans, one per work package, with a locked decision set
+- Team working instructions so each member's tooling picks up the right plan
+- Admin seeding credentials moved to the environment
+- Proxy trust restricted; environment examples corrected
+
+## Individual contributions
+
+**Ruthwik** — Ran the audit and wrote it up, plus the plan index, the storage,
+upload and deployment plans, the Phase 2 schedule and the team instructions.
+Then closed three gaps: the seeding script hardcoded `admin@hive.app` /
+`Admin@123` and printed the password to stdout; `trust proxy` was set to `true`,
+which lets a client spoof `X-Forwarded-For` and bypass the rate limiter; and the
+environment examples disagreed on the port, omitted `BACKEND_URL` and documented
+four AWS variables that nothing reads.
+
+**Srujan** — Wrote the data model and demo seed plans, and the four-person
+development and Git workflow document.
+
+**Nagachaitanya** — Wrote the quick wins, authorization, testing, documentation
+and QA plans.
+
+**Bhargav** — Documented all 22 mobile TypeScript errors, grouped by root cause,
+and wrote the UX completion plan.
+
+## Important technical implementation
+
+The audit's most consequential finding is architectural rather than a single
+bug: **the backend uses the service-role key for every query, which bypasses row
+level security entirely.** The 505-line policy set written in Phase 1 protects
+only the handful of queries the mobile client makes directly to Supabase. Every
+API endpoint must therefore enforce authorization explicitly in the service
+layer — and in four places it did not.
+
+## Issues and challenges
+
+Deciding what *not* to do. The audit surfaced 46 gaps and the temptation was to
+plan all of them. Ten decisions were locked up front — storage provider,
+synchronous image processing over a queue, integer cents, trunk-based work — so
+later weeks could not relitigate them.
+
+## Testing and validation
+
+Dependencies were installed and the monorepo compiled for the first time. The
+backend passes typecheck and build; the mobile package fails with 22 errors.
+That had not been visible during the static audit.
+
+## End state
+
+An audited codebase with an executable plan per work package, and three security
+gaps closed.
+
+## Next week
+
+Private photo storage and thumbnail generation — the most severe finding and the
+worst performance problem, which share one fix.
+
+---
+
+# Week 15 — Private Photo Storage & Image Processing
+
+**Dates:** 10 – 16 May 2026
+**Commits:** 7 — Ruthwik 7
+
+## Phase objective
+
+Close the audit's most severe finding: every child's photograph was reachable by
+anyone holding or guessing a URL, with no credential required.
+
+## Work completed
+
+- Photos bucket made private; public read and blanket write policies dropped
+- Signed URL helpers with batch signing
+- Thumbnails, blurhash and dimensions generated synchronously during upload
+- HEIC converted to JPEG; image magic bytes verified
+- Uploads moved from local disk to Supabase Storage
+- Unauthenticated `/uploads` static route removed
+- Unreachable BullMQ workers, S3 client and AWS configuration deleted
+
+## Individual contributions
+
+**Ruthwik** — The whole of Plan 03. Two independent exposures had to close
+together: the storage bucket was created public with a `TO public` read policy,
+and the API served the uploads directory through `express.static` mounted before
+any authentication. Photos now live in a private bucket and are reachable only
+through short-lived signed URLs.
+
+## Important technical implementation
+
+**Image processing moved into the request rather than a queue.** Neither BullMQ
+queue was ever enqueued — a repo-wide search for `.add(` found only `Set.add` —
+so `thumbnail_s3_key`, `blurhash`, `width` and `height` had been permanently
+null and the feed served full-resolution originals, up to 25 MB each, to a
+mobile grid. The workers could not have worked in any case: they read from S3
+while files were written to local disk, and updated a `content_type` column that
+does not exist.
+
+`sharp` takes 100–300 ms for a typical phone photo, which is imperceptible next
+to the upload. Removing the queue removed a Redis dependency for background work
+and an entire class of stuck-in-processing failures.
+
+## Issues and challenges
+
+The plan specified checking `format === 'heif' || format === 'heic'`. Sharp's
+type union contains only `heif` — HEIC containers report as `heif` — so the
+`'heic'` comparison is a compile error. Caught by typecheck.
+
+A staging error also went unnoticed initially: `git add -A <paths>` did not
+stage file deletions, so a commit claiming to delete the workers left them
+tracked. Caught on verification, and the week's commits were rebuilt with
+correct staging.
+
+## Testing and validation
+
+`sharp` confirmed to load with libvips 8.15.3 before starting, since the whole
+approach depended on it. Backend typecheck and build pass; no `express.static`,
+S3 client or queue reference remains.
+
+**Not verified at runtime.** No `.env` exists, so migration `00020` has not been
+applied and no photo has been uploaded to the private bucket.
+
+## End state
+
+Photos are private objects served through signed URLs, with thumbnails
+generated on upload.
+
+## Next week
+
+The feed query, which breaks as data grows, and the upload ordering bug that
+suppresses parent notifications.
+
+---
+
+# Week 16 — Feed Query, Upload Ordering & Type Recovery
+
+**Dates:** 17 – 23 May 2026
+**Commits:** 9 — Ruthwik 6, Srujan 3
+
+## Phase objective
+
+Fix the two defects that make the product quietly wrong at scale: a feed query
+that stops working as photos accumulate, and an upload sequence that prevents
+parents from ever being notified.
+
+## Work completed
+
+- Feed rewritten as a single paginated join
+- Photos confirmed after tagging so notification triggers fire correctly
+- Upload concurrency bounded; accepted-image count corrected
+- Supabase database types regenerated, clearing 7 of 22 type errors
+- Trunk-based workflow adopted; `develop` abandoned
+
+## Individual contributions
+
+**Ruthwik** — The feed previously fetched *every* `photo_student_tags` row for a
+parent's children with no limit, then passed all resulting photo IDs back as an
+`IN` filter. For a child with a couple of thousand tagged photos that builds a
+URL containing thousands of UUIDs and PostgREST answers 414 URI Too Long: the
+feed did not degrade as data grew, it stopped working. Now one query with an
+inner join, paginated in the database.
+
+Also fixed the ordering bug: the pipeline marked a photo ready *before* tagging
+it, so `notify_parents_on_photo` always looped over zero tags. Teachers still
+received their upload-complete notification, which is why the gap went unnoticed.
+
+**Srujan** — Regenerated the Supabase types. The root cause was not staleness:
+the file was hand-written, never CLI-generated, and did not satisfy
+`GenericSchema` — no table declared `Relationships` and the schema had no
+`Views`, `Enums` or `CompositeTypes`. Compounding it, `@supabase/supabase-js` is
+pinned `^2.43.0` but resolves to 2.98, whose select-type resolution is far
+stricter. That version drift turned a tolerated shape into eight `never` errors.
+
+## Important technical implementation
+
+Deduplication needed care. An inner join emits one row per matching tag, so a
+photo containing two of a parent's children arrives twice. Over-fetching and
+deduplicating is straightforward; computing `hasNext` from it is not. Taking the
+deduplicated count alone truncates the feed whenever siblings appear together,
+so `hasNext` also considers whether the database hit the fetch ceiling. A
+spurious empty page is a far better failure than a silently shortened feed.
+
+## Issues and challenges
+
+`develop` was created in Week 14 and abandoned in Week 16 — half the team was
+committing to `main` directly and the two diverged within days. All
+documentation was corrected to describe trunk-based work rather than a process
+nobody was following.
+
+Srujan's type regeneration also sat unmerged on a branch for over a week while
+Bhargav was blocked on it, which is the concrete argument for merging daily.
+
+## Testing and validation
+
+Mobile errors fell from 22 to 15. Backend typecheck, build and lint pass.
+
+**The feed rewrite is the highest-risk change so far and has not been run
+against real data.** Pagination across pages, the sibling-dedup path and the 414
+case it exists to fix are all untested.
+
+## End state
+
+Both scale defects fixed in code; neither verified.
+
+## Next week
+
+Deployment groundwork — the environment that would let any of this be verified.
+
+---
+
+# Week 17 — Observability, Containerisation & Load Testing
+
+**Dates:** 24 – 30 May 2026
+**Commits:** 5 — Ruthwik 5
+
+## Phase objective
+
+Make the service observable and deployable, and prepare the measurement needed
+to demonstrate the performance work.
+
+## Work completed
+
+- Request correlation IDs; production request logging
+- Health check that verifies the database
+- Multi-stage Docker image and local compose stack
+- CI: lint, typecheck, build and image build
+- Database migration and reset scripts
+- k6 load test suite with four profiles
+
+## Individual contributions
+
+**Ruthwik** — `X-Request-ID` was allow-listed in the CORS configuration but
+never generated, read or logged, so a user reporting a failure gave us nothing
+to search for. Requests were also logged at `debug` while production runs at
+`info` — production had no request log at all.
+
+`/health` returned a static 200, so an instance unable to reach Supabase still
+reported healthy and the platform kept routing traffic to it. It now checks the
+database and answers 503 on failure, returning a boolean only since the endpoint
+is public.
+
+Also containerised the backend, added CI, and wrote the k6 suite.
+
+## Important technical implementation
+
+CI is deliberately non-blocking on the mobile package. Backend typecheck and
+build are hard gates; mobile typecheck and lint carry failures inherited from
+Phase 1. A pipeline that is red from the first commit teaches everyone to ignore
+it, so those steps are marked `continue-on-error` with a note to make them
+blocking once the type errors clear.
+
+The load suite tracks `feed_payload_bytes` as a custom metric. Before Week 15 no
+thumbnails existed and a 20-photo page could exceed 100 MB; the threshold is
+2 MB p95. That before-and-after is the clearest performance evidence available
+and costs one extra run.
+
+## Issues and challenges
+
+Auth failure logging included `req.ip` — personally identifiable — and logged
+whole error objects, which can embed the bearer token. Both corrected while
+adding correlation IDs.
+
+## Testing and validation
+
+Backend typecheck and build pass. The Docker image and CI workflow are written
+but have not been executed; the load suite cannot run without a deployed
+instance.
+
+## End state
+
+The service is instrumented, containerised and CI-verified in principle.
+
+## Next week
+
+Blocked pending a working environment. Roughly 25 commits of work — the storage
+rewrite, feed query, upload pipeline and observability — compile but have never
+executed. Creating a `.env` and applying migration `00020` is the prerequisite
+for everything remaining.
+
+---

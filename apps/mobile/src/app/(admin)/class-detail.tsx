@@ -171,7 +171,6 @@ export default function ClassDetailScreen() {
               onRemove={handleRemoveStudent}
             />
           )}
-          estimatedItemSize={70}
           keyExtractor={(item) => item.id}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListEmptyComponent={

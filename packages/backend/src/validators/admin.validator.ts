@@ -26,10 +26,10 @@ export const updateSchoolSchema = z.object({
 });
 
 export const updateUserRoleSchema = z.object({
+  // school_admin is not in the profiles.role CHECK constraint, so offering it
+  // let the admin UI submit a role the database rejects. (G-09)
   role: z.enum(['parent', 'teacher', 'admin'], {
-    errorMap: () => ({
-      message: 'role must be parent, teacher, or admin',
-    }),
+    errorMap: () => ({ message: 'role must be parent, teacher, or admin' }),
   }),
 });
 

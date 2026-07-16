@@ -20,8 +20,8 @@ This plan makes the API's authorization explicit, so the statement *"RLS is defe
 ## Prerequisites
 
 ```bash
-git checkout develop && git pull
-git checkout -b security/authorization develop
+git checkout main && git pull
+git checkout -b security/authorization main
 ```
 
 ---
@@ -208,7 +208,7 @@ This plan produces good viva material. Record for Plan 10's security document:
 - [ ] Deep-linking to another role's route redirects
 - [ ] Legitimate access for every role still works
 - [ ] Typecheck, lint, build pass
-- [ ] Merged into `develop`
+- [ ] Merged into `main`
 - [ ] Findings recorded for Plan 10
 
 ---

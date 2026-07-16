@@ -13,10 +13,10 @@ import {
 } from '../src/validators/admin.validator';
 import {
   requestUploadSchema,
-  tagStudentsSchema,
+  tagStudentsBodySchema,
   getPhotosSchema,
 } from '../src/validators/photo.validator';
-import { createTestUser, cleanup, type TestUser } from './helpers';
+import { createTestUser, cleanupUsers, type TestUser } from './helpers';
 
 // ---------------------------------------------------------------------------
 // T-26 — every Zod schema rejects representative malformed input
@@ -38,8 +38,9 @@ describe('T-26: validation schemas reject malformed input', () => {
     { name: 'requestUploadSchema — disallowed contentType', schema: requestUploadSchema, bad: { classId: '00000000-0000-0000-0000-000000000000', filename: 'a.gif', contentType: 'image/gif', fileSize: 1 } },
     { name: 'requestUploadSchema — file over 25MB', schema: requestUploadSchema, bad: { classId: '00000000-0000-0000-0000-000000000000', filename: 'a.jpg', contentType: 'image/jpeg', fileSize: 26 * 1024 * 1024 } },
     { name: 'requestUploadSchema — malformed sha256', schema: requestUploadSchema, bad: { classId: '00000000-0000-0000-0000-000000000000', filename: 'a.jpg', contentType: 'image/jpeg', fileSize: 1, sha256Hash: 'xyz' } },
-    { name: 'tagStudentsSchema — empty studentIds', schema: tagStudentsSchema, bad: { photoId: '00000000-0000-0000-0000-000000000000', studentIds: [] } },
-    { name: 'tagStudentsSchema — non-UUID studentId', schema: tagStudentsSchema, bad: { photoId: '00000000-0000-0000-0000-000000000000', studentIds: ['abc'] } },
+    { name: 'tagStudentsBodySchema — empty studentIds', schema: tagStudentsBodySchema, bad: { studentIds: [] } },
+    { name: 'tagStudentsBodySchema — non-UUID studentId', schema: tagStudentsBodySchema, bad: { studentIds: ['abc'] } },
+    { name: 'tagStudentsBodySchema — over the 50-student cap', schema: tagStudentsBodySchema, bad: { studentIds: Array.from({ length: 51 }, () => '11111111-1111-4111-8111-111111111111') } },
     { name: 'getPhotosSchema — non-UUID classId', schema: getPhotosSchema, bad: { classId: 'abc' } },
   ];
 
@@ -179,7 +180,7 @@ describe('error envelope over the mounted app', () => {
   });
 
   afterAll(async () => {
-    await cleanup();
+    await cleanupUsers();
   });
 
   it('an unmatched route returns the standard 404 envelope', async () => {

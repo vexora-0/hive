@@ -142,7 +142,6 @@ export default function SchoolsScreen() {
         <FlashList
           data={schools}
           renderItem={renderItem}
-          estimatedItemSize={200}
           keyExtractor={(item) => item.id}
           ItemSeparatorComponent={renderSeparator}
           ListFooterComponent={renderFooter}

@@ -32,8 +32,8 @@ The worker could not succeed even if enqueued — it downloads from **S3** (`ima
 ## Prerequisites
 
 ```bash
-git checkout develop && git pull
-git checkout -b security/private-photo-storage develop
+git checkout main && git pull
+git checkout -b security/private-photo-storage main
 ```
 
 Confirm the `photos` bucket exists in the Supabase dashboard (created by `00015`).
@@ -241,10 +241,45 @@ This leaves files ephemeral on deploy (G-I4) and blocks horizontal scaling (G-I5
 - [ ] `jobs/`, `config/s3.ts`, `utils/signedUrl.ts` deleted; deps removed
 - [ ] Before/after payload sizes recorded for Plan 11
 - [ ] Typecheck, lint, build pass
-- [ ] Merged into `develop`
+- [ ] Merged into `main`
 
 ---
 
 ## Deviations
 
-*Record here anything that differed from this plan, and why.*
+### Completed by Ruthwik, W15 (11–14 May)
+
+**Absorbed Plan 05's Step 1 (backend half).** The plan left `status='ready'` in
+`saveUploadedFile` and deferred the tag-before-ready fix to Plan 05. That is not
+separable — rewriting the upload path and then returning to the same function a
+week later to move one line means touching it twice. `saveUploadedFile` now
+leaves the photo in `processing`; `confirmUpload` performs the transition.
+**Plan 05 Step 1's backend half is therefore already done.**
+
+**Extracted `utils/imageProcessor.ts`** rather than inlining the sharp pipeline
+in the service, because Plan 06's seed script needs byte-identical processing.
+Srujan can import `processAndUploadPhoto(buffer, storagePath, mimeType)`.
+
+**Step 7 rename skipped.** `requestUpload` → `createPhotoRecord` and the route
+rename were listed as optional. Dropped — it touches the mobile service for no
+functional gain. The vestigial `uploadUrl: ''` was removed as planned.
+
+**`sharp` verified before starting:** loads with libvips 8.15.3. The Rollback
+section was not needed.
+
+**Sharp format check corrected.** The plan says to test `format === 'heif' ||
+format === 'heic'`. Sharp's type union contains only `heif` — HEIC containers
+report as `heif`, and comparing against `'heic'` is a compile error.
+
+### Not verified — no `.env` exists
+
+None of this has been exercised at runtime. Outstanding:
+
+- Migration `00020` has **not been applied** to Supabase
+- No photo has been uploaded to the private bucket
+- No signed URL has been resolved, and no expired/unsigned URL rejected
+- HEIC conversion untested
+- Feed thumbnail rendering untested
+
+Everything below the line in Verification is still open. Whoever creates the
+first working `.env` (Plan 09) should run it.

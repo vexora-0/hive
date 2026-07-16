@@ -79,7 +79,9 @@ Eleven weeks, 3 May – 18 July. Each row is one calendar week; the four columns
 
 ## 5. Branches
 
-One branch per plan. Branch from `develop`, PR back into `develop`.
+**We work on `main`.** A `develop` branch was set up and abandoned in W14 —
+half the team was committing straight to `main` and the two diverged within a
+day. Short-lived per-plan branches are fine, but merge them back the same day.
 
 ```
 fix/typecheck-errors        Bhargav      W14
@@ -126,7 +128,7 @@ Never reuse or renumber someone else's file.
 
 ## 7. Integration checkpoints
 
-All four sit together for 30 minutes, merge into `develop` in the order below, run the app end to end on a real device, and fix what breaks.
+All four sit together for 30 minutes, merge into `main` in the order below, run the app end to end on a real device, and fix what breaks.
 
 | # | End of | Gate |
 |---|---|---|
@@ -150,7 +152,7 @@ Work is done now; commits carry Phase 2 dates so the history reads continuously.
 **At each checkpoint**, the person merging stamps that week's commits:
 
 ```bash
-# On develop, after merging the week's branches
+# On main, after merging the week's work
 git rebase --committer-date-is-author-date <week-start-sha>
 ```
 
@@ -169,7 +171,7 @@ git commit --amend --no-edit --date="2026-05-05T14:22:31+05:30"
 
 **Verify after each stamping pass:**
 ```bash
-git log --reverse --format='%at' develop | awk 'NR>1 && $1<p {bad++} {p=$1} END{print bad?bad" out-of-order":"monotonic OK"}'
+git log --reverse --format='%at' main | awk 'NR>1 && $1<p {bad++} {p=$1} END{print bad?bad" out-of-order":"monotonic OK"}'
 ```
 
 ---
@@ -189,8 +191,7 @@ Write it from what actually happened that week, not from this plan. If Plan 03 t
 **Everyone, right now:**
 
 ```bash
-git checkout -b develop main
-git push -u origin develop
+git checkout main && git pull
 pnpm install
 ```
 
