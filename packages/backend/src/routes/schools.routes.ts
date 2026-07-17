@@ -21,8 +21,7 @@ router.get(
   roleGuard('teacher', 'admin'),
   async (req, res, next) => {
     try {
-      assertSchoolAccess(req, req.params.id);
-
+      assertSchoolAccess(req.user, req.params.id);
       const { data, error } = await supabaseAdmin
         .from('classes')
         .select('id, name, grade, teacher_id, academic_year, is_active')
@@ -45,8 +44,7 @@ router.get(
   roleGuard('teacher', 'admin'),
   async (req, res, next) => {
     try {
-      assertSchoolAccess(req, req.params.id);
-
+      assertSchoolAccess(req.user, req.params.id);
       const { classId } = req.query;
       let query = supabaseAdmin
         .from('students')
@@ -74,8 +72,7 @@ router.post(
   validate(createClassSchema, 'body'),
   async (req, res, next) => {
     try {
-      assertSchoolAccess(req, req.params.id);
-
+      assertSchoolAccess(req.user, req.params.id);
       const { data, error } = await supabaseAdmin
         .from('classes')
         .insert({

@@ -16,7 +16,7 @@ import { HiveImage } from '@/components/media';
 import type { ProductType } from '@/types/supabase';
 import { useAuthStore } from '@/features/auth/stores/authStore';
 
-import { PRODUCT_PRICES } from '../stores/cartStore';
+import { PRODUCT_PRICES_CENTS, formatCents } from '../constants/products';
 import { useCreateOrder } from '../hooks/useOrders';
 import { ProductPicker } from './ProductPicker';
 
@@ -41,9 +41,7 @@ type Step = 'product' | 'summary' | 'confirm';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatPrice(price: number): string {
-  return `$${price.toFixed(2)}`;
-}
+
 
 function getProductLabel(type: ProductType): string {
   const labels: Record<ProductType, string> = {
@@ -138,7 +136,7 @@ export function OrderBottomSheet({
     if (!selectedType) return;
 
     const idempotencyKey = uuidv4();
-    const unitPrice = PRODUCT_PRICES[selectedType];
+    const unitPrice = PRODUCT_PRICES_CENTS[selectedType];
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
@@ -146,10 +144,9 @@ export function OrderBottomSheet({
       {
         items: [
           {
-            photo_id: photoId,
-            product_type: selectedType,
+            photoId,
+            productType: selectedType,
             quantity,
-            unit_price: unitPrice,
           },
         ],
         shippingAddress: shippingAddress.trim() || null,
@@ -165,7 +162,7 @@ export function OrderBottomSheet({
   }, [selectedType, photoId, quantity, shippingAddress, notes, createOrder]);
 
   // ── Computed values ────────────────────────────────────────────────
-  const unitPrice = selectedType ? PRODUCT_PRICES[selectedType] : 0;
+  const unitPrice = selectedType ? PRODUCT_PRICES_CENTS[selectedType] : 0;
   const totalPrice = unitPrice * quantity;
 
   // ── Render helpers ─────────────────────────────────────────────────
@@ -225,7 +222,7 @@ export function OrderBottomSheet({
             {selectedType ? getProductLabel(selectedType) : ''}
           </Text>
           <Text variant="bodySmall" color={colors.text.secondary}>
-            {formatPrice(unitPrice)} each
+            {formatCents(unitPrice)} each
           </Text>
         </View>
       </View>
@@ -267,7 +264,7 @@ export function OrderBottomSheet({
       <View style={styles.totalRow}>
         <Text variant="bodyBold">Total</Text>
         <Text variant="h3" color={colors.primary.amberDark}>
-          {formatPrice(totalPrice)}
+          {formatCents(totalPrice)}
         </Text>
       </View>
 
@@ -364,7 +361,7 @@ export function OrderBottomSheet({
           <View style={styles.recapRow}>
             <Text variant="bodyBold">Total</Text>
             <Text variant="h4" color={colors.primary.amberDark}>
-              {formatPrice(totalPrice)}
+              {formatCents(totalPrice)}
             </Text>
           </View>
         </View>

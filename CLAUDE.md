@@ -42,46 +42,60 @@ Match it against the table. **This determines what you work on.** If the email d
 
 ---
 
-## 3. Progress — updated 30 May (end of W17)
+## 3. Progress — updated 8 July
 
 | Plan | Owner | Status |
 |---|---|---|
-| **00** typecheck | Bhargav | ◐ Group B done by Srujan. **15 of 22 errors remain** — Groups A, C, D, E. |
-| **01** quick wins | shared | ◐ Steps 4, 6, 7 done. **Steps 1, 2, 3, 5, 8 outstanding.** |
-| **02** order contract | Srujan | ☐ Not started |
-| **03** storage & media | Ruthwik | ✔ Done — **never executed** |
-| **04** authorization | Nagachaitanya | ☐ Not started |
-| **05** upload & feed perf | Ruthwik | ✔ Done except Step 4 → reassigned |
-| **06** demo seed | Srujan | ☐ Not started |
+| **00** typecheck | Bhargav | ✔ **Zero errors — the app compiles** |
+| **01** quick wins | shared | ✔ Done (SMTP config outstanding — dashboard task) |
+| **02** order contract | Srujan | ✔ Done |
+| **03** storage & media | Ruthwik | ✔ Done |
+| **04** authorization | Nagachaitanya | ✔ Done |
+| **05** upload & feed perf | Ruthwik | ✔ Done except G-34 |
+| **06** demo seed | Srujan | ☐ Not started — needs credentials to run |
 | **07** UX completion | Bhargav | ☐ Not started |
-| **08** tests | all four | ☐ Blocked — needs a test Supabase project |
-| **09** deployment | **Bhargav** | ◐ Docker, CI, health check, request IDs, db scripts written. **Env setup and Render deploy outstanding — see `docs/environment-setup.md`.** |
-| **10** docs | all four | ☐ Not started |
-| **11** QA & load | all four | ◐ k6 suite written, cannot run without a deployment |
+| **08** tests | all four | ◐ Harness + 19 backend tests written |
+| **09** deployment | Bhargav | ◐ Docker, CI, health, request IDs done; deploy outstanding |
+| **10** docs | all four | ◐ Architecture done |
+| **11** QA & load | all four | ◐ k6 suite written |
 
-**Weeks 14–17 complete.** 35 commits. See `docs/PROGRESS-REPORT.md`.
+### Every P0 security and correctness gap is closed
 
-### Blocking right now, in priority order
+| Gap | Was |
+|---|---|
+| G-02 | Every child's photo a public URL |
+| G-01 | Orders failed with 400 — feature never worked |
+| G-03 | Three "Coming Soon" screens |
+| G-04 | Any parent could read any photo |
+| G-05 | Parent could deep-link into the admin UI |
+| G-06 | Dashboard always showed 0 orders |
+| G-07 | Parents never notified of new photos |
+| G-08/G-17 | Cross-school roster and photo access |
+| G-09 | Admin UI offered a role the DB rejects |
+| G-12 | No thumbnails — full-res originals to mobile |
+| G-14 | Feed broke at scale (414) |
+| G-16 | Filter injection in admin search |
 
-1. **No `.env` exists — Bhargav owns this.** Migration `00020` is unapplied and
-   no photo has ever been uploaded to the private bucket. Roughly 25 commits —
-   the storage rewrite, the feed query, the upload pipeline, observability —
-   compile and have **never executed**. Follow `docs/environment-setup.md`; it
-   ends with the verification checklist nobody has been able to run. This is the
-   single highest-value action available and unblocks Plans 08, 09 and 11.
-2. **The app still does not compile** — 15 mobile type errors. Bhargav's Plan 00,
-   Groups A, C, D, E.
-3. **Three "Coming Soon" screens are live** — Plan 01 Step 1, Nagachaitanya.
-   About an hour; ~700 lines of finished code sit unimported.
-4. **G-34** (`getSchools` N+1) has no owner — dropped from Plan 05 because
-   `admin.service.ts` belongs to Nagachaitanya.
+### Still blocking
+
+1. **No usable `.env`.** The files now exist — `packages/backend/.env`,
+   `apps/mobile/.env` and `packages/backend/.env.test`, copied from the tracked
+   examples and gitignored — but they still hold placeholder values. A real
+   Supabase project URL, service-role key and anon key have to be filled in;
+   see `docs/environment-setup.md`. Until then migrations `00017` and `00020`
+   are unapplied and **nothing below has ever executed** — it compiles, and that
+   is the whole claim.
+2. **Plan 06** demo seed and **Plan 07** UX polish are unstarted.
+3. **G-34** (`getSchools` N+1) still has no owner.
 
 ### Verified vs written
 
-Be precise about this when reporting progress. **Verified:** backend typecheck,
-build and lint; mobile error count. **Written but never run:** private storage,
-signed URLs, thumbnail generation, HEIC conversion, the feed join, the upload
-confirm step, the Docker image, the CI workflow, the k6 suite.
+**Verified:** typecheck and build pass across both packages; lint clean except
+three pre-existing `any` warnings; 22 mobile type errors reduced to 0.
+
+**Written, never run:** private storage, signed URLs, thumbnails, HEIC
+conversion, the feed join, upload confirm, the order contract, RoleGate, the
+Docker image, CI, k6, and all 19 tests.
 
 ---
 

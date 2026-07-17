@@ -3,8 +3,8 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '@/theme';
-import { TabBar } from '@/components/navigation';
 import { RoleGate } from '@/features/auth/components/RoleGate';
+import { TabBar } from '@/components/navigation';
 
 // ---------------------------------------------------------------------------
 // Tab icon helper
@@ -44,65 +44,62 @@ function tabIcon(
  * 3. **Alerts** — notifications.
  * 4. **Profile** — account info and sign out.
  * (photo/[id] is a stack screen, hidden from tab bar.)
- *
- * Gated to `parent`, so deep-linking `hive://(parent)/feed` as a teacher or
- * admin redirects instead of rendering.
  */
 export default function ParentLayout() {
   return (
     <RoleGate allow={['parent']}>
-      <Tabs
-        tabBar={(props) => <TabBar {...props} />}
-        screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: colors.primary.amber,
-          tabBarInactiveTintColor: colors.text.tertiary,
+    <Tabs
+      tabBar={(props) => <TabBar {...props} />}
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: colors.primary.amber,
+        tabBarInactiveTintColor: colors.text.tertiary,
+      }}
+    >
+      <Tabs.Screen
+        name="feed"
+        options={{
+          title: 'Feed',
+          tabBarIcon: tabIcon('images', 'images-outline'),
+          tabBarAccessibilityLabel: 'Photo Feed',
         }}
-      >
-        <Tabs.Screen
-          name="feed"
-          options={{
-            title: 'Feed',
-            tabBarIcon: tabIcon('images', 'images-outline'),
-            tabBarAccessibilityLabel: 'Photo Feed',
-          }}
-        />
+      />
 
-        <Tabs.Screen
-          name="orders"
-          options={{
-            title: 'Orders',
-            tabBarIcon: tabIcon('cart', 'cart-outline'),
-            tabBarAccessibilityLabel: 'Order History',
-          }}
-        />
+      <Tabs.Screen
+        name="orders"
+        options={{
+          title: 'Orders',
+          tabBarIcon: tabIcon('cart', 'cart-outline'),
+          tabBarAccessibilityLabel: 'Order History',
+        }}
+      />
 
-        <Tabs.Screen
-          name="notifications"
-          options={{
-            title: 'Alerts',
-            tabBarIcon: tabIcon('notifications', 'notifications-outline'),
-            tabBarAccessibilityLabel: 'Notifications',
-          }}
-        />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Alerts',
+          tabBarIcon: tabIcon('notifications', 'notifications-outline'),
+          tabBarAccessibilityLabel: 'Notifications',
+        }}
+      />
 
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: 'Profile',
-            tabBarIcon: tabIcon('person', 'person-outline'),
-            tabBarAccessibilityLabel: 'Profile',
-          }}
-        />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: tabIcon('person', 'person-outline'),
+          tabBarAccessibilityLabel: 'Profile',
+        }}
+      />
 
-        {/* Hidden: detail screen when tapping a photo */}
-        <Tabs.Screen
-          name="photo/[id]"
-          options={{
-            href: null,
-          }}
-        />
-      </Tabs>
+      {/* Hidden: detail screen when tapping a photo */}
+      <Tabs.Screen
+        name="photo/[id]"
+        options={{
+          href: null,
+        }}
+      />
+    </Tabs>
     </RoleGate>
   );
 }

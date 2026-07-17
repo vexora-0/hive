@@ -86,9 +86,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             canPreventDefault: true,
           });
           if (!isFocused && !event.defaultPrevented) {
-            // Single-argument form: the tab routes carry no params, and the
-            // two-argument overload does not accept `never` for both.
-            navigation.navigate(route.name as never);
+            navigation.navigate(route.name, route.params);
           }
         };
 

@@ -9,7 +9,6 @@ import {
   fileExistsInStorage,
   deletePhotoObjects,
 } from '../utils/supabaseStorage';
-import type { AuthUser } from '../middleware/auth';
 import type { RequestUploadInput } from '../validators/photo.validator';
 
 const CONTENT_TYPE_TO_EXT: Record<string, string> = {
@@ -120,78 +119,13 @@ export async function requestUpload(
  * over photo_student_tags, so tags must already exist or no parent is ever
  * notified. See G-07.
  */
-interface PhotoOwnershipRow {
-  s3_key: string;
-  status: string;
-  /** NOT NULL DEFAULT 'image/jpeg' — see migration 00007. */
-  mime_type: string;
-  school_id: string;
-  uploaded_by: string;
-}
-
-/**
- * Load a photo and assert that `user` is entitled to mutate it.
- *
- * Every route below takes a photo ID straight from the URL. Without this,
- * checking only `status` — as all three of them did — lets any teacher
- * overwrite, confirm or tag any other teacher's photo.
- *
- * - `admin` may act on any photo.
- * - `teacher` must be the uploader **and** at the photo's school.
- * - anything else is refused.
- *
- * Tagging is held to the same uploader rule as upload and confirm rather than
- * the looser school rule it used before. A colleague at the same school tagging
- * someone else's photo is a plausible product decision, but it is not one this
- * codebase needs, and a single guard across all three routes is easier to
- * reason about than two similar ones that differ in a way nobody remembers.
- */
-async function assertPhotoOwnership(
-  photoId: string,
-  user: AuthUser,
-): Promise<PhotoOwnershipRow> {
-  const { data: photo, error } = await supabaseAdmin
-    .from('photos')
-    .select('s3_key, status, mime_type, school_id, uploaded_by')
-    .eq('id', photoId)
-    .single();
-
-  if (error || !photo) {
-    throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
-  }
-
-  if (user.role === 'admin') {
-    return photo as PhotoOwnershipRow;
-  }
-
-  const isOwner =
-    user.role === 'teacher' &&
-    photo.uploaded_by === user.id &&
-    photo.school_id === user.schoolId;
-
-  if (!isOwner) {
-    logger.warn('Blocked photo mutation', {
-      photoId,
-      userId: user.id,
-      role: user.role,
-    });
-    throw new AppError(
-      'You do not have permission to modify this photo',
-      403,
-      'FORBIDDEN',
-    );
-  }
-
-  return photo as PhotoOwnershipRow;
-}
-
 export async function saveUploadedFile(
   photoId: string,
   tempFilePath: string,
-  user: AuthUser,
+  user: { id: string; role: string; schoolId: string | null },
 ): Promise<void> {
   try {
-    const photo = await assertPhotoOwnership(photoId, user);
+    const photo = await assertPhotoAccess(photoId, user);
 
     if (photo.status !== 'processing') {
       throw new AppError(
@@ -259,9 +193,9 @@ export async function saveUploadedFile(
  */
 export async function confirmUpload(
   photoId: string,
-  user: AuthUser,
+  user: { id: string; role: string; schoolId: string | null },
 ): Promise<void> {
-  const photo = await assertPhotoOwnership(photoId, user);
+  const photo = await assertPhotoAccess(photoId, user);
 
   if (photo.status !== 'processing') {
     throw new AppError(
@@ -296,14 +230,15 @@ export async function confirmUpload(
 export async function tagStudents(
   photoId: string,
   studentIds: string[],
-  user: AuthUser,
+  user: { id: string; role: string; schoolId: string | null },
 ): Promise<void> {
-  // 1. Load the photo and verify ownership. This supersedes the separate
-  //    profile/school lookup that used to live here: ownership already implies
-  //    the caller is at the photo's school.
-  const photo = await assertPhotoOwnership(photoId, user);
+  // 1. Load the photo and verify ownership, using the same guard as /file and
+  //    /confirm. This supersedes the separate profile/school lookup that used
+  //    to live here — ownership already implies the caller is at the photo's
+  //    school, and the old check did not verify the uploader at all.
+  const photo = await assertPhotoAccess(photoId, user);
 
-  // 2. Verify all students belong to the same school
+  // 3. Verify all students belong to the same school
   const { data: students, error: studentsError } = await supabaseAdmin
     .from('students')
     .select('id')
@@ -325,7 +260,7 @@ export async function tagStudents(
     );
   }
 
-  // 3. Insert photo_student_tags (upsert to avoid duplicates)
+  // 4. Insert photo_student_tags (upsert to avoid duplicates)
   const tags = studentIds.map((studentId) => ({
     photo_id: photoId,
     student_id: studentId,
@@ -354,39 +289,79 @@ export async function tagStudents(
   });
 }
 
+/**
+ * Verify the caller may act on this photo.
+ *
+ * Admins may act anywhere. A teacher must be **the uploader, and at the
+ * photo's school**. The file and confirm endpoints previously checked nothing
+ * but status, so any teacher could overwrite any other teacher's photo by
+ * supplying its ID. (G-17)
+ *
+ * The school check alone is not enough. G-17 as written in the audit is
+ * "Teacher A can overwrite the file content of any other teacher's photo — at
+ * their own school, or, combined with G-08, any school." A school-scoped guard
+ * closes only the cross-school half and leaves same-school overwrite open,
+ * which is the more likely scenario in practice: colleagues share a school.
+ *
+ * Uploader scope is applied to tagging too, so one guard covers /file,
+ * /confirm and /tag. Letting a colleague tag your photo is a defensible
+ * product choice, but nothing in the app needs it, and one rule across three
+ * routes is easier to keep correct than two that differ subtly.
+ */
+async function assertPhotoAccess(
+  photoId: string,
+  user: { id: string; role: string; schoolId: string | null },
+): Promise<{ s3_key: string; status: string; mime_type: string; school_id: string }> {
+  const { data: photo, error } = await supabaseAdmin
+    .from('photos')
+    .select('s3_key, status, mime_type, school_id, uploaded_by')
+    .eq('id', photoId)
+    .single();
+
+  if (error || !photo) {
+    throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
+  }
+
+  if (user.role === 'admin') {
+    return photo;
+  }
+
+  const isOwner =
+    user.role === 'teacher' &&
+    photo.uploaded_by === user.id &&
+    photo.school_id === user.schoolId;
+
+  if (!isOwner) {
+    logger.warn('Blocked photo mutation', {
+      photoId,
+      userId: user.id,
+      role: user.role,
+    });
+    throw new AppError('You do not have access to this photo', 403, 'FORBIDDEN');
+  }
+
+  return photo;
+}
+
 export async function getPhotosByClass(
   classId: string,
-  user: AuthUser,
-  cursor?: string,
-  limit: number = 20,
+  cursor: string | undefined,
+  limit: number,
+  user: { role: string; schoolId: string | null },
 ): Promise<PaginatedPhotos> {
-  // The class ID arrives from the query string, so confirm it belongs to the
-  // caller's school before listing anything. Same shape as the check
-  // requestUpload already performs. Takes the whole AuthUser rather than a
-  // school ID because platform admins have school_id = null and must still be
-  // able to read any class.
-  if (user.role !== 'admin') {
-    const { data: classRecord, error: classError } = await supabaseAdmin
-      .from('classes')
-      .select('school_id')
-      .eq('id', classId)
-      .single();
+  // Scope to the caller's school — previously any teacher could list any
+  // class's photos by ID. (G-08)
+  const { data: cls, error: clsError } = await supabaseAdmin
+    .from('classes')
+    .select('school_id')
+    .eq('id', classId)
+    .single();
 
-    if (classError || !classRecord) {
-      throw new AppError('Class not found', 404, 'CLASS_NOT_FOUND');
-    }
-
-    if (classRecord.school_id !== user.schoolId) {
-      logger.warn('Blocked cross-school photo listing', {
-        classId,
-        userId: user.id,
-      });
-      throw new AppError(
-        'You do not have permission to view photos for this class',
-        403,
-        'FORBIDDEN',
-      );
-    }
+  if (clsError || !cls) {
+    throw new AppError('Class not found', 404, 'CLASS_NOT_FOUND');
+  }
+  if (user.role !== 'admin' && cls.school_id !== user.schoolId) {
+    throw new AppError('You do not have access to this class', 403, 'FORBIDDEN');
   }
 
   let query = supabaseAdmin

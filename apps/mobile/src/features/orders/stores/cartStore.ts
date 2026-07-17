@@ -1,20 +1,12 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import type { ProductType } from '@/types/supabase';
+import { PRODUCT_PRICES_CENTS, type ProductType } from '../constants/products';
 
 // ---------------------------------------------------------------------------
 // Product Prices
 // ---------------------------------------------------------------------------
 
-export const PRODUCT_PRICES: Record<ProductType, number> = {
-  print_4x6: 4.99,
-  print_5x7: 7.99,
-  print_8x10: 12.99,
-  digital_download: 2.99,
-  photo_book: 29.99,
-  magnet: 9.99,
-  mug: 14.99,
-};
+
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,7 +18,7 @@ export interface CartItem {
   photoUri: string;
   productType: ProductType;
   quantity: number;
-  unitPrice: number;
+  unitPriceCents: number;
 }
 
 interface CartStoreState {
@@ -43,7 +35,8 @@ interface CartStoreActions {
   /** Clear all items from the cart. */
   clearCart: () => void;
   /** Compute the total price of all items in the cart. */
-  getTotal: () => number;
+  /** Total in integer cents. */
+  getTotalCents: () => number;
   /** Compute the total number of items in the cart. */
   getItemCount: () => number;
 }
@@ -67,7 +60,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
       photoUri,
       productType,
       quantity: 1,
-      unitPrice: PRODUCT_PRICES[productType],
+      unitPriceCents: PRODUCT_PRICES_CENTS[productType],
     };
 
     set((state) => ({
@@ -98,9 +91,9 @@ export const useCartStore = create<CartStore>((set, get) => ({
     set({ items: [] });
   },
 
-  getTotal: () => {
+  getTotalCents: () => {
     const { items } = get();
-    return items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+    return items.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0);
   },
 
   getItemCount: () => {

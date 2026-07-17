@@ -3,8 +3,8 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '@/theme';
-import { TabBar } from '@/components/navigation/TabBar';
 import { RoleGate } from '@/features/auth/components/RoleGate';
+import { TabBar } from '@/components/navigation/TabBar';
 
 // ---------------------------------------------------------------------------
 // Tab icon helper
@@ -25,66 +25,62 @@ function tabIcon(
 
 /**
  * Admin tab layout — 5 tabs: Dashboard, Users, Schools, Notifications, Profile.
- *
- * Gated to `admin`. This is the group the audit called out by name: `hive://`
- * is a registered scheme, so `hive://(admin)/dashboard` previously rendered the
- * full admin console for a parent.
  */
 export default function AdminLayout() {
   return (
     <RoleGate allow={['admin']}>
-      <Tabs
-        tabBar={(props) => <TabBar {...props} />}
-        screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: colors.primary.amber,
-          tabBarInactiveTintColor: colors.text.tertiary,
+    <Tabs
+      tabBar={(props) => <TabBar {...props} />}
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: colors.primary.amber,
+        tabBarInactiveTintColor: colors.text.tertiary,
+      }}
+    >
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: 'Dashboard',
+          tabBarIcon: tabIcon('stats-chart-outline', 'stats-chart'),
         }}
-      >
-        <Tabs.Screen
-          name="dashboard"
-          options={{
-            title: 'Dashboard',
-            tabBarIcon: tabIcon('stats-chart-outline', 'stats-chart'),
-          }}
-        />
-        <Tabs.Screen
-          name="users"
-          options={{
-            title: 'Users',
-            tabBarIcon: tabIcon('people-outline', 'people'),
-          }}
-        />
-        <Tabs.Screen
-          name="schools"
-          options={{
-            title: 'Schools',
-            tabBarIcon: tabIcon('school-outline', 'school'),
-          }}
-        />
-        <Tabs.Screen
-          name="notifications"
-          options={{
-            title: 'Alerts',
-            tabBarIcon: tabIcon('notifications-outline', 'notifications'),
-          }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: 'Profile',
-            tabBarIcon: tabIcon('person-outline', 'person'),
-          }}
-        />
+      />
+      <Tabs.Screen
+        name="users"
+        options={{
+          title: 'Users',
+          tabBarIcon: tabIcon('people-outline', 'people'),
+        }}
+      />
+      <Tabs.Screen
+        name="schools"
+        options={{
+          title: 'Schools',
+          tabBarIcon: tabIcon('school-outline', 'school'),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Alerts',
+          tabBarIcon: tabIcon('notifications-outline', 'notifications'),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: tabIcon('person-outline', 'person'),
+        }}
+      />
 
-        {/* Hidden: class detail screen pushed from schools tab */}
-        <Tabs.Screen
-          name="class-detail"
-          options={{
-            href: null,
-          }}
-        />
-      </Tabs>
+      {/* Hidden: class detail screen pushed from schools tab */}
+      <Tabs.Screen
+        name="class-detail"
+        options={{
+          href: null,
+        }}
+      />
+    </Tabs>
     </RoleGate>
   );
 }

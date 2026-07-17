@@ -3,21 +3,10 @@ import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
 import { createNotification } from './notification.service';
+import { PRODUCT_PRICES_CENTS } from '../constants/products';
 import type { CreateOrderInput } from '../validators/order.validator';
 
-// Server-side pricing in cents
-const PRODUCT_PRICES: Record<string, number> = {
-  '4x6': 299,
-  '5x7': 499,
-  '8x10': 999,
-  '11x14': 1499,
-  '16x20': 2499,
-  digital: 199,
-  photo_book: 3999,
-  magnet: 799,
-  mug: 1499,
-  canvas: 4999,
-};
+
 
 interface OrderItem {
   id: string;
@@ -25,7 +14,7 @@ interface OrderItem {
   photo_id: string;
   product_type: string;
   quantity: number;
-  unit_price: number;
+  unit_price_cents: number;
 }
 
 interface Order {
@@ -35,7 +24,7 @@ interface Order {
   status: string;
   shipping_address: string;
   notes: string | null;
-  total_amount: number;
+  total_cents: number;
   created_at: string;
   items?: OrderItem[];
 }
@@ -93,7 +82,7 @@ export async function createOrder(
   let subtotal = 0;
 
   const orderItems: Omit<OrderItem, 'id'>[] = items.map((item) => {
-    const unitPrice = PRODUCT_PRICES[item.productType];
+    const unitPrice = PRODUCT_PRICES_CENTS[item.productType];
     if (unitPrice === undefined) {
       throw new AppError(
         `Unknown product type: ${item.productType}`,
@@ -109,7 +98,7 @@ export async function createOrder(
       photo_id: item.photoId,
       product_type: item.productType,
       quantity: item.quantity,
-      unit_price: unitPrice,
+      unit_price_cents: unitPrice,
     };
   });
 
@@ -121,7 +110,7 @@ export async function createOrder(
     status: 'pending',
     shipping_address: shippingAddress,
     notes: notes ?? null,
-    total_amount: subtotal,
+    total_cents: subtotal,
     idempotency_key: idempotencyKey ?? uuidv4(),
   });
 
@@ -175,7 +164,7 @@ export async function createOrder(
     status: 'pending',
     shipping_address: shippingAddress,
     notes: notes ?? null,
-    total_amount: subtotal,
+    total_cents: subtotal,
     created_at: new Date().toISOString(),
     items: itemsWithIds,
   };
@@ -188,7 +177,7 @@ export async function getOrders(
 ): Promise<PaginatedOrders> {
   let query = supabaseAdmin
     .from('orders')
-    .select('id, parent_id, school_id, status, shipping_address, notes, total_amount, created_at')
+    .select('id, parent_id, school_id, status, shipping_address, notes, total_cents, created_at')
     .eq('parent_id', parentId)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
@@ -234,7 +223,7 @@ export async function getOrderById(
 ): Promise<Order> {
   const { data: order, error } = await supabaseAdmin
     .from('orders')
-    .select('id, parent_id, school_id, status, shipping_address, notes, total_amount, created_at')
+    .select('id, parent_id, school_id, status, shipping_address, notes, total_cents, created_at')
     .eq('id', orderId)
     .eq('parent_id', parentId)
     .single();
@@ -245,7 +234,7 @@ export async function getOrderById(
 
   const { data: items } = await supabaseAdmin
     .from('order_items')
-    .select('id, order_id, photo_id, product_type, quantity, unit_price')
+    .select('id, order_id, photo_id, product_type, quantity, unit_price_cents')
     .eq('order_id', orderId);
 
   return { ...order, items: items ?? [] } as Order;

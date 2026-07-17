@@ -25,6 +25,8 @@ export interface UploadProgressProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Exhaustive over `ImageUploadState` -- adding a state to that union deliberately
+// breaks this map, so the new state gets a label instead of falling through.
 const STATE_LABELS: Record<ImageUploadState, string> = {
   idle: 'Ready',
   'requesting-url': 'Preparing...',

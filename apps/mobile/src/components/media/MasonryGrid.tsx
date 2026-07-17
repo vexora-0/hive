@@ -13,8 +13,6 @@ export interface MasonryGridProps<T> {
   data: T[];
   /** Render function for each item. */
   renderItem: ListRenderItem<T>;
-  /** Estimated item height used by FlashList for layout calculations. @default 250 */
-  estimatedItemSize?: number;
   /** Called when the user scrolls near the end of the list. */
   onEndReached?: () => void;
   /** Whether the list is currently refreshing. */
@@ -50,7 +48,6 @@ export interface MasonryGridProps<T> {
 export function MasonryGrid<T>({
   data,
   renderItem,
-  estimatedItemSize = 250,
   onEndReached,
   refreshing,
   onRefresh,

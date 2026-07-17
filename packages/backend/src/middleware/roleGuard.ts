@@ -1,5 +1,5 @@
-import { Request, Response, NextFunction } from 'express';
 import { AppError } from './errorHandler';
+import { Request, Response, NextFunction } from 'express';
 
 export function roleGuard(...allowedRoles: string[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -26,33 +26,21 @@ export function roleGuard(...allowedRoles: string[]) {
 }
 
 /**
- * Assert that the caller may act on `schoolId`.
+ * Verify the caller may act on a given school.
  *
- * `roleGuard` answers "what kind of user is this?"; this answers "is this
- * *their* school?". Route handlers that take a school ID from the URL need
- * both — the role check alone lets any teacher enumerate any other school.
- *
- * Platform admins are allowed through for any school: they legitimately need
- * cross-school access, and their `school_id` is null, so a plain equality
- * check would lock them out of everything.
- *
- * Throws rather than writing a response, so callers can `next(err)` and let
- * `errorHandler` render it in the standard envelope.
+ * Admins are cross-school by design. Everyone else is confined to their own —
+ * without this, any teacher could enumerate another school's classes and its
+ * complete student roster including dates of birth. (G-08)
  */
-export function assertSchoolAccess(req: Request, schoolId: string): void {
-  if (!req.user) {
+export function assertSchoolAccess(
+  user: { role: string; schoolId: string | null } | undefined,
+  schoolId: string,
+): void {
+  if (!user) {
     throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
   }
-
-  if (req.user.role === 'admin') {
-    return;
-  }
-
-  if (req.user.schoolId !== schoolId) {
-    throw new AppError(
-      'You do not have access to this school',
-      403,
-      'FORBIDDEN',
-    );
+  if (user.role === 'admin') return;
+  if (user.schoolId !== schoolId) {
+    throw new AppError('You do not have access to this school', 403, 'FORBIDDEN');
   }
 }

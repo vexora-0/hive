@@ -31,6 +31,8 @@ export interface UploadPreviewProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Both maps are exhaustive over `ImageUploadState`. Adding a state to that union
+// deliberately breaks them -- fill the new key in rather than widening the type.
 const STATE_BADGE_VARIANT: Record<
   ImageUploadState,
   'default' | 'success' | 'warning' | 'error'
@@ -65,7 +67,7 @@ const STATE_BADGE_LABEL: Record<ImageUploadState, string> = {
  *
  * Each image card shows:
  * - A thumbnail preview
- * - A state badge (hashing / uploading / complete / error)
+ * - A state badge (uploading / tagging / complete / error)
  * - A honeycomb-styled progress bar (amber coloured)
  * - A remove button (X) when the image is idle
  */

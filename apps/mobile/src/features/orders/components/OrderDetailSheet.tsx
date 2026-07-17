@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 
+import { formatCents } from '../constants/products';
 import { colors, spacing, layout } from '@/theme';
 import { Text } from '@/components/ui';
 import { HiveImage } from '@/components/media';
@@ -51,9 +52,7 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatPrice(amount: number): string {
-  return `$${amount.toFixed(2)}`;
-}
+
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -196,11 +195,11 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
                 {getProductLabel(item.product_type)}
               </Text>
               <Text variant="caption" color={colors.text.secondary}>
-                Qty: {item.quantity} x {formatPrice(item.unit_price)}
+                Qty: {item.quantity} x {formatCents(item.unit_price_cents)}
               </Text>
             </View>
             <Text variant="bodySmallBold">
-              {formatPrice(item.quantity * item.unit_price)}
+              {formatCents(item.quantity * item.unit_price_cents)}
             </Text>
           </View>
         ))}
@@ -287,7 +286,7 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
               <View style={styles.totalRow}>
                 <Text variant="bodyBold">Total Amount</Text>
                 <Text variant="h3" color={colors.primary.amberDark}>
-                  {formatPrice(order.total_amount)}
+                  {formatCents(order.total_cents)}
                 </Text>
               </View>
             </View>

@@ -182,6 +182,31 @@ export async function getFeed(
 }
 
 export async function getPhotoDetails(photoId: string, userId: string) {
+  // Ownership first. Without this any authenticated parent could read any
+  // photo by UUID — its URL, filename, class, school and the full list of
+  // tagged children, including families at other schools. (G-04)
+  const { data: ownLinks } = await supabaseAdmin
+    .from('parent_student_mappings')
+    .select('student_id')
+    .eq('parent_id', userId);
+
+  const ownStudentIds = ownLinks?.map((l) => l.student_id) ?? [];
+  if (ownStudentIds.length === 0) {
+    throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
+  }
+
+  const { count: visible } = await supabaseAdmin
+    .from('photo_student_tags')
+    .select('id', { count: 'exact', head: true })
+    .eq('photo_id', photoId)
+    .in('student_id', ownStudentIds);
+
+  // 404 rather than 403 — a 403 confirms the photo exists, which is itself a
+  // disclosure.
+  if (!visible) {
+    throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
+  }
+
   const { data: photo, error } = await supabaseAdmin
     .from('photos')
     .select('id, s3_key, thumbnail_s3_key, blurhash, width, height, status, created_at, uploaded_by, class_id, original_filename, mime_type, file_size_bytes')
@@ -190,56 +215,6 @@ export async function getPhotoDetails(photoId: string, userId: string) {
     .single();
 
   if (error || !photo) {
-    throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
-  }
-
-  // Authorization. The backend queries through supabaseAdmin, which holds the
-  // service-role key and is exempt from RLS by design, so ownership has to be
-  // checked explicitly here. The caller may read this photo only if one of
-  // their own children is tagged in it.
-  //
-  // A caller who is not entitled to the photo gets 404, never 403: a 403 would
-  // confirm that the photo exists, which is itself an information leak when the
-  // ID space is enumerable.
-  //
-  // This runs before the signed URL is minted — a signed URL grants access to
-  // the file itself, so it must never be generated for an unauthorised caller.
-  const { data: links, error: linksError } = await supabaseAdmin
-    .from('parent_student_mappings')
-    .select('student_id')
-    .eq('parent_id', userId);
-
-  if (linksError) {
-    logger.error('Failed to fetch parent-student links', {
-      error: linksError.message,
-      userId,
-    });
-    throw new AppError('Failed to fetch student links', 500, 'QUERY_FAILED');
-  }
-
-  const ownStudentIds = links?.map((l) => l.student_id) ?? [];
-
-  if (ownStudentIds.length === 0) {
-    throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
-  }
-
-  const { data: ownTags, error: ownTagsError } = await supabaseAdmin
-    .from('photo_student_tags')
-    .select('student_id')
-    .eq('photo_id', photoId)
-    .in('student_id', ownStudentIds);
-
-  if (ownTagsError) {
-    logger.error('Failed to verify photo ownership', {
-      error: ownTagsError.message,
-      photoId,
-      userId,
-    });
-    throw new AppError('Failed to fetch photo', 500, 'QUERY_FAILED');
-  }
-
-  if (!ownTags || ownTags.length === 0) {
-    logger.warn('Blocked photo detail access', { photoId, userId });
     throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
   }
 
@@ -262,6 +237,12 @@ export async function getPhotoDetails(photoId: string, userId: string) {
     ? (signed.get(photo.thumbnail_s3_key) ?? null)
     : null;
 
+  // Get tagged student IDs
+  const { data: tags } = await supabaseAdmin
+    .from('photo_student_tags')
+    .select('student_id')
+    .eq('photo_id', photoId);
+
   return {
     id: photo.id,
     url,
@@ -277,9 +258,10 @@ export async function getPhotoDetails(photoId: string, userId: string) {
     file_size_bytes: photo.file_size_bytes,
     className: classRow?.name ?? null,
     schoolName: classRow?.schools?.name ?? null,
-    // Only this parent's own children, never the full tag list. Authorisation
-    // is not binary: a parent entitled to see the photo is still not entitled
-    // to learn which other children appear in it.
-    taggedStudentIds: ownTags.map((t) => t.student_id),
+    // Only this parent's children — an authorised viewer still must not learn
+    // which other children appear in the frame.
+    taggedStudentIds: (tags ?? [])
+      .map((t) => t.student_id)
+      .filter((id) => ownStudentIds.includes(id)),
   };
 }

@@ -153,10 +153,14 @@ fix(ui): flatten nested style prop typing in text input
 
 ## Done when
 
-- [ ] `pnpm typecheck` passes across the whole monorepo
+- [x] `pnpm typecheck` passes across the whole monorepo
 - [ ] App runs with no visual or behavioural regression on the checklist above
-- [ ] Merged into `main`
-- [ ] **Announce it** — this unblocks all three other developers
+      — **partially verified.** `npx expo export --platform ios` bundles clean
+      (5.52 MB, 0 errors), which proves every module resolves and the tree
+      builds. The eight-item render checklist above is **not** ticked: it needs
+      a device or simulator against a live backend. See the deviation note.
+- [x] Merged into `main`
+- [x] **Announce it** — this unblocks all three other developers
 
 ---
 
@@ -239,3 +243,77 @@ green — backend lint has 2 pre-existing errors that are not yours.
 Ping me if a Supabase row type still resolves to `never` anywhere — that would
 mean the regenerated schema is missing something and it is mine to fix, not
 yours to cast around.
+
+### Groups A, C, D, E + ClassItem — DONE (Bhargav, W20–W21)
+
+`pnpm --filter @hive/mobile typecheck` is clean. Backend typecheck and
+`pnpm build:backend` still pass. Lint is unchanged against `BASELINE.md`.
+
+It landed in two passes, six weeks after its W14 slot:
+
+1. **The type errors** — `6c9078d`, `61a541b`, `732714a`, `edb3d2b` (W20).
+   All 15 cleared, typecheck green.
+2. **A residual pass** — `7e38b5c`, `7cbd74d`, `21510fa`, `19bd5c4` (W21).
+   Green typecheck is not the same as correct; the first pass left four things
+   behind, below.
+
+**Landed six weeks late.** That everyone else kept working around a
+non-compiling app for six weeks is the real finding, not the type errors. The
+execution plan's graph says 00 blocks everything; in practice it blocked
+nothing, because the other three verified by reading rather than running. That
+is why so much of Phase 2 is written-but-never-executed.
+
+**What the first pass left behind**
+
+1. **`ClassSelector` announced "null" to screen readers.** `ClassItem.grade`
+   was widened to `string | null`, but the three render sites were not touched
+   — which is the half of step 5 above that says *"and handle the empty case at
+   render"*. The visible `Text` nodes degrade quietly, but the trigger's
+   `accessibilityLabel` interpolates the value into a template string, so a
+   class with no grade is announced as *"Selected class: Butterflies, null. Tap
+   to change."* Fixed in `7e38b5c`. **Widening a type is not the same as
+   handling the new value** — the compiler cannot see into a template literal.
+
+2. **`MasonryGrid` kept a dead public prop.** `estimatedItemSize` was removed
+   where it was passed to `FlashList` but left on `MasonryGridProps` and
+   destructured with a default of 250. The component advertised a layout knob
+   that silently did nothing. Fixed in `7cbd74d`.
+
+3. **`TabBar` silently dropped route params.** The fix moved `navigate()` to the
+   single-argument form, commented as *"the two-argument overload does not
+   accept `never` for both"*. That reads the error backwards: the overload was
+   fine, the `as never` casts were the problem. Casting the name to `never`
+   makes `RouteName` infer as `never`, and the conditional in
+   `NavigationHelpers.navigate` distributes over `never`, collapsing the whole
+   parameter list. Dropping both casts types the two-argument form correctly and
+   restores `route.params`. Fixed in `21510fa`. No tab route carries params
+   today, which is exactly why it would have gone unnoticed until one did.
+
+4. **A stale doc comment.** `UploadPreview` still described its badge as showing
+   "hashing", the state that had just been deleted. Fixed in `19bd5c4`, along
+   with a note on each `Record<ImageUploadState, …>` that it is exhaustive —
+   the durable form of the warning this plan asked for.
+
+**Also deviating from the plan as written:** `HiveImage` uses the renamed
+`ImageContentFit` export rather than the inline union. The plan offered either;
+checking the installed `expo-image@3.0.11` `.d.ts`, as the plan instructs, shows
+the type is still exported under the new name, so the import is renamed. That
+keeps the prop tied to what `expo-image` accepts instead of a copy that drifts.
+
+**Group C needed no `confirming` note.** The plan says to leave a comment
+warning that Plan 05 will add that state. Plan 05 landed first and Ruthwik
+updated all three call sites as the conflict protocol required, so only the
+stale `hashing` key needed removing.
+
+**Not done — runtime verification.** The eight-item render checklist is
+unticked. `expo export` bundles clean, so every import resolves, but that is not
+the same as the screens rendering. Two changes carry real runtime surface:
+removing `estimatedItemSize` changes how FlashList v2 measures rows (feed,
+orders, users, schools, notifications should all be scrolled), and the `TabBar`
+`navigate()` change is on the tap path for every tab. Blocked on the same thing
+as everything else — see the environment note below.
+
+**`.env` files now exist locally** (`packages/backend/.env`, `apps/mobile/.env`,
+`packages/backend/.env.test`), copied from the tracked examples and gitignored.
+They still hold placeholder values: a real Supabase project URL, service-role
+key and anon key have to be filled in before anything can run.

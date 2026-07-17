@@ -419,7 +419,7 @@ export type Database = {
           school_id: string;
           idempotency_key: string;
           status: OrderStatus;
-          total_amount: number;
+          total_cents: number;
           shipping_address: string | null;
           notes: string | null;
           created_at: string;
@@ -431,7 +431,7 @@ export type Database = {
           school_id: string;
           idempotency_key: string;
           status?: OrderStatus;
-          total_amount?: number;
+          total_cents?: number;
           shipping_address?: string | null;
           notes?: string | null;
           created_at?: string;
@@ -443,7 +443,7 @@ export type Database = {
           school_id?: string;
           idempotency_key?: string;
           status?: OrderStatus;
-          total_amount?: number;
+          total_cents?: number;
           shipping_address?: string | null;
           notes?: string | null;
           created_at?: string;
@@ -473,7 +473,7 @@ export type Database = {
           photo_id: string;
           product_type: ProductType;
           quantity: number;
-          unit_price: number;
+          unit_price_cents: number;
           created_at: string;
         };
         Insert: {
@@ -482,7 +482,7 @@ export type Database = {
           photo_id: string;
           product_type: ProductType;
           quantity?: number;
-          unit_price: number;
+          unit_price_cents: number;
           created_at?: string;
         };
         Update: {

@@ -110,9 +110,11 @@ export function ClassSelector({
             >
               {item.name}
             </Text>
-            <Text variant="bodySmall" color={colors.text.secondary}>
-              {item.grade}
-            </Text>
+            {item.grade && (
+              <Text variant="bodySmall" color={colors.text.secondary}>
+                {item.grade}
+              </Text>
+            )}
           </View>
 
           {isSelected && (
@@ -150,7 +152,9 @@ export function ClassSelector({
         accessibilityRole="button"
         accessibilityLabel={
           selectedClass
-            ? `Selected class: ${selectedClass.name}, ${selectedClass.grade}. Tap to change.`
+            ? `Selected class: ${selectedClass.name}${
+                selectedClass.grade ? `, ${selectedClass.grade}` : ''
+              }. Tap to change.`
             : placeholder
         }
       >
@@ -159,9 +163,11 @@ export function ClassSelector({
             <Text variant="body" color={colors.text.primary} numberOfLines={1}>
               {selectedClass.name}
             </Text>
-            <Text variant="caption" color={colors.text.secondary} numberOfLines={1}>
-              {selectedClass.grade}
-            </Text>
+            {selectedClass.grade && (
+              <Text variant="caption" color={colors.text.secondary} numberOfLines={1}>
+                {selectedClass.grade}
+              </Text>
+            )}
           </View>
         ) : (
           <Text variant="body" color={colors.text.tertiary}>

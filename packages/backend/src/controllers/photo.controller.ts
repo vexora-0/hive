@@ -92,9 +92,9 @@ export async function getPhotos(
 
     const result = await photoService.getPhotosByClass(
       query.classId,
-      req.user!,
       query.cursor,
       query.limit,
+      { role: req.user!.role, schoolId: req.user!.schoolId },
     );
 
     res.json(paginated(result.photos, result.nextCursor));
