@@ -42,60 +42,46 @@ Match it against the table. **This determines what you work on.** If the email d
 
 ---
 
-## 3. Progress — updated 8 July
+## 3. Progress — updated 16 July
 
-| Plan | Owner | Status |
-|---|---|---|
-| **00** typecheck | Bhargav | ✔ **Zero errors — the app compiles** |
-| **01** quick wins | shared | ✔ Done (SMTP config outstanding — dashboard task) |
-| **02** order contract | Srujan | ✔ Done |
-| **03** storage & media | Ruthwik | ✔ Done |
-| **04** authorization | Nagachaitanya | ✔ Done |
-| **05** upload & feed perf | Ruthwik | ✔ Done except G-34 |
-| **06** demo seed | Srujan | ☐ Not started — needs credentials to run |
-| **07** UX completion | Bhargav | ☐ Not started |
-| **08** tests | all four | ◐ Harness + 19 backend tests written |
-| **09** deployment | Bhargav | ◐ Docker, CI, health, request IDs done; deploy outstanding |
-| **10** docs | all four | ◐ Architecture done |
-| **11** QA & load | all four | ◐ k6 suite written |
-
-### Every P0 security and correctness gap is closed
-
-| Gap | Was |
+| Plan | Status |
 |---|---|
-| G-02 | Every child's photo a public URL |
-| G-01 | Orders failed with 400 — feature never worked |
-| G-03 | Three "Coming Soon" screens |
-| G-04 | Any parent could read any photo |
-| G-05 | Parent could deep-link into the admin UI |
-| G-06 | Dashboard always showed 0 orders |
-| G-07 | Parents never notified of new photos |
-| G-08/G-17 | Cross-school roster and photo access |
-| G-09 | Admin UI offered a role the DB rejects |
-| G-12 | No thumbnails — full-res originals to mobile |
-| G-14 | Feed broke at scale (414) |
-| G-16 | Filter injection in admin search |
+| **00** typecheck | ✔ Zero errors |
+| **01** quick wins | ✔ (custom SMTP outstanding — dashboard task) |
+| **02** order contract | ✔ |
+| **03** storage & media | ✔ |
+| **04** authorization | ✔ |
+| **05** upload & feed perf | ✔ |
+| **06** demo seed | ✔ (needs JPEGs in `seed-assets/` and credentials to run) |
+| **07** UX completion | ✔ (real upload progress deferred — cosmetic) |
+| **08** tests | ◐ Harness + 19 backend tests; order/admin/mobile tests outstanding |
+| **09** deployment | ◐ Docker, CI, health, request IDs done; **not deployed** |
+| **10** docs | ✔ Architecture, database, API, security, demo guide |
+| **11** QA & load | ◐ k6 suite written, never run |
 
-### Still blocking
+**All 46 audit gaps closed except:** the remaining Plan 08 tests, deployment,
+and running anything.
 
-1. **No usable `.env`.** The files now exist — `packages/backend/.env`,
-   `apps/mobile/.env` and `packages/backend/.env.test`, copied from the tracked
-   examples and gitignored — but they still hold placeholder values. A real
-   Supabase project URL, service-role key and anon key have to be filled in;
-   see `docs/environment-setup.md`. Until then migrations `00017` and `00020`
-   are unapplied and **nothing below has ever executed** — it compiles, and that
-   is the whole claim.
-2. **Plan 06** demo seed and **Plan 07** UX polish are unstarted.
-3. **G-34** (`getSchools` N+1) still has no owner.
+### The one thing that matters now
+
+**Nothing has ever executed.** Migrations `00017` and `00020` are unapplied, no
+photo has been uploaded, no order placed, no test run, nothing deployed.
+
+`00017` renames `total_amount` → `total_cents` and the code expects the new
+name. **If the app runs before that migration is applied, every order query
+fails.** Same for `00020` and photos.
+
+Follow `docs/environment-setup.md`. Section 7 is the verification checklist —
+report failures, not just ticks.
 
 ### Verified vs written
 
-**Verified:** typecheck and build pass across both packages; lint clean except
-three pre-existing `any` warnings; 22 mobile type errors reduced to 0.
+**Verified:** typecheck and build pass both packages; lint clean but for three
+pre-existing `any` warnings; mobile type errors 22 → 0.
 
 **Written, never run:** private storage, signed URLs, thumbnails, HEIC
-conversion, the feed join, upload confirm, the order contract, RoleGate, the
-Docker image, CI, k6, and all 19 tests.
+conversion, the feed join, upload confirm, the order contract, RoleGate, toasts,
+the demo seed, the Docker image, CI, k6, and all 19 tests.
 
 ---
 

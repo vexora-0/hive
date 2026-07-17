@@ -215,9 +215,32 @@ Stated plainly. Every one of these is a real gap.
 5. **No 2FA**, including for admin accounts.
 6. **No account lockout or breach-password checking** on the seeded password accounts.
 7. **No automated revocation.** Signing out clears the local session; the JWT remains valid until it expires.
+7. **Rate limiting is per-instance and in-memory** — `express-rate-limit`'s
+   default store does not hold across multiple instances, so the effective
+   limit multiplies by the instance count.
+8. **No password reset flow for the admin account.** Recovery means re-running
+   `pnpm seed:admin` with new environment values.
 8. **Authorization is enforced in application code, not the database, on the API path.** This is a consequence of the service-role key and it means a new endpoint that forgets its ownership check is insecure by default. RLS would be secure by default. Rewriting the backend to use per-request user tokens would fix this class of bug outright, and is the single change that would most improve this system's security posture. It was not attempted within the project's scope.
 9. **⚠ The security fixes in §4 have not been verified against a running system.** No `.env` exists in this repository, so the backend cannot boot. The IDOR fixes and route guards are reviewed code and passing typechecks, not observed behaviour. `scripts/verify-security.sh` (Plan 11) exists to run these checks once a deployment does. Until it has been run, treat §4 as "believed fixed", not "confirmed fixed".
 10. **⚠ The test suite has never executed.** 12 of Plan 08's 36 tests are written; there is no test Supabase project to run them against, and the sabotage exercise that would prove they detect anything has not been done.
+
+---
+
+## 9. Verification
+
+The runtime checklist lives in `docs/environment-setup.md` §7 and in
+`scripts/verify-security.sh`, which runs it against a deployed instance and
+exits with the failure count.
+
+The checks that matter most: an unsigned or expired Storage URL must be
+rejected; a cross-family photo request must return **404**; a cross-school
+student listing must return **403**; a teacher writing to another teacher's
+photo must return **403**; and a triggered 500 must not leak a stack trace.
+
+**None of these has been executed.** There is no `.env` in the repository and
+nothing is deployed, so every remediation in §4 is written and compiled, not
+proven. `verify-security.sh` reports skipped checks separately from passes for
+exactly this reason — a run with skips does not verify this document.
 
 ---
 
