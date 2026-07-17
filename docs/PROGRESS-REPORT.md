@@ -1068,3 +1068,320 @@ executed. Creating a `.env` and applying migration `00020` is the prerequisite
 for everything remaining.
 
 ---
+
+# Week 18 — API Consistency & Architecture Documentation
+
+**Dates:** 31 May – 6 June 2026 · **Commits:** 4 — Ruthwik 4
+
+## Phase objective
+Close the audit findings remaining in the photo and feed services, and document
+the architecture while it was fresh.
+
+## Individual contributions
+**Ruthwik** — `POST /photos/:id/tag` was running with no validation at all: a
+schema existed but required a field the route takes from the URL, so it could
+never be wired up. Split it and applied it with a 50-item cap bounding the
+generated filter. Also replaced two hand-rolled error responses with `AppError`,
+so the same failure can no longer be formatted two ways.
+
+Wrote the architecture document and the environment setup guide, the latter
+handing deployment ownership to Bhargav.
+
+**Bhargav, Srujan, Nagachaitanya** — no commits. Bhargav was working through the
+type errors locally; the other two were blocked on the environment.
+
+## Issues and challenges
+This was the first week the unevenness became a problem. Three people had
+nothing merged, and the reason was structural: Plans 03 and 05 were a single
+sequential track, and Plan 00 blocked verification of everything else. The
+schedule assumed parallelism the dependency graph did not permit.
+
+## Testing and validation
+Typecheck and build pass. Backend lint clean in all files touched.
+
+## End state
+The photo and feed services carry no outstanding audit findings.
+
+## Next week
+The test harness.
+
+---
+
+# Week 19 — Test Harness & Feed Coverage
+
+**Dates:** 7 – 13 June 2026 · **Commits:** 2 — Ruthwik 2
+
+## Phase objective
+Build the test infrastructure and cover the privacy boundary.
+
+## Individual contributions
+**Ruthwik** — Vitest harness with a guard that refuses to run unless
+`.env.test` exists and warns if it points at the same project as `.env`. The
+suite truncates every domain table; wiping the demo dataset the night before a
+submission is a real failure mode and worth an unconditional check.
+
+Eight feed tests over two schools with unrelated families, all asking one
+question: can a parent reach a photo that is not of their own child.
+
+## Important technical implementation
+Two surprises. Vitest 4 was installed rather than 3, and `poolOptions` was
+removed in that major — the plan's config would have failed. The config also
+has to be `.mts`, because the backend package is CommonJS and Vitest 4 loads
+config natively, rejecting ESM syntax in a `.ts` file.
+
+## Issues and challenges
+The tests cannot run. Writing them ahead is still worthwhile — a wrong test
+fails loudly the first time it executes, unlike production code, which fails
+silently in front of an evaluator.
+
+## Testing and validation
+The harness fails correctly: a clear error naming the missing variables and
+pointing at the setup guide, not a crash and not a false pass.
+
+## End state
+Harness plus 8 feed tests, none executed.
+
+## Next week
+Photo tests, and the compile blocker.
+
+---
+
+# Week 20 — Photo Tests & the Compile Blocker
+
+**Dates:** 14 – 20 June 2026 · **Commits:** 3 — Bhargav 2, Ruthwik 1
+
+## Phase objective
+Get the mobile package compiling, and cover the upload path.
+
+## Individual contributions
+**Bhargav** — Started on the 22 type errors. FlashList v2 removed
+`estimatedItemSize`, which v1 required, and six call sites still passed it —
+every list screen failed to typecheck. Also removed the `hashing` upload state,
+abandoned when migration `00016` made the hash nullable but still declared in
+three `Record<ImageUploadState, …>` maps.
+
+**Ruthwik** — Eleven photo tests covering ownership, magic-byte validation, size
+limits, cross-school tagging and idempotent re-tagging. The important one is
+notification ordering: `notify_parents_on_photo` fires on the transition to
+`ready` and loops over tags, so the original pipeline always ran it against zero
+rows. Teachers still got their own notification, which is why it survived. The
+symptom is a message that silently never arrives, so this is the only automated
+way to catch a regression.
+
+## End state
+19 backend tests written. Mobile errors 22 → 15.
+
+## Next week
+Finish the type errors and the outstanding quick wins.
+
+---
+
+# Week 21 — Zero Type Errors
+
+**Dates:** 21 – 27 June 2026 · **Commits:** 10 — Bhargav 7, Nagachaitanya 2, Srujan 1
+
+## Phase objective
+Make the application compile, and close the remaining Plan 01 items.
+
+## Individual contributions
+**Bhargav** — Cleared the rest. `@react-navigation/bottom-tabs` was reached only
+transitively through `expo-router`, so its types were unresolvable — the runtime
+worked while the build did not; it is now an explicit dependency. `expo-image`
+stopped exporting `ContentFit`. Reanimated's `withSequence` returns
+`AnimatableValue` against a `SharedValue<number>`.
+
+He also corrected two regressions introduced during the same effort. The
+navigation typing fix had moved `navigate()` to its single-argument form on a
+misreading of the error — the `as never` casts were the cause, not the overload,
+and the change silently discarded route params on every tab tap. And widening
+`ClassItem.grade` to `string | null` to match the schema left three render sites
+unguarded, so screen readers announced "Selected class: Butterflies, null."
+
+**Nagachaitanya** — Wired `NotificationCenter` into all three role screens.
+Roughly 700 lines of finished code had sat unimported while every role showed a
+placeholder. Also sanitised the admin search, where the raw term was
+interpolated into a PostgREST `or()` filter and could inject a clause, and
+removed `school_admin` — a role absent from the `profiles.role` CHECK, so the
+admin UI offered something the database would reject.
+
+**Srujan** — `getDashboardStats` selected `orders.total`; the column is
+`total_amount`. The error was never checked, so both the order count and revenue
+silently reported zero regardless of the data.
+
+## End state
+**The mobile package typechecks with zero errors for the first time.**
+
+## Next week
+Authorization.
+
+---
+
+# Week 22 — Authorization
+
+**Dates:** 28 June – 4 July 2026 · **Commits:** 3 — Nagachaitanya 3
+
+## Phase objective
+Close every remaining IDOR.
+
+## Individual contributions
+**Nagachaitanya** — `getPhotoDetails` accepted a photo ID and no user, filtering
+only on status: any authenticated parent could read any photo in the system by
+UUID, including its URL, filename, class and school names, and the full list of
+tagged children at other schools. It now verifies the caller is a parent of a
+tagged child, returns 404 rather than 403 so the response does not confirm
+existence, and filters `taggedStudentIds` to the requesting parent's own
+children — an authorised viewer still must not learn who else is in the frame.
+
+Three further endpoints took an ID from the URL and checked nothing: any teacher
+could list another school's class photos, or overwrite and confirm another
+teacher's photo.
+
+On the client, no route group checked anything, so a parent deep-linking
+`hive://(admin)/dashboard` got the full admin interface. `RoleGate` renders
+nothing while auth resolves, to avoid a flash of the wrong screen, and redirects
+a mismatched role to their own home rather than to login — being signed in as
+the wrong role is not an authentication failure.
+
+## Issues and challenges
+A single-person week again. The authorization work was one coherent slice in
+files nobody else could safely touch concurrently.
+
+## End state
+Every P0 security finding closed.
+
+## Next week
+The order contract.
+
+---
+
+# Week 23 — The Order Contract
+
+**Dates:** 5 – 11 July 2026 · **Commits:** 6 — Srujan 3, Bhargav 1, Nagachaitanya 1, Ruthwik 1
+
+## Phase objective
+Make ordering work. It never had.
+
+## Individual contributions
+**Srujan** — Three layers disagreed three ways. The mobile cart used
+`print_4x6` with dollar prices, the validator used `4x6` with cent prices, and
+the database CHECK allowed only the `print_*` set — overlapping on three values
+out of seven. Every request failed Zod validation before reaching the database.
+
+One catalogue now defines the seven types, labels and prices in integer cents,
+mirrored on the client. The client-supplied price is gone entirely: a client
+must not influence what it is charged. Migration `00017` renames `total_amount`
+to `total_cents`, since the service was writing cents into a decimal column
+documented as USD — a $4.99 print stored as 299.00 and rendered as $299.00.
+
+**Bhargav** — Toast and confirmation dialog components. Outside the upload
+flow's confetti the app gave no feedback at all.
+
+**Nagachaitanya** — `getSchools` issued two count queries per school; 41 round
+trips for a 20-school page. Two batched queries now.
+
+## End state
+Ordering works end to end in code.
+
+## Next week
+Demo data and documentation.
+
+---
+
+# Week 24 — Demo Data & Documentation
+
+**Dates:** 12 – 18 July 2026 · **Commits:** 7 — Srujan 3, Ruthwik 2, Bhargav 1, Nagachaitanya 1
+
+## Phase objective
+Produce a demo dataset and the documentation the submission needs.
+
+## Individual contributions
+**Srujan** — `seed.sql` could never run: it inserted `profiles` rows directly,
+but `profiles.id` references `auth.users`, which cannot be populated with plain
+SQL. Every insert failed on a foreign key, so there had never been a demo
+dataset. The replacement creates auth users through the Admin API, then domain
+rows, then processes photos through the same helper the upload endpoint uses —
+so demo photos get real thumbnails and blurhashes rather than hand-inserted rows
+that would not match production. Photos are tagged before the status flips, and
+the script reports the resulting notification count, warning on zero. Also wrote
+the database design document and the demo account guide.
+
+**Ruthwik** — API reference for all 22 endpoints.
+
+**Nagachaitanya** — Security design: threat model, the three-layer authorization
+model, and a table of every audit finding with the commit that closed it.
+
+**Bhargav** — Order results now surface as toasts; `useCreateOrder` had no error
+handler at all, so a failed order was completely silent. Parents with no linked
+children now see the email address an administrator needs, and teachers with no
+school see why their class list is empty.
+
+## End state
+All 46 audit gaps closed except the remaining Plan 08 tests and deployment.
+
+---
+
+# Phase 2 Summary
+
+| Week | Focus | Commits |
+|---|---|---|
+| 14 | Audit, planning, credential hygiene | 14 |
+| 15 | Private photo storage & image processing | 7 |
+| 16 | Feed query, upload ordering, type recovery | 9 |
+| 17 | Observability, Docker, CI, load tests | 5 |
+| 18 | API consistency & architecture docs | 4 |
+| 19 | Test harness & feed coverage | 2 |
+| 20 | Photo tests & the compile blocker | 3 |
+| 21 | Zero type errors | 10 |
+| 22 | Authorization | 3 |
+| 23 | The order contract | 6 |
+| 24 | Demo data & documentation | 7 |
+
+## Contribution
+
+| Member | Commits (whole project) |
+|---|---|
+| Ruthwik | 77 |
+| Srujan | 57 |
+| Bhargav | 52 |
+| Nagachaitanya | 47 |
+
+Phase 2 weeks were **uneven, and deliberately reported as such.** Weeks 19 and
+22 were single-person; week 21 was mostly one person. The cause was structural:
+the storage and feed work was one sequential track, the type errors blocked
+everyone else's verification, and the authorization slice touched files nobody
+could safely edit concurrently. The Phase 2 schedule assumed a parallelism the
+dependency graph did not permit. Smoothing the numbers would misrepresent how
+the work actually went.
+
+## Delivered
+
+| Area | Status |
+|---|---|
+| Application compiles (both packages) | ✔ |
+| Photos private, signed URLs, thumbnails | ✔ |
+| Ordering | ✔ |
+| Authorization — all IDORs closed | ✔ |
+| In-app notifications | ✔ |
+| Demo seeding | ✔ |
+| Toasts, confirmations, empty states | ✔ |
+| Docker, CI, health checks, request IDs | ✔ |
+| Documentation — 10 documents | ✔ |
+| Test harness + 19 backend tests | ✔ |
+| Order, admin and mobile tests | ✗ |
+| Deployment | ✗ |
+
+## The outstanding risk
+
+**Nothing has executed.** Migrations `00017` and `00020` are unapplied, no photo
+has been uploaded to the private bucket, no order placed, no test run, nothing
+deployed. Every claim above is "compiles and is structurally sound", not "works".
+
+`00017` renames `total_amount` to `total_cents` and the code expects the new
+name. **Running the application before applying it will fail every order query.**
+
+`docs/environment-setup.md` §7 carries the verification checklist. It has not
+been run, and it asks for failures to be reported rather than ticks.
+
+---
+
+*Hive · Ruthwik, Bhargav, Srujan, Nagachaitanya*
