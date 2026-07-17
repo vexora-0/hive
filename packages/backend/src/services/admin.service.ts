@@ -255,7 +255,7 @@ export async function getSchools(
   //
   // The classes(id, name, grade) embed in the select above already batches
   // correctly, so it is left alone.
-  const schoolIds = rawResults.map((school: any) => school.id);
+  const schoolIds = rawResults.map((school: { id: string }) => school.id);
 
   const [studentRows, teacherRows] = await Promise.all([
     schoolIds.length
