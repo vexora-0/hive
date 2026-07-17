@@ -102,47 +102,34 @@ export async function createOrder(
     };
   });
 
-  // 3. Insert order + order_items
-  const { error: orderError } = await supabaseAdmin.from('orders').insert({
-    id: orderId,
-    parent_id: parentId,
-    school_id: schoolId,
-    status: 'pending',
-    shipping_address: shippingAddress,
-    notes: notes ?? null,
-    total_cents: subtotal,
-    idempotency_key: idempotencyKey ?? uuidv4(),
-  });
-
-  if (orderError) {
-    logger.error('Failed to create order', {
-      error: orderError.message,
-      orderId,
-    });
-    throw new AppError('Failed to create order', 500, 'ORDER_CREATE_FAILED');
-  }
-
+  // 3. Insert the order and its items in one transaction (G-37).
+  //
+  // These were previously two separate inserts with a compensating DELETE if
+  // the second failed. A crash in between left an order with no items, and the
+  // compensation never ran because the process was gone. A function body is a
+  // single transaction, so either both land or neither does.
   const itemsWithIds = orderItems.map((item) => ({
     id: uuidv4(),
     ...item,
   }));
 
-  const { error: itemsError } = await supabaseAdmin
-    .from('order_items')
-    .insert(itemsWithIds);
+  const { error: rpcError } = await supabaseAdmin.rpc('create_order_with_items', {
+    p_order_id: orderId,
+    p_parent_id: parentId,
+    p_school_id: schoolId,
+    p_idempotency_key: idempotencyKey ?? uuidv4(),
+    p_shipping_address: shippingAddress,
+    p_notes: notes ?? null,
+    p_total_cents: subtotal,
+    p_items: itemsWithIds,
+  });
 
-  if (itemsError) {
-    logger.error('Failed to create order items', {
-      error: itemsError.message,
+  if (rpcError) {
+    logger.error('Failed to create order', {
+      error: rpcError.message,
       orderId,
     });
-    // Attempt to clean up the order
-    await supabaseAdmin.from('orders').delete().eq('id', orderId);
-    throw new AppError(
-      'Failed to create order items',
-      500,
-      'ORDER_ITEMS_FAILED',
-    );
+    throw new AppError('Failed to create order', 500, 'ORDER_CREATE_FAILED');
   }
 
   logger.info('Order created', {
