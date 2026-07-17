@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/node';
+import type { Breadcrumb } from '@sentry/node';
 import { env } from './env';
 import { logger } from './logger';
 
@@ -164,7 +165,7 @@ export function scrubEvent(event: Sentry.ErrorEvent): Sentry.ErrorEvent | null {
   }
 
   if (event.breadcrumbs) {
-    event.breadcrumbs = event.breadcrumbs.map((crumb) => ({
+    event.breadcrumbs = event.breadcrumbs.map((crumb: Breadcrumb) => ({
       ...crumb,
       message: crumb.message ? scrubString(crumb.message) : crumb.message,
       data: crumb.data
@@ -211,7 +212,7 @@ export function initSentry(): void {
 
     beforeSend: scrubEvent,
 
-    beforeBreadcrumb: (crumb) => {
+    beforeBreadcrumb: (crumb: Breadcrumb) => {
       // HTTP breadcrumbs record full URLs, which for this service means signed
       // photo URLs and Supabase requests carrying the service-role key.
       if (crumb.category === 'http' || crumb.category === 'fetch') return null;
