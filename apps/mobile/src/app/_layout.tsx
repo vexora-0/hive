@@ -15,7 +15,7 @@ import {
 } from '@expo-google-fonts/nunito';
 
 import { queryClient } from '@/lib/queryClient';
-import { ErrorBoundary } from '@/components/feedback';
+import { ErrorBoundary, ToastProvider } from '@/components/feedback';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { initSentry, Sentry } from '@/lib/sentry';
 
@@ -71,39 +71,41 @@ function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <ErrorBoundary>
-            <Stack screenOptions={{ headerShown: false }}>
-              {/* Auth group — shown when not authenticated */}
-              <Stack.Screen
-                name="(auth)"
-                options={{ headerShown: false }}
-              />
+            <ToastProvider>
+              <Stack screenOptions={{ headerShown: false }}>
+                {/* Auth group — shown when not authenticated */}
+                <Stack.Screen
+                  name="(auth)"
+                  options={{ headerShown: false }}
+                />
 
-              {/* Role-based groups — shown when authenticated */}
-              <Stack.Screen
-                name="(teacher)"
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen
-                name="(parent)"
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen
-                name="(admin)"
-                options={{ headerShown: false }}
-              />
+                {/* Role-based groups — shown when authenticated */}
+                <Stack.Screen
+                  name="(teacher)"
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                  name="(parent)"
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                  name="(admin)"
+                  options={{ headerShown: false }}
+                />
 
-              {/* Catch-all index redirect */}
-              <Stack.Screen
-                name="index"
-                options={{ headerShown: false }}
-              />
+                {/* Catch-all index redirect */}
+                <Stack.Screen
+                  name="index"
+                  options={{ headerShown: false }}
+                />
 
-              {/* 404 */}
-              <Stack.Screen
-                name="+not-found"
-                options={{ headerShown: false }}
-              />
-            </Stack>
+                {/* 404 */}
+                <Stack.Screen
+                  name="+not-found"
+                  options={{ headerShown: false }}
+                />
+              </Stack>
+            </ToastProvider>
           </ErrorBoundary>
         </QueryClientProvider>
       </SafeAreaProvider>

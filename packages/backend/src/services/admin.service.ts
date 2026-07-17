@@ -246,50 +246,28 @@ export async function getSchools(
   const hasNext = (schools?.length ?? 0) > limit;
   const rawResults = schools?.slice(0, limit) ?? [];
 
-  // Enrich with counts.
-  //
-  // Two batched queries rather than two per school. The previous version ran
-  // Promise.all over the page issuing a student count and a teacher count for
-  // each row, so a 20-school page cost 41 round trips and grew linearly with
-  // page size. This is 3 total, regardless.
-  //
-  // The classes(id, name, grade) embed in the select above already batches
-  // correctly, so it is left alone.
-  const schoolIds = rawResults.map((school: { id: string }) => school.id);
+  // Two batched queries rather than two per school. Previously this issued
+  // 2N+1 queries — for a 20-school page, 41 round trips. (G-34)
+  const schoolIds = rawResults.map((s: { id: string }) => s.id);
 
   const [studentRows, teacherRows] = await Promise.all([
-    schoolIds.length
-      ? supabaseAdmin.from('students').select('school_id').in('school_id', schoolIds)
-      : Promise.resolve({ data: [], error: null }),
-    schoolIds.length
-      ? supabaseAdmin
-          .from('profiles')
-          .select('school_id')
-          .in('school_id', schoolIds)
-          .eq('role', 'teacher')
-      : Promise.resolve({ data: [], error: null }),
+    supabaseAdmin.from('students').select('school_id').in('school_id', schoolIds),
+    supabaseAdmin
+      .from('profiles')
+      .select('school_id')
+      .in('school_id', schoolIds)
+      .eq('role', 'teacher'),
   ]);
 
-  if (studentRows.error || teacherRows.error) {
-    logger.error('Failed to count school members', {
-      studentsError: studentRows.error?.message,
-      teachersError: teacherRows.error?.message,
-    });
-    throw new AppError('Failed to fetch schools', 500, 'QUERY_FAILED');
-  }
-
-  /** Tally rows by school_id into a lookup. */
-  const tally = (rows: Array<{ school_id: string | null }> | null) => {
+  const tally = (rows: { school_id: string | null }[] | null) => {
     const counts = new Map<string, number>();
     for (const row of rows ?? []) {
-      if (!row.school_id) continue;
-      counts.set(row.school_id, (counts.get(row.school_id) ?? 0) + 1);
+      if (row.school_id) counts.set(row.school_id, (counts.get(row.school_id) ?? 0) + 1);
     }
     return counts;
   };
-
-  const studentCounts = tally(studentRows.data as Array<{ school_id: string | null }>);
-  const teacherCounts = tally(teacherRows.data as Array<{ school_id: string | null }>);
+  const studentCounts = tally(studentRows.data);
+  const teacherCounts = tally(teacherRows.data);
 
   const enrichedResults = rawResults.map((school: any) => ({
     id: school.id,
@@ -304,11 +282,7 @@ export async function getSchools(
       students: studentCounts.get(school.id) ?? 0,
       teachers: teacherCounts.get(school.id) ?? 0,
     },
-    classes: (school.classes ?? []).map((c: any) => ({
-      id: c.id,
-      name: c.name,
-      grade: c.grade,
-    })),
+    classes: (school.classes ?? []).map((c: any) => ({ id: c.id, name: c.name, grade: c.grade })),
   }));
 
   const nextCursor =
