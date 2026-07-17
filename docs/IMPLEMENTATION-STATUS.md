@@ -13,7 +13,7 @@ Deliberately separate from the plans, which describe intent.
 | Person | Plans | Status |
 |---|---|---|
 | **Ruthwik** | 03 · 05 · 09 (infra) · 08 (feed/photos tests) · 10 (architecture) · 11 (k6) | Merged |
-| **Nagachaitanya** | 04 · 01 (Steps 1, 3, 5) · 08 (auth/error tests) · 09 (Sentry) · 10 (security) · 11 (verify script) | Merged |
+| **Nagachaitanya** | 04 · 01 (Steps 1, 3, 5) · 05 Step 4 (G-34) · 08 (auth/error tests) · 09 (Sentry) · 10 (security) · 11 (verify script) | Merged |
 | **Bhargav** | 00 (all 22 typecheck errors) | Merged |
 | **Srujan** | 00 Group B (types) · 01 Step 2 (dashboard) | Merged |
 
@@ -41,6 +41,7 @@ Plans 02, 06 and 07 have not been started.
 | **G-06** | Medium | Admin dashboard queried a non-existent column and silently showed £0. | Srujan |
 | **G-09** | Medium | Five photo routes guarded on `school_admin`, a role the DB `CHECK` rejects. | Nagachaitanya |
 | **G-16** | Medium | PostgREST filter injection in admin user search. | Nagachaitanya |
+| **G-34** | Medium | `getSchools` issued two count queries per school — 41 round trips for a 20-school page. Now 3, regardless of page size. | Nagachaitanya |
 | **G-L3/L4** | Low | `auth.ts` logged client IPs and raw error objects. | both |
 | — | — | 22 mobile typecheck errors. **The app now compiles.** | Bhargav + Srujan |
 
@@ -123,7 +124,6 @@ deployed. Migration `00020` is not applied.
 | **G-01** | Srujan · Plan 02 | Order submission is broken three ways. **No order can be placed.** This is now the most serious functional defect. |
 | **G-11** | Srujan · Plan 06 | No demo data. |
 | **G-26…G-33** | Bhargav · Plan 07 | UX completion — toasts, confirm dialogs, empty states. |
-| **G-34** | Nagachaitanya | `getSchools` N+1. Reassigned from Plan 05 because `admin.service.ts` is this stream's file. |
 | **G-45** | unowned | Plan 01 Step 8 — custom SMTP. Supabase's default is rate-limited to a few emails an hour, so **OTP delivery will fail mid-demo**. Dashboard task, no code fix. |
 | **S-15** | Plan 11 | Supabase project ref committed; keys not rotated. |
 | — | Bhargav | **Create the first `.env`.** Everything in §5 is blocked on it. |
@@ -155,7 +155,7 @@ deployed. Migration `00020` is not applied.
 4. **Run `scripts/verify-security.sh`** against a deployed instance with real
    tokens. That is what turns §2 from "believed fixed" into "confirmed fixed".
 5. **Plan 01 Step 8 (SMTP).** Unowned, and it fails during a live demo.
-6. Bhargav: Plan 07. Srujan: Plan 06. Nagachaitanya: G-34.
+6. Bhargav: Plan 07. Srujan: Plan 06.
 
 ---
 

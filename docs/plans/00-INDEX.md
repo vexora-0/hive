@@ -85,7 +85,7 @@ Every plan follows the same loop:
 | 02 | Srujan | ☐ Not started | ☐ |
 | 03 | Ruthwik | ✔ Done — **runtime unverified, no `.env`** | ✔ |
 | 04 | Nagachaitanya | ✔ Done — **runtime unverified**, see Deviations | ✔ |
-| 05 | Ruthwik | ◐ Steps 1, 2, 3, 5 done. **Step 4 (G-34) reassigned to Nagachaitanya** | ✔ |
+| 05 | Ruthwik | ✔ Steps 1, 2, 3, 5 (Ruthwik) · Step 4 / G-34 (Nagachaitanya) | ✔ |
 | 06 | Srujan | ☐ Not started | ☐ |
 | 07 | Bhargav | ☐ Not started | ☐ |
 | 08 | all four | ◐ Harness + feed/photos (Ruthwik) + auth/errors (Nagachaitanya). **Never executed** | ◐ |
@@ -105,8 +105,6 @@ Supabase query can be made and nothing is deployed. See each plan's
 
 ### Open items needing an owner
 
-- **G-34** (`getSchools` N+1) — dropped from Plan 05 because `admin.service.ts`
-  is Nagachaitanya's file. Now assigned to him; still open.
 - **Plan 01 Step 8** (custom SMTP for OTP delivery) — a Supabase dashboard task.
   Unowned. It is a demo-day failure with no code fix.
 - **No `.env` anywhere.** Plans 03, 04, 05, 08, 09 and 11 all compile and have
