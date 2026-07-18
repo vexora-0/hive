@@ -32,7 +32,17 @@ This applies every file in `supabase/migrations/` in order, including the new tr
 
 ## Option B: SQL Editor (manual)
 
-If you prefer not to use the CLI:
+> ⚠️ **`combined_migrations.sql` is out of date — it stops at `00015`.**
+> It omits `00016`, `00017`, `00018` and `00020`. Running it alone gives you a
+> database that looks complete but has a **publicly-readable photos bucket**
+> (G-02) and a **broken order flow** (G-01, G-19).
+>
+> If you use this option you must also run, in this order, from
+> `supabase/migrations/`: `00016`, `00017`, `00018`, `00020`.
+>
+> **Option A is strongly preferred** — it applies every file and records what
+> ran, so the next person can tell. Regenerating this file is a task for
+> whoever owns the schema.
 
 1. Open **Supabase Dashboard** → your project → **SQL Editor**.
 2. If your database is **empty** (no tables yet), run the full migration file:

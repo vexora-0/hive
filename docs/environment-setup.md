@@ -1,11 +1,16 @@
 # Environment Setup
 
-Everything needed to get Hive running locally. **Nothing in Phase 2 has been
-verified at runtime because no environment exists yet** — roughly 25 commits of
-work compile but have never executed. Completing this document unblocks Plans
-08, 09 and 11.
+Everything needed to get Hive running locally.
 
 Owner: **Bhargav**.
+
+**Status — 1 Aug: an environment now exists and the backend runs against it.**
+Supabase project `hive` (`udawaiykfvdcvcouiqxr`, ap-northeast-1), all 19
+migrations applied, `/health` returning `"database": "ok"`. §7 records what that
+made it possible to verify, and what still needs seed data or a device.
+
+A second `hive-test` project for Plan 08 does **not** exist yet, so
+`packages/backend/.env.test` is still unfilled and `pnpm test` still cannot run.
 
 ---
 
@@ -69,12 +74,34 @@ Then `EXPO_PUBLIC_API_URL=http://192.168.1.5:4000`. Expo inlines
 
 ## 4. Apply the migrations
 
+**Use the CLI. Do not use `supabase/combined_migrations.sql`** — it stops at
+`00015` and silently omits `00016`, `00017`, `00018` and `00020`. That leaves a
+database that looks correctly set up but has a publicly-readable photos bucket
+(G-02) and a broken order flow (G-01). See the warning in
+`supabase/README_MIGRATIONS.md`.
+
+Pass `--include-all`: migrations do not arrive in numeric order (`00020` landed
+before `00018`), and without that flag the CLI skips a file whose version is
+lower than one already applied.
+
 ```bash
 npm install -g supabase
 supabase login
 supabase link --project-ref <your-ref>
 pnpm db:migrate
 ```
+
+No Docker needed — this pushes to the linked cloud project. If you would rather
+skip `login`/`link`, pass the connection string directly (password from
+Project Settings → Database):
+
+```bash
+supabase db push --include-all \
+  --db-url "postgresql://postgres:<password>@db.<your-ref>.supabase.co:5432/postgres"
+```
+
+⚠ Never run `pnpm db:reset`. It targets a *local* stack and, against a linked
+project, drops and recreates the database.
 
 **Migration `00020` has not been applied anywhere yet.** It makes the photos
 bucket private and drops the public read policy — the fix for the audit's most
@@ -145,10 +172,33 @@ code that was written but never executed.
 - [ ] A photo tagged with two of the parent's children appears **once**
 - [ ] A second parent does **not** see the first child's photos
 
-**Observability (Plan 09)**
-- [ ] Responses carry an `X-Request-ID` header
-- [ ] Backend logs one `info` line per request with ID, status, duration
-- [ ] Stop Supabase access → `/health` returns 503
+**Observability (Plan 09)** — *verified 1 Aug against `udawaiykfvdcvcouiqxr`*
+- [x] Responses carry an `X-Request-ID` header
+- [x] Backend logs one `info` line per request with ID, status, duration
+- [ ] Stop Supabase access → `/health` returns 503 *(not tested — would need to
+      revoke the key mid-run)*
+
+Also seen while up: the auth-failure warning logs the parse error but **not**
+the token or `req.ip`, so the PII scrubbing added alongside the correlation IDs
+is doing its job. Sentry took its no-op path cleanly (`Sentry disabled (no
+SENTRY_DSN)`) rather than failing the boot.
+
+**Verified at boot — 1 Aug (no seed data needed)**
+- [x] `supabase db push --include-all` applies all 19 migrations to a fresh
+      cloud project, `00001`–`00018` and `00020`
+- [x] `photos` bucket exists with `public = false` — **G-02, applied for the
+      first time anywhere**
+- [x] `/health` → 200 with `"checks": {"database": "ok"}`
+- [x] `curl localhost:4000/uploads/anything` → 404 (static route deleted)
+- [x] Redis connects on boot
+- [x] `/api/v1/{feed,photos,orders,notifications,admin}` all → 401
+      unauthenticated; a malformed bearer token also → 401
+- [x] Anon key against `profiles` returns `[]`, not a dump — RLS enforcing
+- [x] Backend boots with no env validation error against real credentials
+
+Everything still unticked above needs either seed data (`pnpm seed:admin`, then
+a school, class and students) or a device. Neither is blocked by the
+environment any more.
 
 ---
 

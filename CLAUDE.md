@@ -50,14 +50,20 @@ worse than one, so this file no longer restates it.
 
 ### The one thing that blocks everything
 
-**Nothing has executed.** Migrations `00017`, `00018` and `00020` are unapplied;
-no photo has been uploaded, no order placed, no test run, nothing deployed.
+**Updated 1 Aug — the environment exists and the backend runs.** Supabase
+project `hive` (`udawaiykfvdcvcouiqxr`), all 19 migrations applied including
+`00017`, `00018` and `00020`, `/health` returning `"database": "ok"`.
 
-`00017` renames `total_amount` → `total_cents` and the code expects the new
-name. **Start the application before applying it and every order query fails.**
+**What blocks everything now is seed data.** There is no school, class, student
+or parent, so no photo can be uploaded, no order placed and no feed page
+fetched. Plan 06 (`seedDemo.ts`, Srujan) is the unblock.
+
+Also still missing: a second `hive-test` Supabase project, without which
+`pnpm test` cannot run.
 
 Follow `docs/environment-setup.md`; §7 is the verification checklist and asks
-for failures to be reported, not ticks.
+for failures to be reported, not ticks. The boot-level items there are now
+ticked with what was actually observed.
 
 ---
 
@@ -76,7 +82,7 @@ for failures to be reported, not ticks.
 | **G-05** | No role-based route protection — a parent can deep-link into the admin UI. |
 | **G-12** | No thumbnails are generated, so the feed serves full-resolution originals. |
 
-**The mobile app does not currently compile** — 22 TypeScript errors. Until Bhargav's Plan 00 lands, nobody can verify anything.
+**The mobile app compiles** — Plan 00 closed all 22 TypeScript errors. The gap table above is the audit's original findings; see `docs/IMPLEMENTATION-STATUS.md` §2 for which are now closed.
 
 ---
 

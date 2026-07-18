@@ -109,18 +109,34 @@ file, so it must never be generated for a caller who is about to be refused.
 | `verify-security.sh` repository-hygiene section | Passes — and found the `Admin@123` comment in `supabase/seed.sql` |
 | Secret scan (`git grep`) | Zero JWTs, AWS keys, Stripe keys, PEM blocks, tracked `.env` files |
 | `require('sharp')` | Loads — the gate on Plan 03's approach |
+| **Migrations against a real database** | **All 19 applied** to Supabase project `hive` (`udawaiykfvdcvcouiqxr`) — `00001`–`00018` and `00020`. First time any migration has run anywhere. |
+| **`photos` bucket** | **`public = false`** — G-02 verified in the database, not just in review |
+| **Backend boot against real credentials** | Starts clean, no env validation error; Redis connects; Sentry takes its no-op path without failing |
+| **`GET /health`** | **200** with `"checks": {"database": "ok"}` — round-trips to Supabase |
+| **`GET /uploads/anything`** | **404** — the static route really is gone |
+| **Unauthenticated `/api/v1/*`** | `feed`, `photos`, `orders`, `notifications`, `admin/users` all **401**; malformed bearer token also 401 |
+| **Anon key against `profiles`** | Returns `[]`, not a dump — RLS enforcing on the client path |
+| **`X-Request-ID` + request logging** | Header present; one `info` line per request with ID, status and duration. Auth-failure log omits the token and client IP — PII scrubbing confirmed |
 
 ---
 
 ## 5. What was NOT verified
 
-**There is still no `.env` anywhere, only `.env.example`.** The backend cannot
-boot, the app cannot start, no Supabase query can be made, and nothing is
-deployed. Migration `00020` is not applied.
+**Updated 1 Aug — an environment now exists.** `packages/backend/.env` and
+`apps/mobile/.env` are filled against Supabase project `hive`
+(`udawaiykfvdcvcouiqxr`), all 19 migrations are applied, and the backend boots
+and answers `/health` with `"database": "ok"`. What that made verifiable is in
+§4; what follows is what is still unproven.
+
+**`packages/backend/.env.test` is still unfilled** — it needs a *second*
+Supabase project, which does not exist yet. `pnpm test` still cannot run.
 
 - **No photo has ever been uploaded to the private bucket.** The whole storage
   rewrite — signed URLs, thumbnails, blurhash, HEIC conversion, magic-byte
-  validation — compiles and has never run.
+  validation — compiles and has never run. The bucket is now confirmed private,
+  but it is empty.
+- **No seed data exists**, so nothing that needs a school, class, student or
+  parent has been exercised: no order, no feed page, no notification.
 - **None of Plan 04's verification ran.** Eight `curl` checks across two accounts
   at different schools, six device checks. Zero executed.
 - **`pnpm test` has never run.** The suite exists; no test Supabase project does.
@@ -142,7 +158,9 @@ deployed. Migration `00020` is not applied.
 | **G-26…G-33** | Bhargav · Plan 07 | UX completion — toasts, confirm dialogs, empty states. |
 | **G-45** | unowned | Plan 01 Step 8 — custom SMTP. Supabase's default is rate-limited to a few emails an hour, so **OTP delivery will fail mid-demo**. Dashboard task, no code fix. |
 | **S-15** | Plan 11 | Supabase project ref committed; keys not rotated. |
-| — | Bhargav | **Create the first `.env`.** Everything in §5 is blocked on it. |
+| — | Bhargav | ~~Create the first `.env`.~~ **Done 1 Aug** — dev environment runs, 19 migrations applied. |
+| — | Bhargav | **Create the `hive-test` Supabase project.** `pnpm test` is blocked on it, and so is CP-4. |
+| — | Srujan · Plan 06 | **Seed data.** Everything left in §5 needs a school, class, students and a parent before it can be exercised. Now the single biggest blocker. |
 
 ---
 
