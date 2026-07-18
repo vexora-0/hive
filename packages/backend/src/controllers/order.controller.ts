@@ -1,7 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import * as orderService from '../services/order.service';
 import { success, paginated } from '../utils/apiResponse';
-import type { CreateOrderInput } from '../validators/order.validator';
+import type {
+  CreateOrderInput,
+  GetOrdersInput,
+} from '../validators/order.validator';
 
 export async function createOrder(
   req: Request,
@@ -45,19 +48,11 @@ export async function getOrders(
 ): Promise<void> {
   try {
     const parentId = req.user!.id;
-    const { cursor, limit } = req.query as {
-      cursor?: string;
-      limit?: string;
-    };
+    // Validated and coerced by validate(getOrdersSchema, 'query'): limit is a
+    // number, defaulted to 20 and already clamped to 1..50.
+    const { cursor, limit } = req.query as unknown as GetOrdersInput;
 
-    const parsedLimit = limit ? parseInt(limit, 10) : 20;
-    const clampedLimit = Math.min(Math.max(parsedLimit || 20, 1), 50);
-
-    const result = await orderService.getOrders(
-      parentId,
-      cursor,
-      clampedLimit,
-    );
+    const result = await orderService.getOrders(parentId, cursor, limit);
 
     res.json(paginated(result.orders, result.nextCursor));
   } catch (err) {

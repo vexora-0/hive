@@ -3,7 +3,7 @@ import { authenticate } from '../middleware/auth';
 import { roleGuard } from '../middleware/roleGuard';
 import { validate } from '../middleware/validate';
 import { idempotency } from '../middleware/idempotency';
-import { createOrderSchema } from '../validators/order.validator';
+import { createOrderSchema, getOrdersSchema } from '../validators/order.validator';
 import * as orderController from '../controllers/order.controller';
 
 const router: import("express").Router = Router();
@@ -24,6 +24,7 @@ router.post(
 router.get(
   '/',
   roleGuard('parent'),
+  validate(getOrdersSchema, 'query'),
   orderController.getOrders,
 );
 
