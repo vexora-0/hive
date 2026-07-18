@@ -117,6 +117,12 @@ file, so it must never be generated for a caller who is about to be refused.
 | **Unauthenticated `/api/v1/*`** | `feed`, `photos`, `orders`, `notifications`, `admin/users` all **401**; malformed bearer token also 401 |
 | **Anon key against `profiles`** | Returns `[]`, not a dump — RLS enforcing on the client path |
 | **`X-Request-ID` + request logging** | Header present; one `info` line per request with ID, status and duration. Auth-failure log omits the token and client IP — PII scrubbing confirmed |
+| **`pnpm seed:admin`** | Creates the admin auth user and profile. **Does not print the password** — G-10 confirmed |
+| **`pnpm seed:demo`** | First ever run. 2 schools, 4 classes, 9 students, 8 profiles, 8 parent-student mappings. Photos skipped — `seed-assets/` is empty |
+| **Real sign-in** | `signInWithPassword` as a seeded demo parent returns a usable JWT |
+| **Authenticated `GET /api/v1/feed`** | **200** — the API path works end to end with a real user. Empty, because there are no photos |
+| **RBAC — parent → `/api/v1/admin/users`** | **403.** Server-side role enforcement confirmed at runtime, not just in review (G-05's server half) |
+| **G-08 cross-school IDOR** | **Confirmed fixed.** Teacher at Bloom: own school's classes **200**; another school's classes **403**; another school's **student roster including dates of birth 403** — `"You do not have access to this school"`. This is the check §5 previously recorded as never executed |
 
 ---
 
@@ -128,20 +134,30 @@ file, so it must never be generated for a caller who is about to be refused.
 and answers `/health` with `"database": "ok"`. What that made verifiable is in
 §4; what follows is what is still unproven.
 
-**`packages/backend/.env.test` is still unfilled** — it needs a *second*
-Supabase project, which does not exist yet. `pnpm test` still cannot run.
+**Demo data now exists** (`pnpm seed:demo`, first run 1 Aug): 2 schools,
+4 classes, 9 students, 8 profiles. **No photos** — `seed-assets/` needs 12–15
+JPEGs sourced by hand, and the script skips photo seeding when it is empty.
+That single gap is what still blocks most of the list below.
+
+**⚠ `packages/backend/.env.test` points at the SAME project as `.env`**, by
+explicit decision, because a second project was not wanted. `pnpm test` runs
+`truncateAll()` in `beforeAll`, so **running the suite deletes the demo data**.
+The guards in `tests/setup.ts` do *not* catch this: guard 1 needs
+`DEV_SUPABASE_URL`, which is unset, and guard 2 hardcodes
+`fhvwsmtivwtmbdscdoyz`, a stale ref. Re-seed after any test run, or create a
+second project before the demo.
 
 - **No photo has ever been uploaded to the private bucket.** The whole storage
   rewrite — signed URLs, thumbnails, blurhash, HEIC conversion, magic-byte
-  validation — compiles and has never run. The bucket is now confirmed private,
-  but it is empty.
-- **No seed data exists**, so nothing that needs a school, class, student or
-  parent has been exercised: no order, no feed page, no notification.
-- **None of Plan 04's verification ran.** Eight `curl` checks across two accounts
-  at different schools, six device checks. Zero executed.
-- **`pnpm test` has never run.** The suite exists; no test Supabase project does.
-  Plan 08's sabotage exercise — revert a fix, confirm the matching test fails —
-  has not been done, so the tests have not been shown to detect anything.
+  validation — compiles and has never run. The bucket is confirmed private and
+  empty. Blocked on seed assets.
+- **No order has been placed and no notification produced** — both need photos.
+- **Plan 04's verification is now part-run.** The cross-school IDOR (G-08) and
+  parent→admin RBAC checks passed against a real instance (§4). The photo-level
+  checks — G-04, G-17, signed-URL expiry — still need an uploaded photo.
+- **`pnpm test` has never run.** See the truncation warning above before running
+  it. Plan 08's sabotage exercise — revert a fix, confirm the matching test
+  fails — has not been done, so the tests have not been shown to detect anything.
 - **No error has reached Sentry.** `initSentry()` has only taken its no-op path.
 - **`verify-security.sh` has never run against a real instance.**
 - **Nothing has been seen on a device.**

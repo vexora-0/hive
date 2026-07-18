@@ -196,9 +196,33 @@ SENTRY_DSN)`) rather than failing the boot.
 - [x] Anon key against `profiles` returns `[]`, not a dump — RLS enforcing
 - [x] Backend boots with no env validation error against real credentials
 
-Everything still unticked above needs either seed data (`pnpm seed:admin`, then
-a school, class and students) or a device. Neither is blocked by the
-environment any more.
+**Verified after seeding — 1 Aug**
+
+`pnpm --filter @hive/backend seed:admin`, then `seed:demo`. Note the scripts
+live in the backend package; there is no root `seed:admin`.
+
+- [x] `seed:admin` creates the admin and **does not print the password** (G-10)
+- [x] `seed:demo` loads 2 schools, 4 classes, 9 students, 8 profiles
+- [x] Real `signInWithPassword` as a demo parent returns a usable JWT
+- [x] Authenticated `GET /api/v1/feed` → 200 (empty — no photos yet)
+- [x] Parent → `GET /api/v1/admin/users` → **403**, server-side RBAC
+- [x] **G-08 cross-school IDOR:** teacher at Bloom gets 200 for her own school's
+      classes, **403** for another school's classes *and* for its student roster
+      including dates of birth
+
+**Two defects found while doing this:**
+
+1. `DEMO_PASSWORD` is required by `seedDemo.ts` but was missing from
+   `packages/backend/.env.example` — it was only in `.env.test.example`, which
+   the script does not read. Added to the example.
+2. `seed:demo` ends with *"WARNING: zero notifications means tags were applied
+   after status went ready."* That is a **false alarm when `seed-assets/` is
+   empty** — no photos means no tags means no notifications, which says nothing
+   about ordering. The warning should be suppressed when zero photos were
+   seeded, or it will be ignored on the one run where it matters.
+
+Everything still unticked needs **photos in `seed-assets/`** (12–15 JPEGs, see
+that directory's README) or a device. Neither is blocked by the environment.
 
 ---
 
