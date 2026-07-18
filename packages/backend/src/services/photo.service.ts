@@ -156,7 +156,6 @@ export async function saveUploadedFile(
         width: processed.width,
         height: processed.height,
         blurhash: processed.blurhash,
-        processed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('id', photoId);
