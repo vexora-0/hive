@@ -301,3 +301,37 @@ fix(db): make policy migrations idempotent
 ## Deviations
 
 *Record here anything that differed from this plan, and why.*
+
+### Steps 6-10 completed — Srujan, W24
+
+Plan 02 was marked done once Steps 1-5 landed (the catalogue, the payload
+alignment and the money conversion in `00017`). **Five of its gaps were still
+open at that point.** They are closed now:
+
+| Step | Gap | Was |
+|---|---|---|
+| 6 | G-18 | `getOrdersSchema` was wired to no route; the controller re-parsed and clamped `limit` by hand |
+| 7 | G-19 | Three columns were `NOT NULL` **and** `ON DELETE SET NULL` — mutually exclusive, so deleting any profile or photo raised a not-null violation instead of cascading |
+| 8 | G-37 | `createOrder` inserted the order, then the items, then issued a compensating `DELETE`. A crash in between left an order with no items and the compensation never ran |
+| 9 | G-31 | `markAsRead` read `count` from an `update()` issued without `{ count: 'exact' }`, so it was always null and the `count === 0` → 404 branch never fired |
+| 10 | G-36 | `00011` and `00015` used bare `CREATE POLICY`, so neither could be replayed onto a partially migrated database |
+
+**Migration numbering differs from the plan.** It allocates
+`00017_align_product_types`, `00018_order_totals_cents` and
+`00019_fix_fk_constraints`. In practice `00017_order_totals_cents` landed first
+and already carries the product-type CHECK, covering Steps 4 and 5 together.
+Steps 7 and 8 are therefore in a single **`00018_order_integrity.sql`** — both
+concern an order staying internally consistent, and a second file bought
+nothing. `00020` belongs to Plan 03.
+
+**Step 6's photo-tagging half** was landed separately in `fix(photos): validate
+the student tagging payload`, so only the order-listing query changed here.
+
+**Still not runtime-verified.** `00018` has never been applied and
+`create_order_with_items` has never executed — a typo in a function body is a
+runtime error, not a compile error. The manual checklist above and the
+`pg_constraint` checks remain outstanding.
+
+**Not fixable from this plan:** the Done-when grep asks for `school_admin` to be
+clean. The remaining occurrences are in files owned by others and the removal is
+Plan 01 Step 3's scope.

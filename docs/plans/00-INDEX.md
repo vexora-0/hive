@@ -122,7 +122,7 @@ Sequential execution means no range reservation is needed, but numbers must not 
 
 | Plan | Migrations |
 |---|---|
-| 02 | `00017_align_product_types.sql`, `00018_order_totals_cents.sql`, `00019_fix_fk_constraints.sql` |
+| 02 | `00017_order_totals_cents.sql` (money + product CHECK), `00018_order_integrity.sql` (FKs + atomic order) |
 | 03 | `00020_photos_bucket_private.sql` |
 | 04 | none — every fix is in the service layer, so `00022` stays unallocated |
 | 05 | — (no schema change) |
