@@ -1467,6 +1467,105 @@ All 46 audit gaps closed except the remaining Plan 08 tests and deployment.
 
 ---
 
+# Week 25 — First Real Execution
+
+**Dates:** 17 – 18 July 2026 · **Commits:** 18 — Nagachaitanya 7, Ruthwik 6, Srujan 4, Bhargav 1
+
+## Phase objective
+
+Stop writing and start running. A Supabase project became available, so the work
+of the previous eleven weeks could finally be executed rather than reviewed.
+
+## Work completed
+
+- Plan 02 finished: atomic order creation, foreign key contradictions, order
+  listing validation, `markAsRead` 404, idempotent policy migrations
+- Duplicated work between two streams reconciled; dead code removed
+- Real seed photographs added, demo dataset created on the live database
+- **Four defects found and fixed that only running could surface**
+- Password sign-in opened to teachers and parents
+- Handover document written
+
+## Individual contributions
+
+**Srujan** — Closed the rest of Plan 02: order creation and its line items now
+happen in one transaction rather than an insert followed by a compensating
+delete; the three `NOT NULL` columns declared `ON DELETE SET NULL` were
+corrected, since the combination made deleting a profile or photo impossible.
+Added eleven Unsplash photographs — scenes and materials, no identifiable
+children — and fixed the seed's school assignment.
+
+**Nagachaitanya** — Validation on order listing, the `markAsRead` 404 that could
+never fire because `count` was read without requesting it, and idempotent policy
+migrations. Also drove much of the runtime verification.
+
+**Ruthwik** — Reconciled the duplicated streams, removed dead code, and fixed
+two of the four runtime defects.
+
+**Bhargav** — Opened password sign-in to teachers and parents.
+
+## The four defects
+
+Each typechecks cleanly. That is the point of recording them.
+
+**`processed_at` did not exist.** Written by the photo upload path and present in
+no migration, inherited from a deleted background worker. PostgREST rejects an
+entire update over one unknown column, so `thumbnail_s3_key`, `blurhash`, `width`
+and `height` silently never persisted. Every upload would have left the feed on
+full-resolution originals — precisely the defect the storage rewrite existed to
+fix, reintroduced by one copied line.
+
+**The seed filed every photo under the wrong school.** It derived the school by
+comparing the first eight characters of a class UUID against another class UUID.
+Every class id shares those characters, so every photo was attributed to the
+wrong school and became invisible to the teacher who uploaded it.
+
+**The dashboard selected a dead column, twice.** First `total`, which never
+existed; then `total_amount`, after a migration renamed it to `total_cents`. The
+first failure was silent and reported zero. The second was caught only because an
+error check had been added alongside the first fix — which is the entire argument
+for checking them.
+
+**Order creation hangs without Redis.** Not an error: a silent, indefinite wait.
+ioredis queues rather than failing, so the request never returns.
+
+## Testing and validation
+
+The first end-to-end verification against a live database:
+
+| Check | Result |
+|---|---|
+| Photos processed | 6/6 with thumbnail, blurhash, dimensions |
+| Photo URL without a signature | 400 |
+| Signed URL | 200; token stripped → 400 |
+| Thumbnail vs original | 16 KB vs 211 KB — **13×** |
+| Parent feed | correct children only; sibling photo appears once |
+| Another family's photo | 404 |
+| Notifications | produced by trigger, correct child names |
+| Order | `total_cents=998` = $9.98 for 2 × $4.99 |
+| Duplicate idempotency key | cached replay, no second order |
+| Ordering another family's photo | 403 |
+| Teacher → another school's class | 403 |
+| Admin dashboard | 2 schools, 8 users, 6 photos, 3 orders, $34.95 |
+
+## Issues and challenges
+
+Password sign-in was reachable only for the admin, so every other account
+depended on an OTP arriving. The seeded accounts use `.demo` domains, which
+cannot receive mail. The parent account the demo guide calls "the account to
+demo" could not be signed into at all.
+
+More broadly: roughly 150 commits had been described as done on the strength of a
+passing typecheck. Four of them were wrong in ways no amount of review would have
+caught. The status documents now separate *verified* from *written*, and that
+distinction is the most useful thing the week produced.
+
+## End state
+
+The core product loop is verified working against a live database.
+
+---
+
 # Phase 2 Summary
 
 | Week | Focus | Commits |
@@ -1482,6 +1581,7 @@ All 46 audit gaps closed except the remaining Plan 08 tests and deployment.
 | 22 | Authorization | 3 |
 | 23 | The order contract | 6 |
 | 24 | Demo data & documentation | 7 |
+| 25 | First real execution | 18 |
 
 ## Contribution
 
@@ -1517,17 +1617,32 @@ the work actually went.
 | Order, admin and mobile tests | ✗ |
 | Deployment | ✗ |
 
-## The outstanding risk
+## What is verified, and what is not
 
-**Nothing has executed.** Migrations `00017` and `00020` are unapplied, no photo
-has been uploaded to the private bucket, no order placed, no test run, nothing
-deployed. Every claim above is "compiles and is structurally sound", not "works".
+**Verified at runtime** (18 July, live database): private storage and signed
+URLs, thumbnail generation, the parent feed and its privacy boundary, cross-family
+404s, notification triggers, order creation at the correct price, idempotency,
+cross-school 403s, and the admin dashboard.
 
-`00017` renames `total_amount` to `total_cents` and the code expects the new
-name. **Running the application before applying it will fail every order query.**
+**Still unverified:** nothing is deployed; the test suite has never run, because
+it needs a separate Supabase project — it truncates every table, so pointing it
+at the demo project would wipe the data; the mobile app has not been driven end
+to end by hand; the k6 suite and CI have never executed.
 
-`docs/environment-setup.md` §7 carries the verification checklist. It has not
-been run, and it asks for failures to be reported rather than ticks.
+## Remaining work
+
+| Item | Owner |
+|---|---|
+| **README still describes Flutter** — the first thing an evaluator reads | Bhargav |
+| `hive-test` Supabase project, then run the suite | Bhargav |
+| Deploy to Render | Bhargav |
+| Mobile tests — cart, upload state machine, RoleGate | Bhargav |
+| `tests/orders.test.ts` | Srujan |
+| `tests/admin.test.ts` | Nagachaitanya |
+| `no-namespace` lint error — the only thing keeping CI red | Nagachaitanya |
+| `docs/performance.md` — k6 results, needs a deployed target | Ruthwik |
+| `docs/testing.md`, `docs/demo-script.md` | all |
+| Custom SMTP — default Supabase is rate-limited | Bhargav |
 
 ---
 
