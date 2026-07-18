@@ -21,6 +21,7 @@ ON CONFLICT (id) DO UPDATE SET
   allowed_mime_types = EXCLUDED.allowed_mime_types;
 
 -- Allow authenticated users (teachers) to upload to photos bucket
+DROP POLICY IF EXISTS "photos_authenticated_upload" ON storage.objects;
 CREATE POLICY "photos_authenticated_upload"
 ON storage.objects
 FOR INSERT
@@ -28,6 +29,7 @@ TO authenticated
 WITH CHECK (bucket_id = 'photos');
 
 -- Allow overwrite for upsert (required for upsert: true in client)
+DROP POLICY IF EXISTS "photos_authenticated_update" ON storage.objects;
 CREATE POLICY "photos_authenticated_update"
 ON storage.objects
 FOR UPDATE
@@ -35,6 +37,7 @@ TO authenticated
 USING (bucket_id = 'photos');
 
 -- Public read is implicit for public buckets; add SELECT so anon can read if needed
+DROP POLICY IF EXISTS "photos_public_read" ON storage.objects;
 CREATE POLICY "photos_public_read"
 ON storage.objects
 FOR SELECT

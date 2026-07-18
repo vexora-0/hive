@@ -85,6 +85,7 @@ $$;
 -- ---------------------------------------------------------------------------
 
 -- Admins: full CRUD on all schools
+DROP POLICY IF EXISTS schools_admin_all ON schools;
 CREATE POLICY schools_admin_all ON schools
     FOR ALL
     TO authenticated
@@ -92,6 +93,7 @@ CREATE POLICY schools_admin_all ON schools
     WITH CHECK (get_my_role() = 'admin');
 
 -- Teachers: read their own school
+DROP POLICY IF EXISTS schools_teacher_select ON schools;
 CREATE POLICY schools_teacher_select ON schools
     FOR SELECT
     TO authenticated
@@ -101,6 +103,7 @@ CREATE POLICY schools_teacher_select ON schools
     );
 
 -- Parents: read their own school
+DROP POLICY IF EXISTS schools_parent_select ON schools;
 CREATE POLICY schools_parent_select ON schools
     FOR SELECT
     TO authenticated
@@ -114,12 +117,14 @@ CREATE POLICY schools_parent_select ON schools
 -- ---------------------------------------------------------------------------
 
 -- Users can read their own profile
+DROP POLICY IF EXISTS profiles_self_select ON profiles;
 CREATE POLICY profiles_self_select ON profiles
     FOR SELECT
     TO authenticated
     USING (id = auth.uid());
 
 -- Users can update their own profile (name, avatar, phone only - not role)
+DROP POLICY IF EXISTS profiles_self_update ON profiles;
 CREATE POLICY profiles_self_update ON profiles
     FOR UPDATE
     TO authenticated
@@ -127,6 +132,7 @@ CREATE POLICY profiles_self_update ON profiles
     WITH CHECK (id = auth.uid());
 
 -- Admins: full access to all profiles
+DROP POLICY IF EXISTS profiles_admin_all ON profiles;
 CREATE POLICY profiles_admin_all ON profiles
     FOR ALL
     TO authenticated
@@ -134,6 +140,7 @@ CREATE POLICY profiles_admin_all ON profiles
     WITH CHECK (get_my_role() = 'admin');
 
 -- Teachers: read profiles in their school (to see parent/colleague names)
+DROP POLICY IF EXISTS profiles_teacher_select ON profiles;
 CREATE POLICY profiles_teacher_select ON profiles
     FOR SELECT
     TO authenticated
@@ -143,6 +150,7 @@ CREATE POLICY profiles_teacher_select ON profiles
     );
 
 -- Parents: read teacher profiles in their school (to see who uploaded photos)
+DROP POLICY IF EXISTS profiles_parent_select_teachers ON profiles;
 CREATE POLICY profiles_parent_select_teachers ON profiles
     FOR SELECT
     TO authenticated
@@ -157,6 +165,7 @@ CREATE POLICY profiles_parent_select_teachers ON profiles
 -- ---------------------------------------------------------------------------
 
 -- Admins: full access
+DROP POLICY IF EXISTS classes_admin_all ON classes;
 CREATE POLICY classes_admin_all ON classes
     FOR ALL
     TO authenticated
@@ -164,6 +173,7 @@ CREATE POLICY classes_admin_all ON classes
     WITH CHECK (get_my_role() = 'admin');
 
 -- Teachers: read classes in their school
+DROP POLICY IF EXISTS classes_teacher_select ON classes;
 CREATE POLICY classes_teacher_select ON classes
     FOR SELECT
     TO authenticated
@@ -173,6 +183,7 @@ CREATE POLICY classes_teacher_select ON classes
     );
 
 -- Parents: read classes where their child is enrolled
+DROP POLICY IF EXISTS classes_parent_select ON classes;
 CREATE POLICY classes_parent_select ON classes
     FOR SELECT
     TO authenticated
@@ -192,6 +203,7 @@ CREATE POLICY classes_parent_select ON classes
 -- ---------------------------------------------------------------------------
 
 -- Admins: full access
+DROP POLICY IF EXISTS students_admin_all ON students;
 CREATE POLICY students_admin_all ON students
     FOR ALL
     TO authenticated
@@ -199,6 +211,7 @@ CREATE POLICY students_admin_all ON students
     WITH CHECK (get_my_role() = 'admin');
 
 -- Teachers: read students in their school
+DROP POLICY IF EXISTS students_teacher_select ON students;
 CREATE POLICY students_teacher_select ON students
     FOR SELECT
     TO authenticated
@@ -208,6 +221,7 @@ CREATE POLICY students_teacher_select ON students
     );
 
 -- Parents: read only their own children
+DROP POLICY IF EXISTS students_parent_select ON students;
 CREATE POLICY students_parent_select ON students
     FOR SELECT
     TO authenticated
@@ -221,6 +235,7 @@ CREATE POLICY students_parent_select ON students
 -- ---------------------------------------------------------------------------
 
 -- Parents: read their own mappings
+DROP POLICY IF EXISTS psm_parent_select ON parent_student_mappings;
 CREATE POLICY psm_parent_select ON parent_student_mappings
     FOR SELECT
     TO authenticated
@@ -230,6 +245,7 @@ CREATE POLICY psm_parent_select ON parent_student_mappings
     );
 
 -- Admins: full CRUD
+DROP POLICY IF EXISTS psm_admin_all ON parent_student_mappings;
 CREATE POLICY psm_admin_all ON parent_student_mappings
     FOR ALL
     TO authenticated
@@ -237,6 +253,7 @@ CREATE POLICY psm_admin_all ON parent_student_mappings
     WITH CHECK (get_my_role() = 'admin');
 
 -- Teachers: read mappings for students in their school (for contact purposes)
+DROP POLICY IF EXISTS psm_teacher_select ON parent_student_mappings;
 CREATE POLICY psm_teacher_select ON parent_student_mappings
     FOR SELECT
     TO authenticated
@@ -254,6 +271,7 @@ CREATE POLICY psm_teacher_select ON parent_student_mappings
 -- ---------------------------------------------------------------------------
 
 -- Admins: full access to all photos
+DROP POLICY IF EXISTS photos_admin_all ON photos;
 CREATE POLICY photos_admin_all ON photos
     FOR ALL
     TO authenticated
@@ -261,6 +279,7 @@ CREATE POLICY photos_admin_all ON photos
     WITH CHECK (get_my_role() = 'admin');
 
 -- Teachers: SELECT ready photos in their school
+DROP POLICY IF EXISTS photos_teacher_select ON photos;
 CREATE POLICY photos_teacher_select ON photos
     FOR SELECT
     TO authenticated
@@ -270,6 +289,7 @@ CREATE POLICY photos_teacher_select ON photos
     );
 
 -- Teachers: INSERT photos into their school's classes
+DROP POLICY IF EXISTS photos_teacher_insert ON photos;
 CREATE POLICY photos_teacher_insert ON photos
     FOR INSERT
     TO authenticated
@@ -280,6 +300,7 @@ CREATE POLICY photos_teacher_insert ON photos
     );
 
 -- Teachers: UPDATE their own photos (e.g., add caption, change status)
+DROP POLICY IF EXISTS photos_teacher_update ON photos;
 CREATE POLICY photos_teacher_update ON photos
     FOR UPDATE
     TO authenticated
@@ -298,6 +319,7 @@ CREATE POLICY photos_teacher_update ON photos
 -- This is the critical privacy policy. A parent can never see a photo
 -- unless that photo has a row in photo_student_tags linking to one of
 -- the parent's children via parent_student_mappings.
+DROP POLICY IF EXISTS photos_parent_select ON photos;
 CREATE POLICY photos_parent_select ON photos
     FOR SELECT
     TO authenticated
@@ -318,6 +340,7 @@ CREATE POLICY photos_parent_select ON photos
 -- ---------------------------------------------------------------------------
 
 -- Admins: full access
+DROP POLICY IF EXISTS pst_admin_all ON photo_student_tags;
 CREATE POLICY pst_admin_all ON photo_student_tags
     FOR ALL
     TO authenticated
@@ -325,6 +348,7 @@ CREATE POLICY pst_admin_all ON photo_student_tags
     WITH CHECK (get_my_role() = 'admin');
 
 -- Teachers: INSERT tags for photos in their school
+DROP POLICY IF EXISTS pst_teacher_insert ON photo_student_tags;
 CREATE POLICY pst_teacher_insert ON photo_student_tags
     FOR INSERT
     TO authenticated
@@ -339,6 +363,7 @@ CREATE POLICY pst_teacher_insert ON photo_student_tags
     );
 
 -- Teachers: read tags for photos in their school
+DROP POLICY IF EXISTS pst_teacher_select ON photo_student_tags;
 CREATE POLICY pst_teacher_select ON photo_student_tags
     FOR SELECT
     TO authenticated
@@ -352,6 +377,7 @@ CREATE POLICY pst_teacher_select ON photo_student_tags
     );
 
 -- Teachers: DELETE tags they created (untag a student)
+DROP POLICY IF EXISTS pst_teacher_delete ON photo_student_tags;
 CREATE POLICY pst_teacher_delete ON photo_student_tags
     FOR DELETE
     TO authenticated
@@ -361,6 +387,7 @@ CREATE POLICY pst_teacher_delete ON photo_student_tags
     );
 
 -- Parents: read tags that reference their own children
+DROP POLICY IF EXISTS pst_parent_select ON photo_student_tags;
 CREATE POLICY pst_parent_select ON photo_student_tags
     FOR SELECT
     TO authenticated
@@ -374,12 +401,14 @@ CREATE POLICY pst_parent_select ON photo_student_tags
 -- ---------------------------------------------------------------------------
 
 -- Admins: read all orders
+DROP POLICY IF EXISTS orders_admin_select ON orders;
 CREATE POLICY orders_admin_select ON orders
     FOR SELECT
     TO authenticated
     USING (get_my_role() = 'admin');
 
 -- Admins: update order status
+DROP POLICY IF EXISTS orders_admin_update ON orders;
 CREATE POLICY orders_admin_update ON orders
     FOR UPDATE
     TO authenticated
@@ -387,6 +416,7 @@ CREATE POLICY orders_admin_update ON orders
     WITH CHECK (get_my_role() = 'admin');
 
 -- Parents: full CRUD on their own orders
+DROP POLICY IF EXISTS orders_parent_select ON orders;
 CREATE POLICY orders_parent_select ON orders
     FOR SELECT
     TO authenticated
@@ -395,6 +425,7 @@ CREATE POLICY orders_parent_select ON orders
         AND parent_id = auth.uid()
     );
 
+DROP POLICY IF EXISTS orders_parent_insert ON orders;
 CREATE POLICY orders_parent_insert ON orders
     FOR INSERT
     TO authenticated
@@ -403,6 +434,7 @@ CREATE POLICY orders_parent_insert ON orders
         AND parent_id = auth.uid()
     );
 
+DROP POLICY IF EXISTS orders_parent_update ON orders;
 CREATE POLICY orders_parent_update ON orders
     FOR UPDATE
     TO authenticated
@@ -417,6 +449,7 @@ CREATE POLICY orders_parent_update ON orders
         AND parent_id = auth.uid()
     );
 
+DROP POLICY IF EXISTS orders_parent_delete ON orders;
 CREATE POLICY orders_parent_delete ON orders
     FOR DELETE
     TO authenticated
@@ -431,6 +464,7 @@ CREATE POLICY orders_parent_delete ON orders
 -- ---------------------------------------------------------------------------
 
 -- Admins: read all order items
+DROP POLICY IF EXISTS order_items_admin_select ON order_items;
 CREATE POLICY order_items_admin_select ON order_items
     FOR SELECT
     TO authenticated
@@ -439,6 +473,7 @@ CREATE POLICY order_items_admin_select ON order_items
     );
 
 -- Parents: read their own order items
+DROP POLICY IF EXISTS order_items_parent_select ON order_items;
 CREATE POLICY order_items_parent_select ON order_items
     FOR SELECT
     TO authenticated
@@ -452,6 +487,7 @@ CREATE POLICY order_items_parent_select ON order_items
     );
 
 -- Parents: insert items into their own orders
+DROP POLICY IF EXISTS order_items_parent_insert ON order_items;
 CREATE POLICY order_items_parent_insert ON order_items
     FOR INSERT
     TO authenticated
@@ -466,6 +502,7 @@ CREATE POLICY order_items_parent_insert ON order_items
     );
 
 -- Parents: delete items from their own pending orders
+DROP POLICY IF EXISTS order_items_parent_delete ON order_items;
 CREATE POLICY order_items_parent_delete ON order_items
     FOR DELETE
     TO authenticated
@@ -484,12 +521,14 @@ CREATE POLICY order_items_parent_delete ON order_items
 -- ---------------------------------------------------------------------------
 
 -- Users: read their own notifications
+DROP POLICY IF EXISTS notifications_self_select ON notifications;
 CREATE POLICY notifications_self_select ON notifications
     FOR SELECT
     TO authenticated
     USING (user_id = auth.uid());
 
 -- Users: update their own notifications (mark as read)
+DROP POLICY IF EXISTS notifications_self_update ON notifications;
 CREATE POLICY notifications_self_update ON notifications
     FOR UPDATE
     TO authenticated
@@ -497,6 +536,7 @@ CREATE POLICY notifications_self_update ON notifications
     WITH CHECK (user_id = auth.uid());
 
 -- Admins: insert notifications for any user
+DROP POLICY IF EXISTS notifications_admin_insert ON notifications;
 CREATE POLICY notifications_admin_insert ON notifications
     FOR INSERT
     TO authenticated
