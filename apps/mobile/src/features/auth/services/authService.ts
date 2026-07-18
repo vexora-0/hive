@@ -57,7 +57,12 @@ export async function verifyOTP(
 }
 
 /**
- * Sign in with email and password (admin users only).
+ * Sign in with email and password.
+ *
+ * Admin always; teacher and parent when they opt out of the OTP flow on the
+ * login screen. Not restricted by role — Supabase authenticates whoever the
+ * credentials belong to, and the role is resolved afterwards from `profiles`.
+ *
  * On success the Supabase SDK automatically stores the session.
  * Throws on invalid credentials or network errors.
  */

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, layout } from '@/theme';
+import { colors, spacing, layout, MIN_TAP_SIZE } from '@/theme';
 import { Text, Button, TextInput } from '@/components/ui';
 import { LottieWrapper, HoneycombPattern } from '@/components/animation';
 import { ScreenContainer } from '@/components/layout';
@@ -398,7 +398,12 @@ const styles = StyleSheet.create({
   },
   switchMethod: {
     alignSelf: 'flex-end',
+    justifyContent: 'center',
+    // Text-only control: without an explicit floor this is ~26px tall, under
+    // the 44px minimum every other tappable element in the app honours.
+    minHeight: MIN_TAP_SIZE,
     paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
     marginBottom: spacing.xs,
   },
   error: {
