@@ -42,46 +42,22 @@ Match it against the table. **This determines what you work on.** If the email d
 
 ---
 
-## 3. Progress — updated 16 July
+## 3. Progress
 
-| Plan | Status |
-|---|---|
-| **00** typecheck | ✔ Zero errors |
-| **01** quick wins | ✔ (custom SMTP outstanding — dashboard task) |
-| **02** order contract | ✔ |
-| **03** storage & media | ✔ |
-| **04** authorization | ✔ |
-| **05** upload & feed perf | ✔ |
-| **06** demo seed | ✔ (needs JPEGs in `seed-assets/` and credentials to run) |
-| **07** UX completion | ✔ (real upload progress deferred — cosmetic) |
-| **08** tests | ◐ Harness + 19 backend tests; order/admin/mobile tests outstanding |
-| **09** deployment | ◐ Docker, CI, health, request IDs done; **not deployed** |
-| **10** docs | ✔ Architecture, database, API, security, demo guide |
-| **11** QA & load | ◐ k6 suite written, never run |
+**See `docs/IMPLEMENTATION-STATUS.md`** — the single source of truth for what
+exists, what runs and what has been proven. Two status tables drifting apart is
+worse than one, so this file no longer restates it.
 
-**All 46 audit gaps closed except:** the remaining Plan 08 tests, deployment,
-and running anything.
+### The one thing that blocks everything
 
-### The one thing that matters now
-
-**Nothing has ever executed.** Migrations `00017` and `00020` are unapplied, no
-photo has been uploaded, no order placed, no test run, nothing deployed.
+**Nothing has executed.** Migrations `00017`, `00018` and `00020` are unapplied;
+no photo has been uploaded, no order placed, no test run, nothing deployed.
 
 `00017` renames `total_amount` → `total_cents` and the code expects the new
-name. **If the app runs before that migration is applied, every order query
-fails.** Same for `00020` and photos.
+name. **Start the application before applying it and every order query fails.**
 
-Follow `docs/environment-setup.md`. Section 7 is the verification checklist —
-report failures, not just ticks.
-
-### Verified vs written
-
-**Verified:** typecheck and build pass both packages; lint clean but for three
-pre-existing `any` warnings; mobile type errors 22 → 0.
-
-**Written, never run:** private storage, signed URLs, thumbnails, HEIC
-conversion, the feed join, upload confirm, the order contract, RoleGate, toasts,
-the demo seed, the Docker image, CI, k6, and all 19 tests.
+Follow `docs/environment-setup.md`; §7 is the verification checklist and asks
+for failures to be reported, not ticks.
 
 ---
 

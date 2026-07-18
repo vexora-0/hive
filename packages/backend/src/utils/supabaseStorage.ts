@@ -29,28 +29,6 @@ export async function uploadPhotoObject(
 }
 
 /**
- * Issue a short-lived signed URL for one object.
- *
- * The bucket is private (migration 00020), so this is the only way to read a
- * photo. Returns null rather than throwing — a missing thumbnail should degrade
- * to showing the original, not fail the whole request.
- */
-export async function getSignedPhotoUrl(
-  storagePath: string,
-  expiresIn: number = SIGNED_URL_TTL_SECONDS,
-): Promise<string | null> {
-  const { data, error } = await supabaseAdmin.storage
-    .from(PHOTOS_BUCKET)
-    .createSignedUrl(storagePath, expiresIn);
-
-  if (error || !data) {
-    logger.warn('Failed to sign photo URL', { storagePath, error: error?.message });
-    return null;
-  }
-  return data.signedUrl;
-}
-
-/**
  * Sign many objects in one round trip.
  *
  * A feed page signs up to 40 objects (original + thumbnail for 20 photos); one

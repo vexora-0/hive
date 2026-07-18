@@ -1,6 +1,8 @@
 # Phase 2 — Implementation Status
 
 **As of:** Week 24 (18 July 2026), after merging all four streams into `main`.
+**Single source of truth for status.** `CLAUDE.md` links here rather than
+restating it; two status tables drifting apart is worse than one.
 **Covers:** everything committed during Phase 2.
 
 A factual record of what exists, what runs, and what has been proven to work.
@@ -14,10 +16,24 @@ Deliberately separate from the plans, which describe intent.
 |---|---|---|
 | **Ruthwik** | 03 · 05 · 09 (infra) · 08 (feed/photos tests) · 10 (architecture) · 11 (k6) | Merged |
 | **Nagachaitanya** | 04 · 01 (Steps 1, 3, 5) · 05 Step 4 (G-34) · 08 (auth/error tests) · 09 (Sentry) · 10 (security) · 11 (verify script) | Merged |
-| **Bhargav** | 00 (all 22 typecheck errors) | Merged |
-| **Srujan** | 00 Group B (types) · 01 Step 2 (dashboard) | Merged |
+| **Bhargav** | 00 (all 22 typecheck errors) · 07 (toasts, dialogs, empty states) | Merged |
+| **Srujan** | 00 Group B (types) · 01 Step 2 (dashboard) · 02 (order contract) · 06 (demo seed) · 10 (database) | Merged |
 
-Plans 02, 06 and 07 have not been started.
+**All twelve plans now have their code written.** Plans 02, 06 and 07 were
+completed after this document was first written.
+
+### Duplicated work
+
+Ruthwik and Nagachaitanya independently implemented much of Plan 04 and parts
+of Plans 01 and 08 — the notification wiring, RoleGate, the photo-detail
+ownership check, school scoping and the test harness all exist because two
+people built them in parallel without agreeing ownership first.
+
+The merge reconciled cleanly, keeping the stronger version in each case: the
+consolidated `assertPhotoAccess` guard over the separate school lookup, the
+hardened test guard with a hard-coded forbidden project ref, and one security
+document rather than two. But the effort went twice, and the fix for next time
+is to agree file ownership before starting, not after.
 
 ---
 
