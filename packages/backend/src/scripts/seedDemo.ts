@@ -158,13 +158,17 @@ async function seedPhotos(ids: Record<string, string>): Promise<void> {
     return;
   }
 
+  // School is carried explicitly. Deriving it from the class UUID prefix was a
+  // bug: every class ID starts with the same eight characters, so every photo
+  // was attributed to the wrong school and became invisible to the teacher who
+  // uploaded it.
   const plan = [
-    { class: CLASS.bloomA, teacher: 'sarita', students: [STUDENTS[0].id] },
-    { class: CLASS.bloomA, teacher: 'sarita', students: [STUDENTS[0].id, STUDENTS[1].id] }, // siblings — exercises feed dedup
-    { class: CLASS.bloomA, teacher: 'sarita', students: [STUDENTS[2].id] },
-    { class: CLASS.bloomB, teacher: 'dinesh', students: [STUDENTS[3].id, STUDENTS[4].id] },
-    { class: CLASS.bloomB, teacher: 'dinesh', students: [STUDENTS[4].id] },
-    { class: CLASS.starsA, teacher: 'kavitha', students: [STUDENTS[6].id, STUDENTS[7].id] },
+    { class: CLASS.bloomA, school: SCHOOL.bloom, teacher: 'sarita', students: [STUDENTS[0].id] },
+    { class: CLASS.bloomA, school: SCHOOL.bloom, teacher: 'sarita', students: [STUDENTS[0].id, STUDENTS[1].id] }, // siblings — exercises feed dedup
+    { class: CLASS.bloomA, school: SCHOOL.bloom, teacher: 'sarita', students: [STUDENTS[2].id] },
+    { class: CLASS.bloomB, school: SCHOOL.bloom, teacher: 'dinesh', students: [STUDENTS[3].id, STUDENTS[4].id] },
+    { class: CLASS.bloomB, school: SCHOOL.bloom, teacher: 'dinesh', students: [STUDENTS[4].id] },
+    { class: CLASS.starsA, school: SCHOOL.stars, teacher: 'kavitha', students: [STUDENTS[6].id, STUDENTS[7].id] },
   ];
 
   for (let i = 0; i < plan.length; i++) {
@@ -172,7 +176,7 @@ async function seedPhotos(ids: Record<string, string>): Promise<void> {
     const file = files[i % files.length];
     const buffer = readFileSync(join(ASSETS, file));
     const photoId = crypto.randomUUID();
-    const schoolId = entry.class.startsWith(CLASS.starsA.slice(0, 8)) ? SCHOOL.stars : SCHOOL.bloom;
+    const schoolId = entry.school;
     const key = `photos/${schoolId}/${entry.class}/${photoId}.jpg`;
 
     const { error: insertError } = await supabase.from('photos').insert({
@@ -191,7 +195,7 @@ async function seedPhotos(ids: Record<string, string>): Promise<void> {
     // identically to real ones — thumbnails, blurhash and dimensions included.
     const processed = await processAndUploadPhoto(buffer, key, 'image/jpeg');
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('photos')
       .update({
         s3_key: processed.storagePath,
@@ -199,9 +203,9 @@ async function seedPhotos(ids: Record<string, string>): Promise<void> {
         width: processed.width,
         height: processed.height,
         blurhash: processed.blurhash,
-        processed_at: new Date().toISOString(),
       })
       .eq('id', photoId);
+    if (updateError) throw new Error(`photo metadata update: ${updateError.message}`);
 
     for (const studentId of entry.students) {
       await supabase.from('photo_student_tags').insert({
