@@ -40,8 +40,19 @@ export default function LoginScreen() {
   const [adminError, setAdminError] = useState<string | undefined>(undefined);
 
   const isAdmin = signInAs === 'admin';
-  const isLoading = isAdmin ? isSigningIn : isSending;
-  const serverError = isAdmin ? adminError : otpError;
+
+  // Teachers and parents default to OTP, but can switch to a password.
+  //
+  // OTP alone made several accounts unreachable: the seeded demo accounts use
+  // .demo domains, which cannot receive mail, and Supabase's default SMTP is
+  // rate-limited to a handful of messages an hour — unreliable for a live
+  // demonstration even with real addresses. signInWithPassword already existed;
+  // it simply was not reachable for these roles.
+  const [usePassword, setUsePassword] = useState(false);
+  const isPasswordMode = isAdmin || usePassword;
+
+  const isLoading = isPasswordMode ? isSigningIn : isSending;
+  const serverError = isPasswordMode ? adminError : otpError;
 
   // ── Already signed in: redirect to role-based home ───────────────────
   useEffect(() => {
@@ -59,14 +70,20 @@ export default function LoginScreen() {
     });
   }, [user?.id, role, setProfile, setRole, router]);
 
-  // ── Clear password state when switching away from admin ───────────────
+  // Switching role resets the opt-in, so a teacher does not silently inherit
+  // password mode from a previous admin selection.
   useEffect(() => {
-    if (!isAdmin) {
+    setUsePassword(false);
+  }, [signInAs]);
+
+  // ── Clear password state when leaving password mode ───────────────────
+  useEffect(() => {
+    if (!isPasswordMode) {
       setPassword('');
       setPasswordError(undefined);
       setAdminError(undefined);
     }
-  }, [isAdmin]);
+  }, [isPasswordMode]);
 
   // ── Validation ──────────────────────────────────────────────────────
   const validateEmail = useCallback((value: string): boolean => {
@@ -89,8 +106,8 @@ export default function LoginScreen() {
     const trimmed = email.trim();
     if (!validateEmail(trimmed)) return;
 
-    if (isAdmin) {
-      // ── Admin: email + password ────────────────────────────────────
+    if (isPasswordMode) {
+      // ── Password sign-in ──────────────────────────────────────────
       if (!password.trim()) {
         setPasswordError('Password is required.');
         return;
@@ -119,7 +136,7 @@ export default function LoginScreen() {
         } as never);
       }
     }
-  }, [email, password, signInAs, isAdmin, validateEmail, sendOTP, router]);
+  }, [email, password, signInAs, isPasswordMode, validateEmail, sendOTP, router]);
 
   // ── Render ─────────────────────────────────────────────────────────
   return (
@@ -243,14 +260,14 @@ export default function LoginScreen() {
           autoCorrect={false}
           autoComplete="email"
           textContentType="emailAddress"
-          returnKeyType={isAdmin ? 'next' : 'go'}
-          onSubmitEditing={isAdmin ? undefined : handleSignIn}
+          returnKeyType={isPasswordMode ? 'next' : 'go'}
+          onSubmitEditing={isPasswordMode ? undefined : handleSignIn}
           editable={!isLoading}
           containerStyle={styles.input}
         />
 
-        {/* Password input (admin only) */}
-        {isAdmin && (
+        {/* Password input */}
+        {isPasswordMode && (
           <TextInput
             label="Password"
             placeholder="Enter your password"
@@ -267,6 +284,23 @@ export default function LoginScreen() {
             editable={!isLoading}
             containerStyle={styles.input}
           />
+        )}
+
+        {/* Teachers and parents can opt into a password instead of an OTP. */}
+        {!isAdmin && (
+          <Pressable
+            onPress={() => setUsePassword((v) => !v)}
+            disabled={isLoading}
+            accessibilityRole="button"
+            accessibilityLabel={
+              usePassword ? 'Use a one-time code instead' : 'Use a password instead'
+            }
+            style={styles.switchMethod}
+          >
+            <Text variant="bodySmall" color={colors.text.link}>
+              {usePassword ? 'Use a one-time code instead' : 'Use a password instead'}
+            </Text>
+          </Pressable>
         )}
 
         {/* Server error */}
@@ -361,6 +395,11 @@ const styles = StyleSheet.create({
   input: {
     width: '100%',
     marginBottom: spacing.md,
+  },
+  switchMethod: {
+    alignSelf: 'flex-end',
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.xs,
   },
   error: {
     marginBottom: spacing.md,

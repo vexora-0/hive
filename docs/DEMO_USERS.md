@@ -16,6 +16,12 @@ not written here.
 
 `.demo` domains so nobody mistakes these for real addresses.
 
+**Sign in with the password, not a one-time code.** On the login screen pick the
+role, then tap **"Use a password instead"**. `.demo` domains cannot receive
+mail, and Supabase's default SMTP is rate-limited to a few messages an hour — so
+OTP is unusable for these accounts and unreliable for a live demonstration even
+with real addresses.
+
 ---
 
 ## The demo path
