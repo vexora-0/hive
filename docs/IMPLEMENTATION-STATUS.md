@@ -123,6 +123,11 @@ file, so it must never be generated for a caller who is about to be refused.
 | **Authenticated `GET /api/v1/feed`** | **200** — the API path works end to end with a real user. Empty, because there are no photos |
 | **RBAC — parent → `/api/v1/admin/users`** | **403.** Server-side role enforcement confirmed at runtime, not just in review (G-05's server half) |
 | **G-08 cross-school IDOR** | **Confirmed fixed.** Teacher at Bloom: own school's classes **200**; another school's classes **403**; another school's **student roster including dates of birth 403** — `"You do not have access to this school"`. This is the check §5 previously recorded as never executed |
+| **Storage pipeline end to end** | **Executed for the first time.** `seed:demo:reset` processed 6 photos: originals and `_thumb.jpg` both written to the private bucket, `status=ready`, and `thumbnail_s3_key`, `blurhash`, `width`, `height` all populated. Dimensions vary (1600×900 … 1600×2409), so portrait and landscape both survive processing |
+| **G-02 signed URLs** | **Confirmed fixed end to end.** A feed signed URL fetches **200**; the same URL with `?token=` stripped returns **400**, not the image. The bucket is private and only signed access works |
+| **G-07 notifications** | **Confirmed fixed.** 16 `new_photo` notifications generated, addressed to the right parents and naming the right child — "New photo of Diya Kumar", "New photo of Aarav Kumar". Tag-before-confirm ordering is correct; the seed's zero-notification warning no longer fires |
+| **Parent privacy scoping** | **Confirmed.** 6 photos exist. Rajesh (Bloom, two children) sees **2**; Vikram (Little Stars) sees **1**; **zero overlap**. No parent sees the full set, and no cross-school leakage |
+| **Feed deduplication** | No duplicate photo IDs in a parent's feed |
 
 ---
 
@@ -134,10 +139,10 @@ file, so it must never be generated for a caller who is about to be refused.
 and answers `/health` with `"database": "ok"`. What that made verifiable is in
 §4; what follows is what is still unproven.
 
-**Demo data now exists** (`pnpm seed:demo`, first run 1 Aug): 2 schools,
-4 classes, 9 students, 8 profiles. **No photos** — `seed-assets/` needs 12–15
-JPEGs sourced by hand, and the script skips photo seeding when it is empty.
-That single gap is what still blocks most of the list below.
+**Demo data now exists, photos included** (`seed:demo:reset`, 1 Aug): 2 schools,
+4 classes, 9 students, 8 profiles, **6 photos with thumbnails, 9 tags,
+16 notifications**. The seed assets landed in `abe853a`, which unblocked the
+storage layer — most of what this section used to list is now in §4.
 
 **⚠ `packages/backend/.env.test` points at the SAME project as `.env`**, by
 explicit decision, because a second project was not wanted. `pnpm test` runs
@@ -147,14 +152,16 @@ The guards in `tests/setup.ts` do *not* catch this: guard 1 needs
 `fhvwsmtivwtmbdscdoyz`, a stale ref. Re-seed after any test run, or create a
 second project before the demo.
 
-- **No photo has ever been uploaded to the private bucket.** The whole storage
-  rewrite — signed URLs, thumbnails, blurhash, HEIC conversion, magic-byte
-  validation — compiles and has never run. The bucket is confirmed private and
-  empty. Blocked on seed assets.
-- **No order has been placed and no notification produced** — both need photos.
-- **Plan 04's verification is now part-run.** The cross-school IDOR (G-08) and
-  parent→admin RBAC checks passed against a real instance (§4). The photo-level
-  checks — G-04, G-17, signed-URL expiry — still need an uploaded photo.
+- **Uploads have only been exercised through the seed script**, which calls the
+  photo service directly. The HTTP upload path — `POST /photos`, the multipart
+  file step, `/tag`, `/confirm` — has not been driven end to end by a client.
+- **HEIC conversion and magic-byte rejection are still unproven.** Every seed
+  asset is already a JPEG, so `converted:false` on all six. Nothing has tested
+  a `.heic` input or a `.txt` renamed to `.jpg`.
+- **No order has been placed.** G-01 is still open, so this is blocked on Plan 02
+  rather than on the environment.
+- **G-17 upload-ownership checks are unverified** — they need two teachers at the
+  same school driving the upload endpoints, which the seed does not do.
 - **`pnpm test` has never run.** See the truncation warning above before running
   it. Plan 08's sabotage exercise — revert a fix, confirm the matching test
   fails — has not been done, so the tests have not been shown to detect anything.
