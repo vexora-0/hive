@@ -15,6 +15,7 @@ interface DashboardStats {
   totalUsers: number;
   totalPhotos: number;
   totalOrders: number;
+  /** Integer cents. */
   totalRevenue: number;
 }
 
@@ -58,10 +59,11 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       supabaseAdmin
         .from('photos')
         .select('id', { count: 'exact', head: true }),
-      // `total` does not exist — the column is total_amount. The error was
-      // never checked, so data came back null and both figures silently
-      // reported 0 regardless of the real data. (G-06)
-      supabaseAdmin.from('orders').select('total_amount'),
+      // Originally selected `total`, which never existed; then `total_amount`,
+      // which migration 00017 renamed to total_cents. Both times the error went
+      // unchecked and the dashboard silently reported zero. It is checked below
+      // now, which is how the second break was caught. (G-06)
+      supabaseAdmin.from('orders').select('total_cents'),
     ]);
 
   for (const [name, result] of Object.entries({
@@ -82,7 +84,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const totalOrders = ordersResult.data?.length ?? 0;
   const totalRevenue =
     ordersResult.data?.reduce(
-      (sum, order) => sum + Number(order.total_amount ?? 0),
+      (sum, order) => sum + Number(order.total_cents ?? 0),
       0,
     ) ?? 0;
 
