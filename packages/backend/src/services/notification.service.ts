@@ -80,7 +80,7 @@ export async function markAsRead(
 ): Promise<void> {
   const { error, count } = await supabaseAdmin
     .from('notifications')
-    .update({ is_read: true })
+    .update({ is_read: true }, { count: 'exact' })
     .eq('id', notificationId)
     .eq('user_id', userId);
 
