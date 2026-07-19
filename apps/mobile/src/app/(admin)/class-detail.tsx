@@ -20,6 +20,7 @@ import { StudentCard } from '@/features/admin/components/StudentCard';
 import { AssignTeacherSheet } from '@/features/admin/components/AssignTeacherSheet';
 import { AddStudentSheet } from '@/features/admin/components/AddStudentSheet';
 import { ParentListSheet } from '@/features/admin/components/ParentListSheet';
+import { ConfirmDialog } from '@/components/feedback';
 import type { CreateStudentData } from '@/features/admin/services/adminService';
 
 // ---------------------------------------------------------------------------
@@ -50,6 +51,11 @@ export default function ClassDetailScreen() {
     id: string;
     name: string;
   } | null>(null);
+  /** Student awaiting removal confirmation. Null when no dialog is open. */
+  const [studentToRemove, setStudentToRemove] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   // ── Handlers ─────────────────────────────────────────────────────────
   const handleAssignTeacher = useCallback(
@@ -68,12 +74,24 @@ export default function ClassDetailScreen() {
     [addStudent],
   );
 
+  // Removal is irreversible from the UI, so it asks first. The tap only opens
+  // the dialog; `confirmRemoveStudent` is what actually removes.
   const handleRemoveStudent = useCallback(
     (studentId: string) => {
-      removeStudent(studentId);
+      const student = classDetail?.students.find((s) => s.id === studentId);
+      if (student) {
+        setStudentToRemove({ id: student.id, name: student.full_name });
+      }
     },
-    [removeStudent],
+    [classDetail],
   );
+
+  const confirmRemoveStudent = useCallback(() => {
+    if (studentToRemove) {
+      removeStudent(studentToRemove.id);
+    }
+    setStudentToRemove(null);
+  }, [studentToRemove, removeStudent]);
 
   const handleStudentPress = useCallback(
     (studentId: string) => {
@@ -225,6 +243,16 @@ export default function ClassDetailScreen() {
         studentId={selectedStudent?.id ?? null}
         studentName={selectedStudent?.name ?? ''}
         onClose={() => setSelectedStudent(null)}
+      />
+
+      <ConfirmDialog
+        visible={!!studentToRemove}
+        title="Remove student"
+        message={`Remove ${studentToRemove?.name ?? 'this student'} from ${classDetail.name}? They will stay enrolled at the school.`}
+        confirmLabel="Remove"
+        destructive
+        onConfirm={confirmRemoveStudent}
+        onCancel={() => setStudentToRemove(null)}
       />
     </ScreenContainer>
   );

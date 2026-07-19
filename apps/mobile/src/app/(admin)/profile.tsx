@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -7,6 +7,7 @@ import { Text, Button } from '@/components/ui';
 import { Avatar } from '@/components/ui';
 import { ScreenContainer } from '@/components/layout';
 import { HeaderBar } from '@/components/navigation';
+import { ConfirmDialog } from '@/components/feedback';
 import { useAuthStore } from '@/features/auth/stores/authStore';
 
 // ---------------------------------------------------------------------------
@@ -21,7 +22,10 @@ export default function AdminProfileScreen() {
   const router = useRouter();
   const { profile, user, signOut } = useAuthStore();
 
-  const handleSignOut = useCallback(async () => {
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+
+  const confirmSignOut = useCallback(async () => {
+    setConfirmingSignOut(false);
     await signOut();
     router.replace('/(auth)/login' as never);
   }, [signOut, router]);
@@ -56,12 +60,21 @@ export default function AdminProfileScreen() {
         <Button
           variant="outline"
           size="lg"
-          onPress={handleSignOut}
+          onPress={() => setConfirmingSignOut(true)}
           style={styles.signOut}
         >
           Sign out
         </Button>
       </View>
+
+      <ConfirmDialog
+        visible={confirmingSignOut}
+        title="Sign out"
+        message="Sign out of Hive? You will need to sign in again to get back in."
+        confirmLabel="Sign out"
+        onConfirm={confirmSignOut}
+        onCancel={() => setConfirmingSignOut(false)}
+      />
     </ScreenContainer>
   );
 }

@@ -14,6 +14,7 @@ import { colors, spacing, layout } from '@/theme';
 import { Text } from '@/components/ui/Text';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/feedback';
 import type { AdminUser, AdminSchool } from '@/features/admin/services/adminService';
 import type { UserRole } from '@/types/supabase';
 
@@ -66,16 +67,26 @@ export function UserEditSheet({
 }: UserEditSheetProps) {
   const [selectedRole, setSelectedRole] = useState<UserRole>('teacher');
   const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null);
+  /** True while the role change awaits confirmation. */
+  const [confirmingRole, setConfirmingRole] = useState(false);
 
   useEffect(() => {
     if (user) {
       setSelectedRole(user.role);
       setSelectedSchoolId(user.school_id);
+      setConfirmingRole(false);
     }
   }, [user]);
 
+  // A role change silently widens or narrows what someone can reach, so it
+  // asks first. Saving is deferred to `confirmSaveRole`.
   const handleSaveRole = useCallback(() => {
+    setConfirmingRole(true);
+  }, []);
+
+  const confirmSaveRole = useCallback(() => {
     if (user) onSaveRole(user.id, selectedRole);
+    setConfirmingRole(false);
   }, [user, selectedRole, onSaveRole]);
 
   const handleAssignSchool = useCallback(() => {
@@ -88,7 +99,11 @@ export function UserEditSheet({
   const roleChanged = selectedRole !== user.role;
   const schoolChanged = selectedSchoolId !== user.school_id;
 
+  const selectedRoleLabel =
+    ROLE_OPTIONS.find((r) => r.value === selectedRole)?.label ?? selectedRole;
+
   return (
+    <>
     <Modal
       visible={isVisible}
       transparent
@@ -270,6 +285,19 @@ export function UserEditSheet({
         </Pressable>
       </KeyboardAvoidingView>
     </Modal>
+
+    {/* Sibling of the sheet rather than nested inside it — stacked modals
+        present more reliably in React Native than a Modal within a Modal. */}
+    <ConfirmDialog
+      visible={confirmingRole}
+      title="Change role"
+      message={`Change ${user.full_name} to ${selectedRoleLabel}? This changes what they can access.`}
+      confirmLabel="Change role"
+      destructive
+      onConfirm={confirmSaveRole}
+      onCancel={() => setConfirmingRole(false)}
+    />
+    </>
   );
 }
 

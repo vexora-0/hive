@@ -14,6 +14,7 @@ import { Text } from '@/components/ui/Text';
 import { TextInput } from '@/components/ui/TextInput';
 import { Button } from '@/components/ui/Button';
 import { useStudentParents } from '@/features/admin/hooks/useClassDetail';
+import { ConfirmDialog } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,12 +50,18 @@ export function ParentListSheet({
 
   const [showPicker, setShowPicker] = useState(false);
   const [search, setSearch] = useState('');
+  /** Parent awaiting unlink confirmation. Null when no dialog is open. */
+  const [parentToRemove, setParentToRemove] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   // Reset state when sheet opens/closes
   useEffect(() => {
     if (!isVisible) {
       setShowPicker(false);
       setSearch('');
+      setParentToRemove(null);
     }
   }, [isVisible]);
 
@@ -86,14 +93,20 @@ export function ParentListSheet({
     [mapParent],
   );
 
-  const handleRemoveParent = useCallback(
-    (parentId: string) => {
-      removeParent(parentId);
-    },
-    [removeParent],
-  );
+  // Unlinking cuts a parent's access to this child's photos, so it asks first.
+  const handleRemoveParent = useCallback((parentId: string, name: string) => {
+    setParentToRemove({ id: parentId, name });
+  }, []);
+
+  const confirmRemoveParent = useCallback(() => {
+    if (parentToRemove) {
+      removeParent(parentToRemove.id);
+    }
+    setParentToRemove(null);
+  }, [parentToRemove, removeParent]);
 
   return (
+    <>
     <Modal
       visible={isVisible}
       transparent
@@ -208,9 +221,13 @@ export function ParentListSheet({
                         </Text>
                       </View>
                       <Pressable
-                        onPress={() => handleRemoveParent(parent.parent_id)}
+                        onPress={() =>
+                          handleRemoveParent(parent.parent_id, parent.full_name)
+                        }
                         hitSlop={8}
                         disabled={isRemovingParent}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Unlink ${parent.full_name} from ${studentName}`}
                       >
                         <Ionicons name="trash-outline" size={20} color={colors.error.main} />
                       </Pressable>
@@ -241,6 +258,19 @@ export function ParentListSheet({
         </Pressable>
       </Pressable>
     </Modal>
+
+    {/* Sibling of the sheet, not nested inside it — stacked modals present
+        more reliably in React Native than a Modal inside another Modal. */}
+    <ConfirmDialog
+      visible={!!parentToRemove}
+      title="Unlink parent"
+      message={`Unlink ${parentToRemove?.name ?? 'this parent'} from ${studentName}? They will stop seeing this child's photos.`}
+      confirmLabel="Unlink"
+      destructive
+      onConfirm={confirmRemoveParent}
+      onCancel={() => setParentToRemove(null)}
+    />
+    </>
   );
 }
 

@@ -250,3 +250,29 @@ feat(ux): show uploader name in feed and real thumbnails in order detail
 ## Deviations
 
 *Record here anything that differed from this plan, and why.*
+
+### Step 2 — confirm dialogs wired (Bhargav, W25)
+
+`ConfirmDialog` already existed but had **zero call sites**, so every action in
+the Step 2 table still fired immediately. All six are now wired: remove student,
+unlink parent, change role, and sign out on all three profile screens.
+
+**Sibling modals, not nested.** `ParentListSheet` and `UserEditSheet` are
+themselves `Modal`s, and `ConfirmDialog` is a `Modal` too. Rather than nest one
+inside the other, each returns a fragment with the dialog as a sibling — stacked
+modals present more reliably in React Native than a `Modal` inside a `Modal`.
+`ParentListSheet` already avoided nesting for its parent picker by toggling
+content inline, so this follows the file's own precedent.
+
+**Sign out is not marked `destructive`.** The red confirm button is reserved for
+actions that lose data. Signing out is reversible by signing back in; colouring
+it the same as "remove student" would dilute the signal. It still confirms.
+
+**`UploadPreview`'s remove was left alone.** It deselects an image that has not
+been uploaded yet — nothing is persisted, so there is nothing to confirm. Not in
+the Step 2 table either.
+
+**Message wording** follows the plan's instruction to state the consequence:
+removing a student says they stay enrolled at the school, unlinking a parent
+says they stop seeing that child's photos, changing a role says it changes what
+they can access.
