@@ -276,3 +276,30 @@ the Step 2 table either.
 removing a student says they stay enrolled at the school, unlinking a parent
 says they stop seeing that child's photos, changing a role says it changes what
 they can access.
+
+### Step 1 — toasts wired to every admin mutation (Bhargav, W25)
+
+The toast system and provider already existed; `useCreateOrder` was the only
+consumer. **Every admin mutation had an `onSuccess` and no `onError` at all**,
+so a failed role change, a rejected parent mapping and a network drop were all
+indistinguishable from no interaction.
+
+Nine mutations now report both outcomes: assign teacher, add student, remove
+student, map parent, remove parent, update role, assign school, create school,
+create class.
+
+**Added `utils/errorMessage.ts`.** The extraction — server message if there is
+one, fallback otherwise — was about to be repeated nine times. `useOrders` now
+uses it too, so there is one pattern rather than two.
+
+**The 409 on parent mapping is surfaced verbatim**, as the plan asks. "This
+parent is already mapped to this student" tells an admin what happened; a
+generic failure sends them looking for a bug that isn't there.
+
+**Not done — tagging errors.** The last row of the Step 1 table wants "Could
+not tag students" on failure, but tagging lives in
+`features/teacher/hooks/useUpload.ts`, which the ownership map in
+`docs/02-...-GIT-PLAN.md` §7 assigns to Ruthwik. Left for him rather than
+edited across an ownership line. Same reason **Step 5 (G-27, real upload
+progress)** is untouched — the fake `0.1 → 0.3 → 0.35 → 0.85` ladder lives in
+that same file.

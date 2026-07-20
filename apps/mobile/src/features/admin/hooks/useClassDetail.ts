@@ -2,6 +2,8 @@ import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { STALE_TIME_MS } from '@/theme';
+import { useToast } from '@/components/feedback';
+import { apiErrorMessage } from '@/utils/errorMessage';
 import {
   getClassDetail,
   assignTeacher as assignTeacherApi,
@@ -25,6 +27,7 @@ import {
 
 export function useClassDetail(classId: string) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const CLASS_KEY = ['admin', 'class', classId];
 
   // ── Class detail query ────────────────────────────────────────────────
@@ -51,10 +54,13 @@ export function useClassDetail(classId: string) {
   // ── Assign teacher mutation ───────────────────────────────────────────
   const assignTeacherMut = useMutation({
     mutationFn: (teacherId: string | null) => assignTeacherApi(classId, teacherId),
-    onSuccess: () => {
+    onSuccess: (_data, teacherId) => {
       queryClient.invalidateQueries({ queryKey: CLASS_KEY });
       queryClient.invalidateQueries({ queryKey: ['admin', 'schools'] });
+      toast.success(teacherId ? 'Teacher assigned' : 'Teacher unassigned');
     },
+    onError: (error) =>
+      toast.error(apiErrorMessage(error, 'Could not assign teacher.')),
   });
 
   const assignTeacher = useCallback(
@@ -65,10 +71,13 @@ export function useClassDetail(classId: string) {
   // ── Add student mutation ──────────────────────────────────────────────
   const addStudentMut = useMutation({
     mutationFn: (data: CreateStudentData) => addStudentApi(classId, data),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: CLASS_KEY });
       queryClient.invalidateQueries({ queryKey: ['admin', 'schools'] });
+      toast.success(`${variables.fullName} added`);
     },
+    onError: (error) =>
+      toast.error(apiErrorMessage(error, 'Could not add student.')),
   });
 
   const addStudent = useCallback(
@@ -82,7 +91,10 @@ export function useClassDetail(classId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CLASS_KEY });
       queryClient.invalidateQueries({ queryKey: ['admin', 'schools'] });
+      toast.success('Student removed from class');
     },
+    onError: (error) =>
+      toast.error(apiErrorMessage(error, 'Could not remove student.')),
   });
 
   const removeStudent = useCallback(
@@ -111,6 +123,7 @@ export function useClassDetail(classId: string) {
 
 export function useStudentParents(studentId: string | null) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const PARENTS_KEY = ['admin', 'student-parents', studentId];
 
   const {
@@ -143,7 +156,13 @@ export function useStudentParents(studentId: string | null) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PARENTS_KEY });
       queryClient.invalidateQueries({ queryKey: ['admin', 'class'] });
+      toast.success('Parent linked');
     },
+    // Surfaces the server text deliberately. The 409 here reads "This parent is
+    // already mapped to this student", which tells the admin what happened —
+    // a generic failure message would send them looking for a bug instead.
+    onError: (error) =>
+      toast.error(apiErrorMessage(error, 'Could not link parent.')),
   });
 
   const mapParent = useCallback(
@@ -157,7 +176,10 @@ export function useStudentParents(studentId: string | null) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PARENTS_KEY });
       queryClient.invalidateQueries({ queryKey: ['admin', 'class'] });
+      toast.success('Parent unlinked');
     },
+    onError: (error) =>
+      toast.error(apiErrorMessage(error, 'Could not unlink parent.')),
   });
 
   const removeParent = useCallback(

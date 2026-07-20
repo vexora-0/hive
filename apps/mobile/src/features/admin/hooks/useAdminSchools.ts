@@ -6,6 +6,8 @@ import {
 } from '@tanstack/react-query';
 
 import { STALE_TIME_MS } from '@/theme';
+import { useToast } from '@/components/feedback';
+import { apiErrorMessage } from '@/utils/errorMessage';
 import {
   getSchools,
   createSchool as createSchoolApi,
@@ -36,6 +38,7 @@ const SCHOOLS_KEY = ['admin', 'schools'] as const;
  */
 export function useAdminSchools() {
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   // ── Infinite query ──────────────────────────────────────────────────
   const {
@@ -64,10 +67,13 @@ export function useAdminSchools() {
   // ── Create school mutation ──────────────────────────────────────────
   const createMutation = useMutation({
     mutationFn: (schoolData: CreateSchoolData) => createSchoolApi(schoolData),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: SCHOOLS_KEY });
       queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
+      toast.success(`${variables.name} created`);
     },
+    onError: (error) =>
+      toast.error(apiErrorMessage(error, 'Could not create school.')),
   });
 
   const createSchool = useCallback(
@@ -79,9 +85,12 @@ export function useAdminSchools() {
   const createClassMutation = useMutation({
     mutationFn: ({ schoolId, data }: { schoolId: string; data: CreateClassData }) =>
       createClassApi(schoolId, data),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: SCHOOLS_KEY });
+      toast.success(`${variables.data.name} created`);
     },
+    onError: (error) =>
+      toast.error(apiErrorMessage(error, 'Could not create class.')),
   });
 
   const createClass = useCallback(

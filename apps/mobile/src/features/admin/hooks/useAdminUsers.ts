@@ -6,6 +6,8 @@ import {
 } from '@tanstack/react-query';
 
 import { STALE_TIME_MS } from '@/theme';
+import { useToast } from '@/components/feedback';
+import { apiErrorMessage } from '@/utils/errorMessage';
 import type { UserRole } from '@/types/supabase';
 import {
   getUsers,
@@ -38,6 +40,7 @@ const USERS_KEY = ['admin', 'users'] as const;
  */
 export function useAdminUsers() {
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   // ── Local filter state ──────────────────────────────────────────────
   const [search, setSearch] = useState('');
@@ -75,7 +78,10 @@ export function useAdminUsers() {
       // Invalidate users list and dashboard stats (user counts may change)
       queryClient.invalidateQueries({ queryKey: USERS_KEY });
       queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
+      toast.success('Role updated');
     },
+    onError: (error) =>
+      toast.error(apiErrorMessage(error, 'Could not update role.')),
   });
 
   const updateRole = useCallback(
@@ -88,10 +94,13 @@ export function useAdminUsers() {
   const schoolMutation = useMutation({
     mutationFn: ({ userId, schoolId }: { userId: string; schoolId: string | null }) =>
       assignUserToSchool(userId, schoolId),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: USERS_KEY });
       queryClient.invalidateQueries({ queryKey: ['admin', 'schools'] });
+      toast.success(variables.schoolId ? 'School assigned' : 'School cleared');
     },
+    onError: (error) =>
+      toast.error(apiErrorMessage(error, 'Could not assign school.')),
   });
 
   const assignSchool = useCallback(

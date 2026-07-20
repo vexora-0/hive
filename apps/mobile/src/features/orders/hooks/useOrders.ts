@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query';
 
 import { useToast } from '@/components/feedback';
+import { apiErrorMessage } from '@/utils/errorMessage';
 import { useCartStore } from '../stores/cartStore';
 import {
   orderService,
@@ -54,13 +55,10 @@ export function useCreateOrder() {
     // There was no error handler at all, so a failed order looked identical to
     // no interaction. Surfaces the server message where there is one — the API
     // returns useful text for authorisation and validation failures.
-    onError: (error: unknown) => {
-      const message =
-        error instanceof Error && error.message
-          ? error.message
-          : 'Could not place order. Please try again.';
-      toast.error(message);
-    },
+    onError: (error: unknown) =>
+      toast.error(
+        apiErrorMessage(error, 'Could not place order. Please try again.'),
+      ),
   });
 }
 
