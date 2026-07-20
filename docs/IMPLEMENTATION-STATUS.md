@@ -128,6 +128,8 @@ file, so it must never be generated for a caller who is about to be refused.
 | **G-07 notifications** | **Confirmed fixed.** 16 `new_photo` notifications generated, addressed to the right parents and naming the right child — "New photo of Diya Kumar", "New photo of Aarav Kumar". Tag-before-confirm ordering is correct; the seed's zero-notification warning no longer fires |
 | **Parent privacy scoping** | **Confirmed.** 6 photos exist. Rajesh (Bloom, two children) sees **2**; Vikram (Little Stars) sees **1**; **zero overlap**. No parent sees the full set, and no cross-school leakage |
 | **Feed deduplication** | No duplicate photo IDs in a parent's feed |
+| **`pnpm test`** | **Ran for the first time** against the new `hive-test` project. **58 of 59 pass**, 1 fails. The suite executes end to end: harness, truncation, user creation, HTTP requests through Supertest |
+| **Test-database guard, armed** | `DEV_SUPABASE_URL` is now set, so guard 1 in `tests/setup.ts` actually compares. It previously did nothing |
 
 ---
 
@@ -144,13 +146,11 @@ and answers `/health` with `"database": "ok"`. What that made verifiable is in
 16 notifications**. The seed assets landed in `abe853a`, which unblocked the
 storage layer — most of what this section used to list is now in §4.
 
-**⚠ `packages/backend/.env.test` points at the SAME project as `.env`**, by
-explicit decision, because a second project was not wanted. `pnpm test` runs
-`truncateAll()` in `beforeAll`, so **running the suite deletes the demo data**.
-The guards in `tests/setup.ts` do *not* catch this: guard 1 needs
-`DEV_SUPABASE_URL`, which is unset, and guard 2 hardcodes
-`fhvwsmtivwtmbdscdoyz`, a stale ref. Re-seed after any test run, or create a
-second project before the demo.
+**A separate `hive-test` project now exists** (`sdbiuzuyipneioceqysm`,
+ap-southeast-1) with all 19 migrations applied, so `pnpm test` no longer
+threatens the demo data. `DEV_SUPABASE_URL` is now set in `.env.test`, which
+arms the first guard in `tests/setup.ts` — it was a no-op before, since that
+guard does nothing unless the variable exists.
 
 - **Uploads have only been exercised through the seed script**, which calls the
   photo service directly. The HTTP upload path — `POST /photos`, the multipart
@@ -162,9 +162,9 @@ second project before the demo.
   rather than on the environment.
 - **G-17 upload-ownership checks are unverified** — they need two teachers at the
   same school driving the upload endpoints, which the seed does not do.
-- **`pnpm test` has never run.** See the truncation warning above before running
-  it. Plan 08's sabotage exercise — revert a fix, confirm the matching test
-  fails — has not been done, so the tests have not been shown to detect anything.
+- **Plan 08's sabotage exercise has not been done** — revert a fix, confirm the
+  matching test fails. The suite now runs (§4), but it has still not been shown
+  to *detect* anything.
 - **No error has reached Sentry.** `initSentry()` has only taken its no-op path.
 - **`verify-security.sh` has never run against a real instance.**
 - **Nothing has been seen on a device.**
@@ -179,10 +179,11 @@ second project before the demo.
 | **G-01** | Srujan · Plan 02 | Order submission is broken three ways. **No order can be placed.** This is now the most serious functional defect. |
 | **G-11** | Srujan · Plan 06 | No demo data. |
 | **G-26…G-33** | Bhargav · Plan 07 | UX completion — toasts, confirm dialogs, empty states. |
-| **G-45** | unowned | Plan 01 Step 8 — custom SMTP. Supabase's default is rate-limited to a few emails an hour, so **OTP delivery will fail mid-demo**. Dashboard task, no code fix. |
+| **G-45** | unowned | Plan 01 Step 8 — custom SMTP. Supabase's default is rate-limited to a few emails an hour, so **OTP delivery will fail mid-demo**. Dashboard task, no code fix. Lower priority now that teacher/parent can sign in with a password. |
+| **T-23 fails** | Ruthwik · Plan 08 | `photos.test.ts > notifies tagged children's parents` expects 200 from `/confirm`, gets **404**. **A defect in the test, not the product** — `createTestPhoto` writes only a database row ("deliberately bypasses the upload endpoint"), but `confirmUpload` calls `fileExistsInStorage` and 404s with `FILE_NOT_FOUND` when the object is absent. The seed path produces notifications correctly, so G-07 itself is fine. Fix: have the helper put a small object at `photo.s3_key` before confirming. **The suite calls this "the most valuable test in the suite"** — it is the only automated guard on G-07, so leaving it red or weakening the assertion loses that cover. |
 | **S-15** | Plan 11 | Supabase project ref committed; keys not rotated. |
 | — | Bhargav | ~~Create the first `.env`.~~ **Done 1 Aug** — dev environment runs, 19 migrations applied. |
-| — | Bhargav | **Create the `hive-test` Supabase project.** `pnpm test` is blocked on it, and so is CP-4. |
+| — | Bhargav | ~~Create the `hive-test` Supabase project.~~ **Done** — `sdbiuzuyipneioceqysm`, 19 migrations applied, suite runs. |
 | — | Srujan · Plan 06 | **Seed data.** Everything left in §5 needs a school, class, students and a parent before it can be exercised. Now the single biggest blocker. |
 
 ---
@@ -193,8 +194,8 @@ second project before the demo.
 |---|---|---|
 | **CP-1** | App compiles · no "Coming Soon" · no credentials in repo | ✔ **Met.** |
 | **CP-2** | Order placeable · private storage with thumbnails · role guards · IDORs closed | ◐ Guards, IDORs and storage written. **Orders still broken. Nothing runtime-verified.** |
-| **CP-3** | Demo seed on a fresh DB · test harness runs | ◐ Harness exists, never run. No seed. |
-| **CP-4** | 36 tests green · CI on every PR | ◐ CI workflow exists, never run. Tests written, 0 green. |
+| **CP-3** | Demo seed on a fresh DB · test harness runs | ✔ **Met.** Seed loads schools, classes, students, parents, 6 photos with thumbnails and 16 notifications. Harness runs against a separate project. |
+| **CP-4** | 36 tests green · CI on every PR | ◐ **58 of 59 green** — target exceeded on count. One failure (T-23, a test defect) and CI has still never run. |
 | **CP-5** | Deployed and reachable · Sentry receiving · docs complete | ✗ Nothing deployed. |
 | **CP-6** | Manual QA green · demo rehearsed · submission pack | ✗ |
 

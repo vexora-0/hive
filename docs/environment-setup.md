@@ -9,8 +9,14 @@ Supabase project `hive` (`udawaiykfvdcvcouiqxr`, ap-northeast-1), all 19
 migrations applied, `/health` returning `"database": "ok"`. §7 records what that
 made it possible to verify, and what still needs seed data or a device.
 
-A second `hive-test` project for Plan 08 does **not** exist yet, so
-`packages/backend/.env.test` is still unfilled and `pnpm test` still cannot run.
+The `hive-test` project now exists too (`sdbiuzuyipneioceqysm`,
+ap-southeast-1), with all 19 migrations applied. `pnpm test` runs against it —
+**58 of 59 pass** — so the suite can no longer touch the demo data.
+
+Two variables the harness requires were missing from `.env.test.example` and
+have been added: `SUPABASE_ANON_KEY` (without it all four test files fail with
+`supabaseKey is required`) and `DEV_SUPABASE_URL` (which arms the guard in
+`tests/setup.ts` — it does nothing while unset).
 
 ---
 

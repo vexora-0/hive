@@ -48,21 +48,30 @@ Match it against the table. **This determines what you work on.** If the email d
 exists, what runs and what has been proven. Two status tables drifting apart is
 worse than one, so this file no longer restates it.
 
-### The one thing that blocks everything
+### Status — 19 July
 
-**Updated 1 Aug — the environment exists and the backend runs.** Supabase
-project `hive` (`udawaiykfvdcvcouiqxr`), all 19 migrations applied including
-`00017`, `00018` and `00020`, `/health` returning `"database": "ok"`.
+The environment works end to end. `hive-dev` (`udawaiykfvdcvcouiqxr`) runs the
+app; `hive-test` (`sdbiuzuyipneioceqysm`) runs the suite. 19 migrations on both.
+Demo data seeded with photos. **58 of 59 tests pass.** G-02, G-07, G-08 and the
+parent privacy boundary are all confirmed at runtime — see
+`docs/IMPLEMENTATION-STATUS.md` §4, and §5 for what is still unproven.
 
-**What blocks everything now is seed data.** There is no school, class, student
-or parent, so no photo can be uploaded, no order placed and no feed page
-fetched. Plan 06 (`seedDemo.ts`, Srujan) is the unblock.
+### What is left
 
-Also still missing: a second `hive-test` Supabase project, without which
-`pnpm test` cannot run.
+Nothing is blocked on infrastructure any more. What remains is ordinary work:
+
+1. **G-01 orders** — Srujan, Plan 02. Still the most serious functional defect;
+   no order can be placed.
+2. **Plan 07 UX** — Bhargav. Confirm dialogs are wired; toasts, real upload
+   progress and the remaining steps are not.
+3. **T-23 is red** — Ruthwik, Plan 08. A defect in the test rather than the
+   product; `createTestPhoto` never puts an object in storage, so `/confirm`
+   404s. It is the only automated guard on G-07, so it is worth fixing properly
+   rather than relaxing.
+4. **CI has never run**, and nothing is deployed.
 
 Follow `docs/environment-setup.md`; §7 is the verification checklist and asks
-for failures to be reported, not ticks. The boot-level items there are now
+for failures to be reported, not ticks. Its boot and storage items are now
 ticked with what was actually observed.
 
 ---
