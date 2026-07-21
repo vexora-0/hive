@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as orderService from '../services/order.service';
 import { success, paginated } from '../utils/apiResponse';
+import { AppError } from '../middleware/errorHandler';
 import type {
   CreateOrderInput,
   GetOrdersInput,
@@ -18,12 +19,11 @@ export async function createOrder(
     const data = req.body as CreateOrderInput;
 
     if (!schoolId) {
-      res.status(400).json({
-        success: false,
-        message: 'User must be associated with a school to place orders',
-        code: 'NO_SCHOOL',
-      });
-      return;
+      throw new AppError(
+        'User must be associated with a school to place orders',
+        400,
+        'NO_SCHOOL',
+      );
     }
 
     const order = await orderService.createOrder(
