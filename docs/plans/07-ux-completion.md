@@ -303,3 +303,39 @@ not tag students" on failure, but tagging lives in
 edited across an ownership line. Same reason **Step 5 (G-27, real upload
 progress)** is untouched — the fake `0.1 → 0.3 → 0.35 → 0.85` ladder lives in
 that same file.
+
+### Step 4 — placeholders replaced, but not with the Lottie (Bhargav, W25)
+
+**`assets/lottie/bee.json` is a stub and should not be used.** The step says to
+confirm it is "a valid, non-trivial Lottie". It is valid and it is trivial: 782
+bytes, one shape layer containing a single filled ellipse with rotation and
+position keyframes. There is no bee in it. Wiring it into `+not-found.tsx`
+would have replaced a 🐝 emoji with a spinning dot — worse than what was there.
+
+Took the step's own documented fallback instead: **themed `Ionicons`**. Emoji
+render differently on iOS and Android and cannot take a brand colour; icons do
+both. `OnboardingSlideData` gains an `icon` field so the choice lives with the
+copy rather than in a conditional — the three slides use `camera`,
+`shield-checkmark` and `images`, and `+not-found` uses `compass-outline`.
+
+The screens were also **not** the empty grey boxes the plan describes — someone
+had already put emoji in them. Still placeholders, so still replaced.
+
+Side effect: `OnboardingSlide.tsx` imported `LottieWrapper` and never used it.
+Removing it dropped mobile lint from 36 warnings to 35.
+
+If real Lottie files are sourced later, the `icon` field is the seam to swap.
+
+### Step 8 — 8c done, 8d verified, 8a and 8b deferred (Bhargav, W25)
+
+- **8c done.** `(admin)/_layout.tsx` now imports `TabBar` from the barrel like
+  the other two layouts.
+- **8d verified, no change needed.** The download action already sets
+  `disabled: true` with a "Coming Soon" badge, and the row honours it — dimmed
+  background, tertiary icon and label, non-interactive. Honest, as the plan
+  wanted.
+- **8a deferred.** Returning the uploader's name needs the feed endpoint to
+  join and return it — backend, Ruthwik's.
+- **8b deferred.** Order items carry only `photoId`; there is no URL to render.
+  Showing a real thumbnail needs the order API to return a signed URL per item,
+  which is a backend change rather than UI polish.

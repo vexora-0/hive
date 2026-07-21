@@ -1,9 +1,9 @@
 import React from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/theme';
 import { Text } from '@/components/ui';
-import { LottieWrapper } from '@/components/animation';
 import type { OnboardingSlideData } from '@/features/onboarding/data/slides';
 
 // ---------------------------------------------------------------------------
@@ -39,12 +39,16 @@ export function OnboardingSlide({ slide }: OnboardingSlideProps) {
     <View
       style={[styles.container, { backgroundColor: slide.backgroundColor, width: SCREEN_WIDTH }]}
     >
-      {/* Lottie animation placeholder — replace source with a real .json asset */}
+      {/* Themed icon rather than emoji: emoji render differently on iOS and
+          Android and cannot take a brand colour. See the note on
+          `OnboardingSlideData.icon` for why this is not a Lottie. */}
       <View style={styles.animationContainer}>
         <View style={styles.animationPlaceholder}>
-          <Text variant="h1" center>
-            {slide.id === 'capture' ? '📸' : slide.id === 'secure' ? '🔒' : '🖼️'}
-          </Text>
+          <Ionicons
+            name={slide.icon}
+            size={ANIMATION_SIZE * 0.42}
+            color={colors.primary.amber}
+          />
         </View>
       </View>
 

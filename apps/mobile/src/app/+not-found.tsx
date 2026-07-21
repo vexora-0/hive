@@ -1,6 +1,7 @@
 import React from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/theme';
 import { Text, Button } from '@/components/ui';
@@ -32,12 +33,17 @@ export default function NotFoundScreen() {
   return (
     <SafeArea>
       <View style={styles.container}>
-        {/* Lottie bee animation placeholder */}
+        {/* Themed icon rather than the 🐝 emoji, which renders differently on
+            each platform and cannot take a brand colour. Not the Lottie either:
+            `assets/lottie/bee.json` is a stub — a single filled ellipse that
+            rotates, with no bee in it. */}
         <View style={styles.beeContainer}>
           <View style={styles.beePlaceholder}>
-            <Text variant="h1" center>
-              {'🐝'}
-            </Text>
+            <Ionicons
+              name="compass-outline"
+              size={BEE_SIZE * 0.5}
+              color={colors.primary.amberDark}
+            />
           </View>
         </View>
 

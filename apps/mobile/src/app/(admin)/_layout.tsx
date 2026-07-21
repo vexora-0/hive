@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '@/theme';
 import { RoleGate } from '@/features/auth/components/RoleGate';
-import { TabBar } from '@/components/navigation/TabBar';
+import { TabBar } from '@/components/navigation';
 
 // ---------------------------------------------------------------------------
 // Tab icon helper

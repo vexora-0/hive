@@ -1,3 +1,5 @@
+import type { Ionicons } from '@expo/vector-icons';
+
 import { colors } from '@/theme';
 
 // ---------------------------------------------------------------------------
@@ -13,6 +15,15 @@ export interface OnboardingSlideData {
   description: string;
   /** Tinted background colour for the slide. */
   backgroundColor: string;
+  /**
+   * Illustration for the slide.
+   *
+   * An icon rather than a Lottie: `assets/lottie/bee.json` is a stub — one
+   * shape layer holding a single filled ellipse that rotates, with no bee in
+   * it. Rendering that would look worse than the emoji it replaced. Icons are
+   * themeable and render identically on both platforms, which emoji do not.
+   */
+  icon: keyof typeof Ionicons.glyphMap;
 }
 
 // ---------------------------------------------------------------------------
@@ -26,6 +37,7 @@ export const slides: OnboardingSlideData[] = [
     description:
       'Teachers snap photos of your little ones throughout the day',
     backgroundColor: colors.background.cream,
+    icon: 'camera',
   },
   {
     id: 'secure',
@@ -33,6 +45,7 @@ export const slides: OnboardingSlideData[] = [
     description:
       'Only you can see your child\u2019s photos. Privacy is our promise.',
     backgroundColor: colors.primary.blueLight,
+    icon: 'shield-checkmark',
   },
   {
     id: 'prints',
@@ -40,5 +53,6 @@ export const slides: OnboardingSlideData[] = [
     description:
       'Turn your favorite moments into prints, photo books, and keepsakes',
     backgroundColor: colors.primary.mintLight,
+    icon: 'images',
   },
 ];
