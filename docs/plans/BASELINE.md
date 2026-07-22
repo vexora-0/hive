@@ -40,7 +40,7 @@ W20–W21. Treat them as a snapshot, not a contract.
 | `pnpm --filter @hive/mobile typecheck` | **passes** — 0 errors *(was 15; Plan 00 done 27 Jun)* |
 | `pnpm --filter @hive/backend lint` | **fails — 4 problems (1 error, 3 warnings)** |
 | `pnpm --filter @hive/mobile lint` | passes — 35 warnings, 0 errors |
-| `npx expo export --platform ios` | **passes** — bundles clean, 5.52 MB |
+| `npx expo export --platform ios` | **passes** — bundles clean, 8.3 MB *(was 5.52 MB before Plans 02, 04 and 07 landed)* |
 
 ### CI: one failing gate left, and it is one rule
 
@@ -89,12 +89,13 @@ originally recorded as 2 errors / 5 warnings at `src/types/express.d.ts:13` and
 Unowned by any current plan and not risky. Worth folding into Plan 01 so the CI
 lint gate can start passing — it is now a one-line fix away.
 
-### Mobile lint — 38 warnings, 0 errors
+### Mobile lint — 35 warnings, 0 errors
 
-Down one from 39: removing the dead `estimatedItemSize` prop from
-`MasonryGrid` also removed the unused-variable warning its destructured default
-was producing. The remaining 38 are inherited unused imports and `any` uses —
-none of them block anything, and `pnpm --filter @hive/mobile lint` still exits 0.
+Down from 39. Removing the dead `estimatedItemSize` prop from `MasonryGrid`
+cleared the unused-variable warning its destructured default was producing, and
+dropping the unused `LottieWrapper` import from `OnboardingSlide` cleared
+another. The remaining 35 are inherited unused imports and `any` uses — none
+block anything, and `pnpm --filter @hive/mobile lint` still exits 0.
 
 ### Formatting
 
