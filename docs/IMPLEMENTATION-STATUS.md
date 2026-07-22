@@ -130,6 +130,7 @@ file, so it must never be generated for a caller who is about to be refused.
 | **Feed deduplication** | No duplicate photo IDs in a parent's feed |
 | **`pnpm test`** | **Ran for the first time** against the new `hive-test` project. **58 of 59 pass**, 1 fails. The suite executes end to end: harness, truncation, user creation, HTTP requests through Supertest |
 | **Test-database guard, armed** | `DEV_SUPABASE_URL` is now set, so guard 1 in `tests/setup.ts` actually compares. It previously did nothing |
+| **G-01 order placement** | **Confirmed fixed.** A parent placed a real order end to end: `POST /api/v1/orders` → 201 with `total_cents: 998` for 2 × `print_4x6` at 499. Integer cents, no float. Sending the same `x-idempotency-key` twice returned the **same order** rather than duplicating. Test orders removed afterwards; demo data is back to 0 orders |
 
 ---
 
@@ -176,7 +177,7 @@ guard does nothing unless the variable exists.
 
 | Gap | Owner | Why it matters |
 |---|---|---|
-| **G-01** | Srujan · Plan 02 | Order submission is broken three ways. **No order can be placed.** This is now the most serious functional defect. |
+| ~~**G-01**~~ | Srujan · Plan 02 | **Closed and verified 22 July.** A parent placed a real order: 201, `total_cents: 998` for 2 × `print_4x6`, and a repeated idempotency key returned the same order instead of a duplicate. This entry previously read "no order can be placed" long after it had been fixed. |
 | **G-11** | Srujan · Plan 06 | No demo data. |
 | **G-27** | Ruthwik · Plan 07 Step 5 | Upload progress is a hardcoded `0.1 → 0.3 → 0.35 → 0.85` ladder, not bytes transferred. Lives in `useUpload.ts` / `teacherService.ts`, both Ruthwik's. The plan marks this its one optional step. |
 | ~~G-26, G-28…G-33~~ | Bhargav · Plan 07 | **Done.** Toasts on all nine admin mutations, confirm dialogs on all six destructive actions, empty states, onboarding and 404 placeholders replaced, schools routes split into validator/service/controller, controllers all throw `AppError`. See the plan's Deviations. |
@@ -195,7 +196,7 @@ guard does nothing unless the variable exists.
 | # | Gate | Status |
 |---|---|---|
 | **CP-1** | App compiles · no "Coming Soon" · no credentials in repo | ✔ **Met.** |
-| **CP-2** | Order placeable · private storage with thumbnails · role guards · IDORs closed | ◐ Guards, IDORs and storage written. **Orders still broken. Nothing runtime-verified.** |
+| **CP-2** | Order placeable · private storage with thumbnails · role guards · IDORs closed | ✔ **Met.** All four verified at runtime — order placed with correct cents and working idempotency, photos private with thumbnails and signed URLs, role guards returning 403, cross-school IDOR closed. |
 | **CP-3** | Demo seed on a fresh DB · test harness runs | ✔ **Met.** Seed loads schools, classes, students, parents, 6 photos with thumbnails and 16 notifications. Harness runs against a separate project. |
 | **CP-4** | 36 tests green · CI on every PR | ◐ **58 of 59 green** — target exceeded on count. One failure (T-23, a test defect) and CI has still never run. |
 | **CP-5** | Deployed and reachable · Sentry receiving · docs complete | ✗ Nothing deployed. |
