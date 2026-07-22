@@ -339,3 +339,28 @@ If real Lottie files are sourced later, the `icon` field is the seam to swap.
 - **8b deferred.** Order items carry only `photoId`; there is no URL to render.
   Showing a real thumbnail needs the order API to return a signed URL per item,
   which is a backend change rather than UI polish.
+
+### Steps 6 and 7 — done (Bhargav, W25)
+
+**Step 7 was already half done.** `photo.controller.getPhotos` had been
+converted to `throw new AppError` by someone; only `order.controller.createOrder`
+still hand-rolled a response body. Converted. No controller writes an error
+body now. The remaining `success: false` in `app.ts` is the global 404 handler
+— a response formatter, not a controller, and Ruthwik's shared file — so it
+stays.
+
+**Step 6 done.** `schools.routes.ts` went from 95 lines of inline Zod, three
+handlers and direct `supabaseAdmin` calls, to 27 lines of route definitions.
+New `validators/school.validator.ts`, `services/school.service.ts` and
+`controllers/school.controller.ts` match the shape every other domain uses.
+
+`assertSchoolAccess` moved **into the service** rather than staying at the route.
+That is where `photo.service` puts its equivalent, and CLAUDE.md §10 is explicit
+that authorization has to be enforced in the service layer, because the backend
+runs on `supabaseAdmin` and bypasses row level security entirely. A check that
+lives only in a route is one refactor away from being dropped.
+
+Verified behaviour-preserving against the running instance, not just by
+typecheck — a Bloom teacher gets 200 with data for her own school's classes and
+students, **403 for another school's** (both endpoints), 403 when trying to
+create a class (admin-only), and 401 unauthenticated. Suite still 58 of 59.
