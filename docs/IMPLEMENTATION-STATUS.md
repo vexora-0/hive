@@ -178,7 +178,9 @@ guard does nothing unless the variable exists.
 |---|---|---|
 | **G-01** | Srujan · Plan 02 | Order submission is broken three ways. **No order can be placed.** This is now the most serious functional defect. |
 | **G-11** | Srujan · Plan 06 | No demo data. |
-| **G-26…G-33** | Bhargav · Plan 07 | UX completion — toasts, confirm dialogs, empty states. |
+| **G-27** | Ruthwik · Plan 07 Step 5 | Upload progress is a hardcoded `0.1 → 0.3 → 0.35 → 0.85` ladder, not bytes transferred. Lives in `useUpload.ts` / `teacherService.ts`, both Ruthwik's. The plan marks this its one optional step. |
+| ~~G-26, G-28…G-33~~ | Bhargav · Plan 07 | **Done.** Toasts on all nine admin mutations, confirm dialogs on all six destructive actions, empty states, onboarding and 404 placeholders replaced, schools routes split into validator/service/controller, controllers all throw `AppError`. See the plan's Deviations. |
+| **8a, 8b** | Ruthwik / Srujan | Plan 07 polish needing API changes: the feed does not return the uploader's name, and order items carry only `photoId` so no thumbnail can be rendered. Both need an endpoint to return more, not UI work. |
 | **G-45** | unowned | Plan 01 Step 8 — custom SMTP. Supabase's default is rate-limited to a few emails an hour, so **OTP delivery will fail mid-demo**. Dashboard task, no code fix. Lower priority now that teacher/parent can sign in with a password. |
 | **T-23 fails** | Ruthwik · Plan 08 | `photos.test.ts > notifies tagged children's parents` expects 200 from `/confirm`, gets **404**. **A defect in the test, not the product** — `createTestPhoto` writes only a database row ("deliberately bypasses the upload endpoint"), but `confirmUpload` calls `fileExistsInStorage` and 404s with `FILE_NOT_FOUND` when the object is absent. The seed path produces notifications correctly, so G-07 itself is fine. Fix: have the helper put a small object at `photo.s3_key` before confirming. **The suite calls this "the most valuable test in the suite"** — it is the only automated guard on G-07, so leaving it red or weakening the assertion loses that cover. |
 | **S-15** | Plan 11 | Supabase project ref committed; keys not rotated. |

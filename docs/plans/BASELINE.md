@@ -39,7 +39,7 @@ W20–W21. Treat them as a snapshot, not a contract.
 | `pnpm build:backend` | **passes** |
 | `pnpm --filter @hive/mobile typecheck` | **passes** — 0 errors *(was 15; Plan 00 done 27 Jun)* |
 | `pnpm --filter @hive/backend lint` | **fails — 4 problems (1 error, 3 warnings)** |
-| `pnpm --filter @hive/mobile lint` | passes — 38 warnings, 0 errors |
+| `pnpm --filter @hive/mobile lint` | passes — 35 warnings, 0 errors |
 | `npx expo export --platform ios` | **passes** — bundles clean, 5.52 MB |
 
 ### CI: one failing gate left, and it is one rule
@@ -132,7 +132,7 @@ pnpm install                                                             # REQUI
 pnpm --filter @hive/backend typecheck                                    # expect clean
 pnpm build:backend                                                       # expect clean
 pnpm --filter @hive/mobile  typecheck 2>&1 | grep -cE "^src/.*error TS"  # expect 0
-pnpm --filter @hive/mobile  lint      2>&1 | grep -oE "[0-9]+ problems"  # expect 38 problems
+pnpm --filter @hive/mobile  lint      2>&1 | grep -oE "[0-9]+ problems"  # expect 35 problems
 pnpm --filter @hive/backend lint      2>&1 | grep -oE "[0-9]+ problems"  # expect 4 problems
 ```
 
