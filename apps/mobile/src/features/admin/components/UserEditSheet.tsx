@@ -103,7 +103,6 @@ export function UserEditSheet({
     ROLE_OPTIONS.find((r) => r.value === selectedRole)?.label ?? selectedRole;
 
   return (
-    <>
     <Modal
       visible={isVisible}
       transparent
@@ -284,20 +283,21 @@ export function UserEditSheet({
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
-    </Modal>
 
-    {/* Sibling of the sheet rather than nested inside it — stacked modals
-        present more reliably in React Native than a Modal within a Modal. */}
-    <ConfirmDialog
-      visible={confirmingRole}
-      title="Change role"
-      message={`Change ${user.full_name} to ${selectedRoleLabel}? This changes what they can access.`}
-      confirmLabel="Change role"
-      destructive
-      onConfirm={confirmSaveRole}
-      onCancel={() => setConfirmingRole(false)}
-    />
-    </>
+      {/* Nested, not a sibling. iOS presents a Modal from the nearest
+          UIViewController up the responder chain, so a sibling presents from
+          the root VC — already presenting this sheet — and UIKit silently
+          refuses. See the matching note in ParentListSheet. */}
+      <ConfirmDialog
+        visible={confirmingRole}
+        title="Change role"
+        message={`Change ${user.full_name} to ${selectedRoleLabel}? This changes what they can access.`}
+        confirmLabel="Change role"
+        destructive
+        onConfirm={confirmSaveRole}
+        onCancel={() => setConfirmingRole(false)}
+      />
+    </Modal>
   );
 }
 

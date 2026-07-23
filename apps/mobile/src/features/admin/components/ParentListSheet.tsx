@@ -109,7 +109,6 @@ export function ParentListSheet({
   }, [parentToRemove, removeParent]);
 
   return (
-    <>
     <Modal
       visible={isVisible}
       transparent
@@ -260,20 +259,24 @@ export function ParentListSheet({
           </View>
         </Pressable>
       </Pressable>
-    </Modal>
 
-    {/* Sibling of the sheet, not nested inside it — stacked modals present
-        more reliably in React Native than a Modal inside another Modal. */}
-    <ConfirmDialog
-      visible={!!parentToRemove}
-      title="Unlink parent"
-      message={`Unlink ${parentToRemove?.name ?? 'this parent'} from ${studentName}? They will stop seeing this child's photos.`}
-      confirmLabel="Unlink"
-      destructive
-      onConfirm={confirmRemoveParent}
-      onCancel={() => setParentToRemove(null)}
-    />
-    </>
+      {/* Nested inside the sheet's Modal, not a sibling of it. On iOS
+          RCTModalHostViewComponentView presents from `reactViewController`,
+          which walks the responder chain to the *nearest* UIViewController —
+          there is no topmost-VC logic. A sibling therefore presents from the
+          root VC, which is already presenting this sheet, and UIKit refuses
+          with "already presenting". Nested, the nearest VC is this sheet's own
+          RCTFabricModalHostViewController, which is presenting nothing. */}
+      <ConfirmDialog
+        visible={!!parentToRemove}
+        title="Unlink parent"
+        message={`Unlink ${parentToRemove?.name ?? 'this parent'} from ${studentName}? They will stop seeing this child's photos.`}
+        confirmLabel="Unlink"
+        destructive
+        onConfirm={confirmRemoveParent}
+        onCancel={() => setParentToRemove(null)}
+      />
+    </Modal>
   );
 }
 

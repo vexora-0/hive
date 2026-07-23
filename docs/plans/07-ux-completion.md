@@ -257,12 +257,25 @@ feat(ux): show uploader name in feed and real thumbnails in order detail
 the Step 2 table still fired immediately. All six are now wired: remove student,
 unlink parent, change role, and sign out on all three profile screens.
 
-**Sibling modals, not nested.** `ParentListSheet` and `UserEditSheet` are
-themselves `Modal`s, and `ConfirmDialog` is a `Modal` too. Rather than nest one
-inside the other, each returns a fragment with the dialog as a sibling — stacked
-modals present more reliably in React Native than a `Modal` inside a `Modal`.
-`ParentListSheet` already avoided nesting for its parent picker by toggling
-content inline, so this follows the file's own precedent.
+**Nested modals, not siblings — this was corrected, and the original reasoning
+was wrong.** `ParentListSheet` and `UserEditSheet` are themselves `Modal`s, and
+`ConfirmDialog` is one too. They were first written with the dialog as a
+*sibling*, on the belief that stacked modals present more reliably than nested
+ones. That is backwards on iOS.
+
+`RCTModalHostViewComponentView.presentViewController:` calls
+`[self reactViewController]`, and `UIView+React.m` implements that by walking
+`nextResponder` and returning the **first** `UIViewController` it finds. There is
+no topmost-VC lookup and no presentation queue anywhere in the modal code. So a
+sibling dialog presents from the *root* view controller — which is already
+presenting the sheet — and UIKit refuses with "already presenting", silently.
+Nested, the nearest view controller is the sheet's own
+`RCTFabricModalHostViewController`, which is presenting nothing, so it works.
+
+Net effect of the original version: on iOS, **the unlink-parent and change-role
+confirmations would probably never have appeared at all**, making those actions
+impossible rather than unconfirmed. Verified against the React Native 0.81.5
+source in `node_modules`; still worth watching once on a simulator.
 
 **Sign out is not marked `destructive`.** The red confirm button is reserved for
 actions that lose data. Signing out is reversible by signing back in; colouring
