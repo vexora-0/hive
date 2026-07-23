@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { uuidIdParam } from '../validators/params.validator';
 import * as notificationController from '../controllers/notification.controller';
 
 const router: import("express").Router = Router();
@@ -15,6 +17,12 @@ router.get('/', notificationController.getNotifications);
 router.get('/unread-count', notificationController.getUnreadCount);
 
 // PATCH /notifications/:id/read - Mark notification as read
-router.patch('/:id/read', notificationController.markAsRead);
+// Params validated: this route carries no roleGuard, so without it any
+// authenticated user could send a non-UUID id and get a 500 from the driver.
+router.patch(
+  '/:id/read',
+  validate(uuidIdParam, 'params'),
+  notificationController.markAsRead,
+);
 
 export default router;
