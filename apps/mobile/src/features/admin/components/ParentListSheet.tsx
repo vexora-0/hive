@@ -100,7 +100,10 @@ export function ParentListSheet({
 
   const confirmRemoveParent = useCallback(() => {
     if (parentToRemove) {
-      removeParent(parentToRemove.id);
+      // Not awaited — the dialog closes immediately. The catch is required:
+      // removeParent returns mutateAsync, which rejects on failure, and the
+      // toast has already reported it.
+      removeParent(parentToRemove.id).catch(() => {});
     }
     setParentToRemove(null);
   }, [parentToRemove, removeParent]);

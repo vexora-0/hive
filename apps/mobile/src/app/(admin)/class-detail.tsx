@@ -58,18 +58,29 @@ export default function ClassDetailScreen() {
   } | null>(null);
 
   // ── Handlers ─────────────────────────────────────────────────────────
+  // The mutations report their own failures through the toast in useClassDetail.
+  // Catching here stops the rejection escaping as an unhandled promise, and
+  // leaves the sheet open on failure so the entered values survive a retry.
   const handleAssignTeacher = useCallback(
     async (teacherId: string | null) => {
-      await assignTeacher(teacherId);
-      setShowTeacherSheet(false);
+      try {
+        await assignTeacher(teacherId);
+        setShowTeacherSheet(false);
+      } catch {
+        // Surfaced by the hook's onError toast.
+      }
     },
     [assignTeacher],
   );
 
   const handleAddStudent = useCallback(
     async (data: CreateStudentData) => {
-      await addStudent(data);
-      setShowAddStudent(false);
+      try {
+        await addStudent(data);
+        setShowAddStudent(false);
+      } catch {
+        // Surfaced by the hook's onError toast.
+      }
     },
     [addStudent],
   );
@@ -88,7 +99,10 @@ export default function ClassDetailScreen() {
 
   const confirmRemoveStudent = useCallback(() => {
     if (studentToRemove) {
-      removeStudent(studentToRemove.id);
+      // Deliberately not awaited — the dialog closes immediately. The catch is
+      // required: removeStudent returns mutateAsync, which rejects on failure,
+      // and the toast has already reported it.
+      removeStudent(studentToRemove.id).catch(() => {});
     }
     setStudentToRemove(null);
   }, [studentToRemove, removeStudent]);

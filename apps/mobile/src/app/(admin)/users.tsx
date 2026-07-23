@@ -75,18 +75,29 @@ export default function UsersScreen() {
     setSelectedUser(null);
   }, []);
 
+  // Failures are reported by the toast in useAdminUsers. Catching stops the
+  // rejection escaping unhandled, and leaves the sheet open on failure — a
+  // sheet that closes on a rejected role change reads as success.
   const handleSaveRole = useCallback(
     async (userId: string, role: UserRole) => {
-      await updateRole(userId, role);
-      handleSheetClose();
+      try {
+        await updateRole(userId, role);
+        handleSheetClose();
+      } catch {
+        // Surfaced by the hook's onError toast.
+      }
     },
     [updateRole, handleSheetClose],
   );
 
   const handleAssignSchool = useCallback(
     async (userId: string, schoolId: string | null) => {
-      await assignSchool(userId, schoolId);
-      handleSheetClose();
+      try {
+        await assignSchool(userId, schoolId);
+        handleSheetClose();
+      } catch {
+        // Surfaced by the hook's onError toast.
+      }
     },
     [assignSchool, handleSheetClose],
   );

@@ -60,10 +60,17 @@ export default function SchoolsScreen() {
     setAddSheetVisible(false);
   }, []);
 
+  // Failures are reported by the toast in useAdminSchools. Catching stops the
+  // rejection escaping unhandled, and keeps the sheet open so the typed values
+  // survive a retry.
   const handleAddSubmit = useCallback(
     async (data: CreateSchoolData) => {
-      await createSchool(data);
-      setAddSheetVisible(false);
+      try {
+        await createSchool(data);
+        setAddSheetVisible(false);
+      } catch {
+        // Surfaced by the hook's onError toast.
+      }
     },
     [createSchool],
   );
@@ -86,8 +93,12 @@ export default function SchoolsScreen() {
   const handleAddClassSubmit = useCallback(
     async (data: CreateClassData) => {
       if (!addClassSchool) return;
-      await createClass(addClassSchool.id, data);
-      setAddClassSchool(null);
+      try {
+        await createClass(addClassSchool.id, data);
+        setAddClassSchool(null);
+      } catch {
+        // Surfaced by the hook's onError toast.
+      }
     },
     [addClassSchool, createClass],
   );
