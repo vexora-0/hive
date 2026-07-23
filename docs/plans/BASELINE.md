@@ -42,19 +42,23 @@ W20–W21. Treat them as a snapshot, not a contract.
 | `pnpm --filter @hive/mobile lint` | passes — 35 warnings, 0 errors |
 | `npx expo export --platform ios` | **passes** — bundles clean, 8.3 MB *(was 5.52 MB before Plans 02, 04 and 07 landed)* |
 
-### CI: one failing gate left, and it is one rule
+### CI runs, and is green
 
 `.github/workflows/ci.yml` runs `pnpm lint`, both typechecks and
-`pnpm build:backend`. Three of those four now pass. **The only remaining
-failure is `pnpm lint`, on the single backend error below.** Fix it and the
-gate goes green.
+`pnpm build:backend`, then builds the Docker image. **43 runs on 1 Aug, 26
+green** — it has been running on every push since the first one.
 
-**A red `pnpm lint` run does not mean your change broke something** — check the
-failing rule against the table below before investigating; only counts *higher*
-than 4 problems are yours.
+Be careful reading that green, though. `pnpm lint` still fails on the single
+backend error below; the step carries `continue-on-error`, so the *workflow*
+passes while the *check* does not. It is advisory, not a gate.
 
-Once lint is green, the `continue-on-error` markers on the mobile typecheck and
-lint steps should come off, so the pipeline starts actually gating.
+Mobile typecheck **is** now blocking — its `continue-on-error` came off once
+Plan 00 took the count to zero, which is the condition the workflow comment set.
+Lint keeps its marker until the one inherited `no-namespace` error is fixed.
+
+**A red `pnpm lint` locally does not mean your change broke something** — check
+the failing rule against the table below before investigating; only counts
+*higher* than 4 problems are yours.
 
 ### Mobile typecheck — 0 errors
 

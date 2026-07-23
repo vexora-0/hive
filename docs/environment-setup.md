@@ -109,9 +109,10 @@ supabase db push --include-all \
 ⚠ Never run `pnpm db:reset`. It targets a *local* stack and, against a linked
 project, drops and recreates the database.
 
-**Migration `00020` has not been applied anywhere yet.** It makes the photos
-bucket private and drops the public read policy — the fix for the audit's most
-severe finding. Until it runs, photos remain publicly readable.
+**Migration `00020` is what makes the photos bucket private** and drops the
+public read policy — the fix for the audit's most severe finding. It is applied
+on both projects; if you create a third, it must run there too or photos are
+publicly readable.
 
 Verify:
 
@@ -239,8 +240,9 @@ live in the backend package; there is no root `seed:admin`.
    about ordering. The warning should be suppressed when zero photos were
    seeded, or it will be ignored on the one run where it matters.
 
-Everything still unticked needs **photos in `seed-assets/`** (12–15 JPEGs, see
-that directory's README) or a device. Neither is blocked by the environment.
+Everything still unticked needs a device, or a case the seed does not cover —
+the 11 seed photographs landed in `abe853a`, so `seed-assets/` is no longer
+empty.
 
 ---
 
@@ -273,5 +275,5 @@ and has nothing to do with the code.
 | App loads, all API calls 401 | `EXPO_PUBLIC_API_URL` wrong, or the backend is pointed at a different Supabase project than the app |
 | Photos upload but never appear | Migration `00020` not applied, or the `photos` bucket does not exist |
 | `sharp` fails to install | Needs libvips. Alpine: `apk add vips-dev`. Debian: `apt install libvips-dev`. |
-| Orders return 400 | Expected until Plan 02 lands — client and server disagree on the payload shape (G-01) |
+| Orders return 400 | Check the product type against `src/constants/products.ts` — client, validator and DB CHECK must agree. G-01 was this disagreeing three ways; it is fixed and verified, so a 400 now means a genuinely bad payload |
 | OTP email never arrives | Supabase default SMTP is rate-limited to a few per hour. Plan 01 Step 8 covers configuring Resend. |

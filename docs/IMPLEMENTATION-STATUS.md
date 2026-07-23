@@ -72,7 +72,7 @@ Worth stating because it is the part most likely to be asked about.
 
 The backend queries exclusively through `supabaseAdmin`, built with
 `SUPABASE_SERVICE_KEY`. **The service-role key bypasses row level security by
-design**, so the 505-line policy set in migration `00011` is never consulted for
+design**, so the 545-line policy set in migration `00011` is never consulted for
 an API request. Every endpoint that accepts a resource ID must re-derive
 authorization itself. That single fact is the root cause of G-04, G-08 and
 G-17, and the reason a newly added endpoint is insecure by default.
@@ -169,7 +169,9 @@ guard does nothing unless the variable exists.
 - **No error has reached Sentry.** `initSentry()` has only taken its no-op path.
 - **`verify-security.sh` has never run against a real instance.**
 - **Nothing has been seen on a device.**
-- **The Docker image has never been built; CI has never run; nothing is deployed.**
+- **Nothing is deployed** — no hosted URL, no APK. CI itself *does* run: 43
+  workflow runs on 1 Aug, 26 green, each building the Docker image. What has
+  never happened is a deployment, not a build.
 
 ---
 
@@ -199,7 +201,7 @@ guard does nothing unless the variable exists.
 | **CP-1** | App compiles · no "Coming Soon" · no credentials in repo | ✔ **Met.** |
 | **CP-2** | Order placeable · private storage with thumbnails · role guards · IDORs closed | ✔ **Met.** All four verified at runtime — order placed with correct cents and working idempotency, photos private with thumbnails and signed URLs, role guards returning 403, cross-school IDOR closed. |
 | **CP-3** | Demo seed on a fresh DB · test harness runs | ✔ **Met.** Seed loads schools, classes, students, parents, 6 photos with thumbnails and 16 notifications. Harness runs against a separate project. |
-| **CP-4** | 36 tests green · CI on every PR | ◐ **58 of 59 green** — target exceeded on count. One failure (T-23, a test defect) and CI has still never run. |
+| **CP-4** | 36 tests green · CI on every PR | ◐ **58 of 59 green** — target exceeded on count. One failure (T-23, a test defect). CI runs green on every push, and mobile typecheck is now a blocking step. |
 | **CP-5** | Deployed and reachable · Sentry receiving · docs complete | ✗ Nothing deployed. |
 | **CP-6** | Manual QA green · demo rehearsed · submission pack | ✗ |
 
@@ -207,17 +209,25 @@ guard does nothing unless the variable exists.
 
 ## 8. What to do next
 
-1. **Create `.env` for `packages/backend` and `apps/mobile`**, and apply
-   migration `00020`. Follow `docs/environment-setup.md`. Roughly 40 commits of
-   work across all four streams compile and have never executed; this unblocks
-   every one of them. Highest-value action available, by a wide margin.
-2. **Srujan: Plan 02.** No order can currently be placed.
-3. **Create a test Supabase project** and run `pnpm test`. Then do Plan 08's
-   sabotage exercise — until then the suite has proven nothing.
-4. **Run `scripts/verify-security.sh`** against a deployed instance with real
-   tokens. That is what turns §2 from "believed fixed" into "confirmed fixed".
-5. **Plan 01 Step 8 (SMTP).** Unowned, and it fails during a live demo.
-6. Bhargav: Plan 07. Srujan: Plan 06.
+*Rewritten 23 July — items 1, 2, 3 and 6 of the previous list were all done and
+still listed as outstanding.*
+
+1. **Run `scripts/verify-security.sh`** against a real instance with real
+   tokens. It has never been run, and the seed now provides exactly what it
+   needs: two schools with a teacher each, and parents at different schools.
+   This is what turns §2 from "believed fixed" into "confirmed fixed", and it is
+   the highest-value item left. Nagachaitanya.
+2. **Fix T-23** — the test, not the product. `createTestPhoto` never puts an
+   object in storage, so `/confirm` 404s. It is the only automated guard on
+   G-07. Ruthwik.
+3. **Plan 08's sabotage exercise** — revert a fix, confirm the matching test
+   goes red. The suite runs, but has not been shown to *detect* anything.
+4. **Deploy.** Nothing is hosted; there is no APK. Bhargav, Plan 09 Step 6.
+5. **The one backend lint error** (`middleware/auth.ts`, `no-namespace`) is the
+   last thing keeping the CI lint step advisory rather than blocking. Unowned,
+   one line.
+6. **Plan 01 Step 8 (SMTP).** Unowned. Lower priority than it was — teacher and
+   parent can now sign in with a password, so OTP is no longer the only way in.
 
 ---
 

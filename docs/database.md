@@ -66,7 +66,7 @@ the product.
 
 ## Row level security
 
-505 lines across all ten tables, with four `SECURITY DEFINER` helpers:
+545 lines across all ten tables, with four `SECURITY DEFINER` helpers:
 `get_my_role`, `get_my_school_id`, `is_parent_of`, `get_my_student_ids`.
 
 They are `SECURITY DEFINER` for a specific reason: they read `profiles` from

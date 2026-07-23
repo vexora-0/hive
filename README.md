@@ -235,7 +235,7 @@ what has actually been executed, §5 what has not. Read §5 before believing any
 feature works.
 
 **Not yet deployed.** No hosted URL or APK exists; the Dockerfile and CI
-workflow are written but have never run.
+workflow exist and CI runs green on every push, but nothing is hosted.
 
 ---
 

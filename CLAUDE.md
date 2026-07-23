@@ -48,37 +48,43 @@ Match it against the table. **This determines what you work on.** If the email d
 exists, what runs and what has been proven. Two status tables drifting apart is
 worse than one, so this file no longer restates it.
 
-### Status — 19 July
+### Status — 23 July
 
 The environment works end to end. `hive-dev` (`udawaiykfvdcvcouiqxr`) runs the
 app; `hive-test` (`sdbiuzuyipneioceqysm`) runs the suite. 19 migrations on both.
-Demo data seeded with photos. **58 of 59 tests pass.** G-02, G-07, G-08 and the
-parent privacy boundary are all confirmed at runtime — see
-`docs/IMPLEMENTATION-STATUS.md` §4, and §5 for what is still unproven.
+Demo data seeded with photos. **58 of 59 tests pass.** **CI runs on every push
+and is green.** G-01, G-02, G-07, G-08 and the parent privacy boundary are all
+confirmed at runtime — see `docs/IMPLEMENTATION-STATUS.md` §4, and §5 for what
+is still unproven.
 
 ### What is left
 
 Nothing is blocked on infrastructure any more. What remains is ordinary work:
 
-1. **G-01 orders** — Srujan, Plan 02. Still the most serious functional defect;
-   no order can be placed.
-2. **Plan 07 UX** — Bhargav. Confirm dialogs are wired; toasts, real upload
-   progress and the remaining steps are not.
-3. **T-23 is red** — Ruthwik, Plan 08. A defect in the test rather than the
+1. **T-23 is red** — Ruthwik, Plan 08. A defect in the test rather than the
    product; `createTestPhoto` never puts an object in storage, so `/confirm`
    404s. It is the only automated guard on G-07, so it is worth fixing properly
    rather than relaxing.
-4. **CI has never run**, and nothing is deployed.
+2. **G-27 upload progress** — Ruthwik, Plan 07 Step 5. Still a hardcoded ladder
+   rather than bytes transferred. The plan marks it optional.
+3. **Nothing is deployed** — no hosted URL, no APK. Bhargav, Plan 09 Step 6.
+4. **One inherited backend lint error** (`middleware/auth.ts`, `no-namespace`)
+   is the last thing keeping the CI lint step advisory rather than blocking.
 
 Follow `docs/environment-setup.md`; §7 is the verification checklist and asks
 for failures to be reported, not ticks. Its boot and storage items are now
 ticked with what was actually observed.
 
+> This block goes stale faster than anything else in the repo — it has twice
+> described work as blocked weeks after it shipped. If you are about to rely on
+> it, re-check against `docs/IMPLEMENTATION-STATUS.md` §4 first, and against a
+> running instance if it matters.
+
 ---
 
 ## 3a. Current state
 
-**Phase 1 is complete** — the application is built: database schema with row level security, a 22-endpoint API, teacher upload with student tagging, a privacy-scoped parent feed, an admin console, and a full design system.
+**Phase 1 is complete** — the application is built: database schema with row level security, a 31-endpoint API, teacher upload with student tagging, a privacy-scoped parent feed, an admin console, and a full design system.
 
 **Phase 2 is fixing what Phase 1 left broken.** The audit found 46 gaps. The most serious:
 
@@ -169,7 +175,9 @@ pnpm typecheck && pnpm lint && pnpm build:backend
 
 ## 7. Commit conventions
 
-Commitlint enforces conventional commits. Format:
+Conventional commits. `commitlint.config.js` exists but **nothing runs it** —
+there are no git hooks and no CI step, so this is a convention the team keeps by
+hand, not a gate. Format:
 
 ```
 <type>(<scope>): <imperative summary>
@@ -216,7 +224,7 @@ Write what actually happened, not what the plan said would happen.
 
 ## 10. Things to know before you touch the code
 
-- **The backend bypasses row level security.** Every service uses `supabaseAdmin`, created with the service-role key, which is exempt from RLS by design. The 505-line policy set in migration `00011` only protects the handful of queries the mobile app makes directly to Supabase. **Every API endpoint must enforce authorization explicitly in the service layer.** This is the root cause of gaps G-04, G-08 and G-17.
+- **The backend bypasses row level security.** Every service uses `supabaseAdmin`, created with the service-role key, which is exempt from RLS by design. The 545-line policy set in migration `00011` only protects the handful of queries the mobile app makes directly to Supabase. **Every API endpoint must enforce authorization explicitly in the service layer.** This is the root cause of gaps G-04, G-08 and G-17.
 - **Two data paths exist.** Most screens go through the Express API; `useChildren`, `useClasses`, `getClassStudents` and `authStore.initialize` query Supabase directly. Know which one you're changing.
 - **`photos.s3_key` holds a Supabase Storage path**, not an S3 key. The column name is historical.
 - **Do not add infrastructure.** BullMQ, Redis workers and the S3 client are being removed, not extended. Thumbnails are generated synchronously with `sharp`. See `docs/plans/00-INDEX.md` for the locked decisions.

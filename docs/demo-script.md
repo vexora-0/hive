@@ -48,7 +48,7 @@ State the constraint first. Everything after is a consequence of it.
 
 ## 1:00 — Architecture
 
-Show diagram G-1 in `architecture.md`.
+Show the system diagram in `architecture.md` (labelled G-1 in Plan 10).
 
 > "React Native and Expo on the front. An Express API in the middle. Supabase
 > for Postgres, auth and object storage.
