@@ -74,6 +74,32 @@ export function errorHandler(
     return;
   }
 
+  // Client errors raised by middleware before any handler runs — body-parser's
+  // SyntaxError on malformed JSON (400) and PayloadTooLargeError (413). Both
+  // carry a status but no `code`, so without this they fell through to the
+  // unknown branch: a 500 instead of the right 4xx, and reportToSentry on every
+  // one. That let any authenticated client fill Sentry and the error log with
+  // stack traces just by POSTing garbage — the exact noise reportToSentry
+  // exists to keep out.
+  const status = (err as { status?: number; statusCode?: number }).statusCode
+    ?? (err as { status?: number }).status;
+  if (typeof status === 'number' && status >= 400 && status < 500) {
+    logger.warn('Malformed request', {
+      requestId: req.requestId,
+      message: err.message,
+      name: err.name,
+      status,
+    });
+
+    res.status(status).json({
+      success: false,
+      message:
+        status === 413 ? 'Request body is too large' : 'Malformed request body',
+      code: status === 413 ? 'PAYLOAD_TOO_LARGE' : 'INVALID_JSON',
+    });
+    return;
+  }
+
   // Supabase errors (they have a `code` property)
   if ('code' in err && typeof (err as Record<string, unknown>).code === 'string') {
     const supaErr = err as Error & { code: string; details?: string };

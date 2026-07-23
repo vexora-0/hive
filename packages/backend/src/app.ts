@@ -62,7 +62,13 @@ app.use((req, res, next) => {
   const startedAt = process.hrtime.bigint();
   res.on('finish', () => {
     const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
-    logger.info(`${req.method} ${req.path}`, {
+    // originalUrl, not path: inside a mounted router req.path is relative to
+    // the mount point, so /api/v1/feed logged as "GET /" and /api/v1/orders as
+    // "POST /". Errors that reach the error handler logged the full path, so
+    // the same stream held both forms. This is the only forensic surface there
+    // is — security.md §8.4 notes there is no audit log — and a line reading
+    // "POST / returned 201" identifies nothing.
+    logger.info(`${req.method} ${req.originalUrl}`, {
       requestId: req.requestId,
       status: res.statusCode,
       durationMs: Math.round(durationMs),
