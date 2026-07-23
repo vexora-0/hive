@@ -29,9 +29,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Non-blocking for now: the mobile package inherits type errors from
-      # before Phase 2 (see docs/plans/BASELINE.md). Remove continue-on-error
-      # once Plan 00 lands and the count reaches zero.
+      # Still non-blocking: the backend carries one inherited lint error
+      # (middleware/auth.ts, @typescript-eslint/no-namespace). See
+      # docs/plans/BASELINE.md. Remove continue-on-error when that reaches zero
+      # — it is a one-line fix and the last thing keeping this step advisory.
       - name: Lint
         run: pnpm lint
         continue-on-error: true
@@ -39,9 +40,10 @@ jobs:
       - name: Typecheck backend
         run: pnpm --filter @hive/backend typecheck
 
+      # Now blocking. Plan 00 took the mobile package from 22 errors to 0, which
+      # is the condition the previous comment set for removing this.
       - name: Typecheck mobile
         run: pnpm --filter @hive/mobile typecheck
-        continue-on-error: true
 
       - name: Build backend
         run: pnpm build:backend

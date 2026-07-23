@@ -15,11 +15,13 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean",
-    "db:migrate": "supabase db push",
+    "db:migrate": "supabase db push --include-all",
     "db:reset": "supabase db reset",
     "db:diff": "supabase db diff",
     "test": "turbo run test",
-    "seed": "pnpm --filter @hive/backend seed:demo"
+    "seed": "pnpm --filter @hive/backend seed:demo",
+    "seed:demo:reset": "pnpm --filter @hive/backend seed:demo:reset",
+    "seed:admin": "pnpm --filter @hive/backend seed:admin"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.3.0",
