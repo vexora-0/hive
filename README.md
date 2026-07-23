@@ -257,6 +257,14 @@ Stated plainly rather than omitted:
 
 ---
 
+## Documentation
+
+Everything else lives in **[`docs/`](docs/README.md)** — architecture, database
+schema, API reference, user flows, security model, the 46-item audit this phase
+was built from, and the twelve plans that addressed it.
+
+---
+
 ## Team
 
 Group 145
