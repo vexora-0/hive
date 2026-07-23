@@ -51,8 +51,17 @@ export default function LoginScreen() {
   const [usePassword, setUsePassword] = useState(false);
   const isPasswordMode = isAdmin || usePassword;
 
+  // `useOTP` owns its error and exposes no reset, so a failed send would keep
+  // showing after switching to password and back. Mark it stale on any switch
+  // and clear the mark when a send is actually attempted.
+  const [otpErrorStale, setOtpErrorStale] = useState(false);
+
   const isLoading = isPasswordMode ? isSigningIn : isSending;
-  const serverError = isPasswordMode ? adminError : otpError;
+  const serverError = isPasswordMode
+    ? adminError
+    : otpErrorStale
+      ? undefined
+      : otpError;
 
   // ── Already signed in: redirect to role-based home ───────────────────
   useEffect(() => {
@@ -71,9 +80,16 @@ export default function LoginScreen() {
   }, [user?.id, role, setProfile, setRole, router]);
 
   // Switching role resets the opt-in, so a teacher does not silently inherit
-  // password mode from a previous admin selection.
+  // password mode from a previous admin selection. Credentials are cleared here
+  // too: going parent-with-password → admin keeps `isPasswordMode` true, so the
+  // effect below never fires and a typed password would carry into the admin
+  // form.
   useEffect(() => {
     setUsePassword(false);
+    setPassword('');
+    setPasswordError(undefined);
+    setAdminError(undefined);
+    setOtpErrorStale(true);
   }, [signInAs]);
 
   // ── Clear password state when leaving password mode ───────────────────
@@ -128,6 +144,8 @@ export default function LoginScreen() {
       }
     } else {
       // ── Teacher / Parent: OTP ──────────────────────────────────────
+      // A send is being attempted, so whatever useOTP reports next is current.
+      setOtpErrorStale(false);
       const success = await sendOTP(trimmed, signInAs as 'teacher' | 'parent');
       if (success) {
         router.push({
@@ -289,7 +307,10 @@ export default function LoginScreen() {
         {/* Teachers and parents can opt into a password instead of an OTP. */}
         {!isAdmin && (
           <Pressable
-            onPress={() => setUsePassword((v) => !v)}
+            onPress={() => {
+              setUsePassword((v) => !v);
+              setOtpErrorStale(true);
+            }}
             disabled={isLoading}
             accessibilityRole="button"
             accessibilityLabel={
@@ -319,7 +340,7 @@ export default function LoginScreen() {
           disabled={isLoading}
           style={styles.button}
         >
-          {isAdmin ? 'Sign In' : 'Send Code'}
+          {isPasswordMode ? 'Sign In' : 'Send Code'}
         </Button>
       </View>
     </ScreenContainer>
