@@ -159,8 +159,8 @@ guard does nothing unless the variable exists.
 - **HEIC conversion and magic-byte rejection are still unproven.** Every seed
   asset is already a JPEG, so `converted:false` on all six. Nothing has tested
   a `.heic` input or a `.txt` renamed to `.jpg`.
-- **No order has been placed.** G-01 is still open, so this is blocked on Plan 02
-  rather than on the environment.
+- ~~No order has been placed.~~ **Done** — see §4. A parent placed a real order
+  with correct integer cents and working idempotency.
 - **G-17 upload-ownership checks are unverified** — they need two teachers at the
   same school driving the upload endpoints, which the seed does not do.
 - **Plan 08's sabotage exercise has not been done** — revert a fix, confirm the
@@ -178,7 +178,7 @@ guard does nothing unless the variable exists.
 | Gap | Owner | Why it matters |
 |---|---|---|
 | ~~**G-01**~~ | Srujan · Plan 02 | **Closed and verified 22 July.** A parent placed a real order: 201, `total_cents: 998` for 2 × `print_4x6`, and a repeated idempotency key returned the same order instead of a duplicate. This entry previously read "no order can be placed" long after it had been fixed. |
-| **G-11** | Srujan · Plan 06 | No demo data. |
+| ~~**G-11**~~ | Srujan · Plan 06 | **Closed.** `seed:demo:reset` loads 2 schools, 4 classes, 9 students, 8 profiles, 6 photos with thumbnails, 9 tags and 16 notifications. |
 | **G-27** | Ruthwik · Plan 07 Step 5 | Upload progress is a hardcoded `0.1 → 0.3 → 0.35 → 0.85` ladder, not bytes transferred. Lives in `useUpload.ts` / `teacherService.ts`, both Ruthwik's. The plan marks this its one optional step. |
 | ~~G-26, G-28…G-33~~ | Bhargav · Plan 07 | **Done.** Toasts on all nine admin mutations, confirm dialogs on all six destructive actions, empty states, onboarding and 404 placeholders replaced, schools routes split into validator/service/controller, controllers all throw `AppError`. See the plan's Deviations. |
 | **8a, 8b** | Ruthwik / Srujan | Plan 07 polish needing API changes: the feed does not return the uploader's name, and order items carry only `photoId` so no thumbnail can be rendered. Both need an endpoint to return more, not UI work. |
@@ -187,7 +187,7 @@ guard does nothing unless the variable exists.
 | **S-15** | Plan 11 | Supabase project ref committed; keys not rotated. |
 | — | Bhargav | ~~Create the first `.env`.~~ **Done 1 Aug** — dev environment runs, 19 migrations applied. |
 | — | Bhargav | ~~Create the `hive-test` Supabase project.~~ **Done** — `sdbiuzuyipneioceqysm`, 19 migrations applied, suite runs. |
-| — | Srujan · Plan 06 | **Seed data.** Everything left in §5 needs a school, class, students and a parent before it can be exercised. Now the single biggest blocker. |
+| — | — | ~~Seed data.~~ **Done** — the seed photographs landed in `abe853a` and the dataset is loaded. This was the last infrastructure blocker; everything remaining is ordinary work. |
 
 ---
 
