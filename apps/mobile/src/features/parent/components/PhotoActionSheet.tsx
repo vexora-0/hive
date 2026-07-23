@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/theme';
@@ -7,6 +7,7 @@ import { Text } from '@/components/ui';
 import { Badge } from '@/components/ui';
 import type { FeedPhoto } from '../services/parentService';
 import type { PhotoAction } from '../hooks/usePhotoActions';
+import { Modal } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types

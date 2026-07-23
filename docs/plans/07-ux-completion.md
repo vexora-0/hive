@@ -309,6 +309,29 @@ uses it too, so there is one pattern rather than two.
 parent is already mapped to this student" tells an admin what happened; a
 generic failure sends them looking for a bug that isn't there.
 
+**The toast was invisible behind every sheet, and that is now fixed.** The
+provider rendered the toast as a sibling of `{children}` at the React root.
+React Native's `Modal` renders into a **separate native window**, so the root
+tree is covered whenever one is open — and every sheet in this app is a `Modal`.
+The error path, which is the entire reason G-28 exists, therefore still reached
+nobody: a failed order, a rejected parent mapping and a role change that did not
+save were all as silent as before.
+
+`ToastProvider` still owns the state, but the visual moved into a `ToastOutlet`
+that any native window can mount, and `components/feedback/Modal.tsx` wraps RN's
+`Modal` to mount one automatically. Thirteen files now import that wrapper
+instead, and a `no-restricted-imports` rule fails the build if a new sheet
+reaches for RN's `Modal` directly.
+
+Every mounted outlet renders, with no "which window is on top" bookkeeping —
+they are geometrically identical, so a stacked pair puts the upper copy exactly
+over the lower one and only one toast is ever visible. That also stays correct
+when a modal fails to present at all, which a topmost-window registry could not.
+
+Not verifiable without a simulator: that Moti animates correctly inside a modal
+window, and Android dialog safe-area insets (the outlet does not add `insets.top`
+on Android, since these dialogs do not set `statusBarTranslucent`).
+
 **Not done — tagging errors.** The last row of the Step 1 table wants "Could
 not tag students" on failure, but tagging lives in
 `features/teacher/hooks/useUpload.ts`, which the ownership map in

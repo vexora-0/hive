@@ -1,11 +1,12 @@
 import React, { useCallback } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/theme';
 import { Text } from '@/components/ui/Text';
 import { Button } from '@/components/ui/Button';
 import type { TeacherOption } from '@/features/admin/services/adminService';
+import { Modal } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types

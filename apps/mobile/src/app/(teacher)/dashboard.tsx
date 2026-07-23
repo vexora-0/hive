@@ -10,8 +10,7 @@ import { ClassSelector, type ClassItem } from '@/components/forms/ClassSelector'
 import { PolaroidCard } from '@/components/media';
 import { MasonryGrid } from '@/components/media';
 import { HoneycombFAB } from '@/components/animation';
-import { SkeletonShimmer } from '@/components/feedback';
-import { EmptyState } from '@/components/feedback';
+import { EmptyState, SkeletonShimmer } from '@/components/feedback';
 import { HeaderBar } from '@/components/navigation';
 
 import { useAuthStore } from '@/features/auth/stores/authStore';

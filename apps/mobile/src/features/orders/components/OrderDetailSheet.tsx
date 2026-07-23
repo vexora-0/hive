@@ -1,7 +1,6 @@
 import React, { useCallback } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +14,7 @@ import { HiveImage } from '@/components/media';
 import type { OrderStatus, ProductType } from '@/types/supabase';
 
 import { useOrderDetail } from '../hooks/useOrders';
+import { Modal } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types

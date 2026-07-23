@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,7 +13,7 @@ import { Text } from '@/components/ui/Text';
 import { TextInput } from '@/components/ui/TextInput';
 import { Button } from '@/components/ui/Button';
 import { useStudentParents } from '@/features/admin/hooks/useClassDetail';
-import { ConfirmDialog } from '@/components/feedback';
+import { ConfirmDialog, Modal } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types

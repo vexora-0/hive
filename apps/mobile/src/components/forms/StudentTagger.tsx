@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
-  Modal,
   Pressable,
   StyleSheet,
   TextInput as RNTextInput,
@@ -11,6 +10,7 @@ import {
 import { colors, spacing, layout, fontFamily, fontSize, lineHeight, MIN_TAP_SIZE } from '@/theme';
 import { Avatar } from '@/components/ui';
 import { Text } from '@/components/ui';
+import { Modal } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types

@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   StyleSheet,
   View,
@@ -19,6 +18,7 @@ import { useAuthStore } from '@/features/auth/stores/authStore';
 import { PRODUCT_PRICES_CENTS, formatCents } from '../constants/products';
 import { useCreateOrder } from '../hooks/useOrders';
 import { ProductPicker } from './ProductPicker';
+import { Modal } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types

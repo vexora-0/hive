@@ -2,7 +2,6 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -13,6 +12,7 @@ import {
 
 import { colors, spacing, layout, fontFamily, fontSize, MIN_TAP_SIZE } from '@/theme';
 import { Text } from '@/components/ui';
+import { Modal } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types

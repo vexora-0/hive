@@ -1,8 +1,9 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { colors, spacing, layout, shadows } from '@/theme';
 import { Text, Button } from '@/components/ui';
+import { Modal } from './Modal';
 
 export interface ConfirmDialogProps {
   visible: boolean;

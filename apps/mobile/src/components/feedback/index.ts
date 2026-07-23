@@ -9,6 +9,8 @@ export type { EmptyStateProps, EmptyStateAction } from './EmptyState';
 
 export { ErrorBoundary } from './ErrorBoundary';
 export type { ErrorBoundaryProps } from './ErrorBoundary';
-export { ToastProvider, useToast } from './Toast';
+export { ToastProvider, useToast, ToastOutlet } from './Toast';
+export { Modal } from './Modal';
+export type { ModalProps } from './Modal';
 export { ConfirmDialog } from './ConfirmDialog';
 export type { ConfirmDialogProps } from './ConfirmDialog';

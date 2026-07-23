@@ -1,7 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import {
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -14,7 +13,7 @@ import { colors, spacing, layout } from '@/theme';
 import { Text } from '@/components/ui/Text';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
-import { ConfirmDialog } from '@/components/feedback';
+import { ConfirmDialog, Modal } from '@/components/feedback';
 import type { AdminUser, AdminSchool } from '@/features/admin/services/adminService';
 import type { UserRole } from '@/types/supabase';
 
