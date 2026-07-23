@@ -15,6 +15,7 @@ been written. §4 lists what has actually been executed; §5 lists what has not.
 | [`../README.md`](../README.md) | Project overview, stack, quick start |
 | [`environment-setup.md`](environment-setup.md) | Full setup — Supabase projects, keys, migrations, Redis, and the §7 verification checklist |
 | [`DEMO_USERS.md`](DEMO_USERS.md) | Seeded accounts and the intended demo path |
+| [`demo-script.md`](demo-script.md) | 8–10 minute walkthrough, the privacy proof, and the questions to expect |
 
 ---
 

@@ -1,0 +1,248 @@
+# Demo Script
+
+Target **8–10 minutes**. Rehearse end to end twice and time it.
+
+Two things differ from the plan's original script, because of where the project
+actually is:
+
+- **Sign in with a password, not an OTP.** The demo accounts use `.demo`
+  addresses, which cannot receive mail, and Supabase's default SMTP is
+  rate-limited anyway. On the login screen: pick the role, then
+  **"Use a password instead"**.
+- **Nothing is deployed yet.** Run against a local backend. If that changes,
+  hit the URL five minutes beforehand — a sleeping free-tier instance takes
+  30–60 seconds to wake and is the most likely failure on the day.
+
+Accounts and passwords: [`DEMO_USERS.md`](DEMO_USERS.md).
+
+---
+
+## Before you start
+
+```bash
+docker start hive-redis
+pnpm dev:backend
+curl -s localhost:4000/health | jq          # expect "database": "ok"
+pnpm --filter @hive/backend seed:demo:reset # clean data
+pnpm dev:mobile
+```
+
+Have open in tabs: [`architecture.md`](architecture.md) (diagram G-1),
+[`user-flows.md`](user-flows.md), [`IMPLEMENTATION-STATUS.md`](IMPLEMENTATION-STATUS.md).
+
+---
+
+## 0:00 — The problem
+
+> "Preschools want to share photos with parents. The obvious way — a shared
+> album or a WhatsApp group — means every parent sees every child. That's a
+> child-privacy problem, and it's the reason this app exists.
+>
+> In Hive, a teacher tags which children are in each photo, and a parent sees
+> **only** the photos their own child is tagged in. Not the class. Not another
+> family's child."
+
+State the constraint first. Everything after is a consequence of it.
+
+---
+
+## 1:00 — Architecture
+
+Show diagram G-1 in `architecture.md`.
+
+> "React Native and Expo on the front. An Express API in the middle. Supabase
+> for Postgres, auth and object storage.
+>
+> Two things worth pointing out. First, there are **two data paths** — most
+> screens go through our API, but a few queries go straight to Supabase with the
+> user's own token. Second, our backend uses the service-role key, which
+> **bypasses row level security entirely**. So row level security protects only
+> that second path. Every API endpoint has to enforce authorization itself, in
+> the service layer. That single fact caused three of the security bugs we found
+> in our own audit."
+
+---
+
+## 2:00 — Teacher upload
+
+Sign in as `teacher.sarita@bloom.demo`.
+
+> "Sarita teaches Sunflower class at Bloom Preschool."
+
+Dashboard → Upload → pick 2–3 photos → select class → **tag two students** →
+upload.
+
+> "Note the order: tag first, then confirm. That's deliberate. A database
+> trigger fires when the photo becomes `ready` and reads the tag rows to work
+> out whose parents to notify. We originally confirmed first, so the trigger
+> always ran against zero tags and **no parent was ever notified**. The feature
+> looked like it worked, because teachers still got their own notification.
+>
+> On upload, `sharp` validates the file by its magic bytes — not the
+> `Content-Type` header, which a client can lie about — converts HEIC to JPEG,
+> and generates a thumbnail and a blurhash."
+
+---
+
+## 4:00 — Parent feed
+
+Sign in as `parent.rajesh@bloom.demo`.
+
+> "Rajesh has **two children**, Aarav and Diya."
+
+Switch child → feed changes. Tap a photo.
+
+> "One photo is tagged with both his children. It appears **once**, not twice —
+> the feed de-duplicates."
+
+---
+
+## 5:30 — Privacy proof · the most important minute
+
+This is the segment to rehearse hardest. Two demonstrations.
+
+**1. A different parent cannot see those photos.**
+
+Sign out, sign in as `parent.vikram@stars.demo` — a parent at the *other*
+school.
+
+> "Same app, same feed screen. Different photos. There are six photos in the
+> database; Rajesh sees two, Vikram sees one, and there is **zero overlap**."
+
+**2. The photo URL itself is not public.**
+
+Have this ready in a terminal:
+
+```bash
+# The URL the app receives — a signed, short-lived one
+curl -s -o /dev/null -w "%{http_code}\n" "<signed-url>"      # 200
+
+# The same object with the signature stripped
+curl -s -o /dev/null -w "%{http_code}\n" "<signed-url-without-?token>"   # 400
+```
+
+> "The bucket is private. The app never gets a permanent link — it gets a signed
+> URL generated per request, and only *after* we've checked the caller is
+> allowed the photo. Strip the signature and Supabase refuses it.
+>
+> That ordering matters: a signed URL is access. It must never be minted for
+> someone who's about to be refused."
+
+Optionally, the cross-school check:
+
+```bash
+# Sarita (Bloom) asking for Little Stars' student roster
+curl -s localhost:4000/api/v1/schools/<other-school-id>/students \
+  -H "Authorization: Bearer <sarita-token>"
+# {"success":false,"message":"You do not have access to this school","code":"FORBIDDEN"}
+```
+
+> "That's a real IDOR we found in our own audit — three endpoints took a school
+> ID from the URL and never compared it to the caller's."
+
+---
+
+## 6:30 — Notifications
+
+Back as Rajesh → notifications.
+
+> "'New photo of Diya Kumar.' Generated by a database trigger when the photo
+> was confirmed, addressed to the parents of the tagged children — not
+> broadcast to the class."
+
+---
+
+## 7:00 — Order
+
+Photo → add to cart → orders → choose product → address → place.
+
+> "Prices live on the **server**. The client sends a product type and a
+> quantity, never a price. Money is integer cents everywhere — client,
+> validator and column — never a float.
+>
+> The request carries an idempotency key. Send the same one twice and you get
+> the same order back, not a duplicate — so a double tap or a retry on a flaky
+> connection can't charge twice."
+
+---
+
+## 8:00 — Admin
+
+Sign in as the admin account.
+
+> "Admin is the only role that crosses schools."
+
+Dashboard → schools → class detail → link a parent to a student.
+
+> "Every destructive action confirms first, and states the consequence rather
+> than asking 'are you sure' — unlinking a parent says they'll stop seeing that
+> child's photos. And when the server rejects something, we show its actual
+> message: try linking a parent twice and you get 'This parent is already
+> mapped to this student', which tells you what happened."
+
+---
+
+## 9:00 — Engineering
+
+```bash
+pnpm test      # 58 of 59 passing
+```
+
+> "58 of 59. The one failure is a defect in the test, not the product — its
+> fixture creates a photo row without putting a file in storage, so the confirm
+> endpoint correctly says the file is missing. We've left it red rather than
+> weaken the assertion, because it's the only automated guard on the
+> notification-ordering bug from earlier."
+
+Show [`IMPLEMENTATION-STATUS.md`](IMPLEMENTATION-STATUS.md) §4 and §5.
+
+> "We keep an explicit split between what we've *proven* runs and what is only
+> written. Most of the second list is there because for most of this phase we
+> had no environment to run anything in."
+
+---
+
+## Questions to expect
+
+**"How do you stop a parent seeing another child's photo?"**
+Three layers. A `photo_student_tags` pivot decides visibility; a service-layer
+ownership check runs on every request; the bucket is private and URLs are signed
+per request. Row level security is a fourth, for direct client queries.
+
+**"Why a backend at all if you have Supabase?"**
+Server-owned pricing, multi-table authorization, image processing, and order
+idempotency. None of those belong in a client.
+
+**"Why did you remove the job queue?"**
+`sharp` takes roughly 200 ms. A queue added a Redis dependency and a whole
+failure mode for no benefit at this scale. Removing complexity deliberately is
+the right call, and we documented why.
+
+**"What breaks at 10,000 users?"**
+Synchronous image processing becomes the bottleneck — that's when the queue we
+removed earns its place. Feed pagination is cursor-based and holds up; storage
+and auth are Supabase's problem before ours.
+
+**"What did you get wrong?"**
+The order contract drifted across three layers — the client sent one product
+vocabulary, the validator expected another, and the database `CHECK` allowed a
+third. Every order failed before reaching the database. Nobody owned it end to
+end. We found it in our own audit, fixed it with a shared catalogue, and added
+a test asserting the client and server agree.
+
+A more uncomfortable one, worth volunteering: **for six weeks the app didn't
+compile, and the other three streams kept working anyway** — verifying by
+reading rather than running. That's why so much was written but unproven, and
+it's the single biggest process lesson from the phase.
+
+---
+
+## Day-of checklist
+
+- [ ] Backend up, `/health` returning `"database": "ok"`
+- [ ] `pnpm seed:demo:reset` for clean data
+- [ ] Signed-URL commands pasted and ready in a terminal
+- [ ] Device charged, notifications silenced, brightness up
+- [ ] Diagrams open in tabs
+- [ ] `pnpm test` run once so it's warm
+- [ ] Video fallback accessible **offline**
