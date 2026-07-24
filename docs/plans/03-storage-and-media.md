@@ -283,3 +283,50 @@ None of this has been exercised at runtime. Outstanding:
 
 Everything below the line in Verification is still open. Whoever creates the
 first working `.env` (Plan 09) should run it.
+
+### Superseded — the above ran on 24 July 2026 (Ruthwik)
+
+Migration `00020` is applied, photos are in the private bucket, an unsigned URL
+returns 400 and a signed one 200, and the feed serves 16 KB thumbnails against
+211 KB originals. The one item that did **not** come out as written is HEIC.
+
+### HEIC conversion does not work, and cannot on the prebuilt `sharp`
+
+Tested against a genuine HEVC-coded HEIC — the format an iPhone produces — on
+24 July 2026. The upload is rejected:
+
+```
+POST /api/v1/photos/:id/file   → 400 INVALID_IMAGE
+heif: Error while loading plugin: No decoding plugin installed
+for this compression format (11.6003)
+```
+
+**Why.** `sharp` 0.33.5 ships a prebuilt libvips whose libheif has the AV1 codec
+and no HEVC codec. `sharp.format.heif.input.fileSuffix` is `['.avif']`, and
+`heif({compression:'hevc'})` fails with `Unsupported compression`. libheif still
+*parses* the container, so `sharp(buffer).metadata()` succeeds and reports
+`format: 'heif'` — the failure only appears when the pixels are decoded. That is
+why the branch looked correct in review: the guard it depends on passes.
+
+An AVIF, which shares the HEIF container and also reports `format: 'heif'`, does
+convert correctly — verified end to end: stored as `.jpg`, `mime_type`
+`image/jpeg`, thumbnail, blurhash and dimensions all written. So the branch works;
+it just cannot reach the format it was written for.
+
+**What was done about it.**
+
+1. **Device-side, which is the real fix.** `(teacher)/upload.tsx` now passes
+   `preferredAssetRepresentationMode: Compatible`, so iOS transcodes to JPEG in
+   the picker and no HEIC leaves the phone. Costs nothing and needs no new
+   dependency.
+2. **Server-side, as a backstop.** The conversion is wrapped, and a failure now
+   returns "This photo is in a format the server cannot read (HEIC). Please
+   re-save it as JPEG and try again." It previously leaked the raw libvips text
+   — `bad seek to 80687` — straight to the client.
+
+**What would fix it properly.** A libvips built against libheif with `libde265`,
+which means building `sharp` from source (`--build-from-source` with
+`libheif-dev`/`libde265-dev` present) rather than using the prebuilt binary. That
+is a deployment decision, not a code one: it lands in the Dockerfile, adds build
+time to every deploy, and brings HEVC patent licensing into scope. Not taken
+unilaterally — flagged for whoever owns the deploy.

@@ -1,7 +1,7 @@
 # Hive — Handover
 
 **State:** the core product loop is verified working against a live database.
-**Last verified:** 18 July 2026.
+**Last verified:** 24 July 2026.
 **Not deployed.** Everything below runs locally.
 
 For deeper detail: `CLAUDE.md` (working rules) · `docs/IMPLEMENTATION-STATUS.md`
@@ -85,6 +85,35 @@ Confirmed against the live database on 18 July:
 | Teacher → another school's class | **403** |
 | Admin dashboard | 2 schools, 8 users, 6 photos, 3 orders, $34.95 |
 
+Added 24 July, all against the same live project:
+
+| Check | Result |
+|---|---|
+| Text file renamed `.jpg` | **400 INVALID_IMAGE** — magic bytes, not the client's MIME |
+| AVIF (HEIF container) upload | converted to JPEG, thumbnail + blurhash written |
+| **Real HEVC HEIC — an iPhone photo** | **400. Cannot be converted.** See below |
+| Feed and photo detail | return `uploadedBy: { id, name }` — "Sarita Devi" |
+| `/confirm` with no object in storage | 404 FILE_NOT_FOUND; 200 once the object exists |
+
+Every row created by these probes was deleted afterwards. The demo dataset is
+back to its seeded state: 6 photos, all `ready`.
+
+### HEIC does not work, and it is not a bug in our code
+
+`sharp` 0.33.5 ships a prebuilt libvips whose libheif has an AV1 codec and **no
+HEVC codec** — and an iPhone HEIC is HEVC. libheif parses the container, so
+`metadata()` succeeds and reports `format: 'heif'`; only the pixel decode fails.
+That is why review never caught it.
+
+Mitigated on the device: the picker now asks iOS for a compatible
+representation, so it transcodes to JPEG before upload and no HEIC leaves the
+phone. The server-side path returns a message a teacher can act on instead of
+leaking `bad seek to 80687`.
+
+A real server-side fix means building `sharp` from source against libheif with
+`libde265`. That belongs in the Dockerfile, not in application code — see
+`docs/plans/03-storage-and-media.md`.
+
 ---
 
 ## 5. Not verified
@@ -92,7 +121,14 @@ Confirmed against the live database on 18 July:
 - **Nothing is deployed.** No Render service, no public URL.
 - **Tests have never run.** The harness and ~19 backend tests exist but need a
   separate `hive-test` Supabase project — the suite truncates every table, so
-  pointing it at the demo project wipes the data.
+  pointing it at the demo project wipes the data. T-23 was reported failing;
+  the cause was the fixture, not the product — `createTestPhoto` wrote a row
+  with no object behind it, and `/confirm` checks storage. The helper now
+  uploads one. The mechanism is proven live (404 without, 200 with); **the test
+  itself still has not been executed.**
+- **The upload progress bar has not been watched on a device.** The transfer now
+  reports real bytes through `XMLHttpRequest`, verified by reading the code path,
+  not by looking at a phone.
 - **The mobile app has not been driven end to end by hand.** The flows above were
   verified over the API with real tokens. Someone needs to tap through it.
 - **k6 load suite** written, never run — needs a deployed target.
@@ -141,6 +177,8 @@ comparison that is always true, or a client that queues forever.
 | Order, admin and mobile tests | Srujan, Nagachaitanya | Harness exists; feed and photo tests written |
 | Custom SMTP | Bhargav | Default Supabase SMTP is rate-limited; OTP unreliable for a live demo |
 | One lint error | Nagachaitanya | `no-namespace` in `middleware/auth.ts` — the only thing keeping CI red |
+| Decide on server-side HEIC | Bhargav | Build `sharp` from source against libheif + libde265, or accept the device-side transcode as the answer. Adds build time and HEVC licensing to the deploy — a call, not a task. |
+| Order item thumbnails (8b) | Ruthwik | Order items carry only `photoId`; the order API returns no signed URL per item |
 
 ---
 

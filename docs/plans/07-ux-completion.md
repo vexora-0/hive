@@ -400,3 +400,48 @@ Verified behaviour-preserving against the running instance, not just by
 typecheck — a Bloom teacher gets 200 with data for her own school's classes and
 students, **403 for another school's** (both endpoints), 403 when trying to
 create a class (admin-only), and 401 unauthenticated. Suite still 58 of 59.
+
+### Steps 5 and 8a, plus Step 1's last row — done (Ruthwik, W25)
+
+The three items Bhargav left because they sit in backend or upload-pipeline
+files.
+
+**Step 5 — real upload progress (G-27).** `uploadPhotoFile` now uses
+`XMLHttpRequest` and takes an `onProgress(fraction)` callback, exactly as the
+step specifies; `useUpload` maps it into the 0.35–0.85 band. Three things the
+step does not mention but that the code needs:
+
+- `Content-Type` is deliberately not set on the request. The platform has to add
+  the multipart boundary, and setting the header by hand strips it.
+- Progress events are throttled to 2% movement. A large file emits hundreds, and
+  each one re-renders the whole image grid.
+- `onerror` and `onabort` both reject. Neither reaches `onload`, so without them
+  a dropped connection leaves the promise pending forever — a worse failure than
+  the frozen bar this step set out to fix.
+
+A retried attempt re-sends the file from zero, so the bar rewinds with it rather
+than sitting at the failed attempt's high-water mark. That looks like a
+regression and is the honest reading: the bytes really are going again.
+
+**Step 1, tagging row.** Tagging failure now raises `Could not tag students`
+before rethrowing. Worth the special case: an untagged photo is one no parent
+will ever see, and the tile alone does not say which of the six pipeline steps
+failed.
+
+**8a — the uploader's name.** `feed.service` embeds
+`uploader:profiles!photos_uploaded_by_fkey(full_name)` in both the feed query
+and `getPhotoDetails`, and both now return `uploadedBy: { id, name }` in place of
+the bare `uploaded_by`. The constraint is named explicitly so the join cannot
+become ambiguous if a second photos → profiles foreign key is ever added.
+
+`name` is `string | null`, not `''`. A deleted uploader is a real state, and null
+lets the client drop the attribution line rather than render `by `.
+
+Rendered in two places: as the `PolaroidCard` caption on the feed — the caption
+field was already there and always null — and appended to the date on the photo
+detail screen. Verified against the running backend: both endpoints return
+`"name": "Sarita Devi"`.
+
+**8b is still open** and still Bhargav's read of it is right — order items carry
+only `photoId`, so a thumbnail needs the order API to return a signed URL per
+item. That is a backend change; it is not in this plan and has not been done.
