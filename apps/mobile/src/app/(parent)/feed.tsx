@@ -114,7 +114,12 @@ export default function FeedScreen() {
         id={item.id}
         uri={item.thumbnailUri ?? item.uri}
         blurhash={item.blurhash ?? undefined}
-        caption={item.caption ?? undefined}
+        // A photo's own caption wins; otherwise attribute it to whoever took
+        // it. `caption` is unused today, so in practice this is the teacher's
+        // name — but the fallback keeps working if captions are ever written.
+        caption={
+          item.caption ?? (item.uploadedBy.name ? `by ${item.uploadedBy.name}` : undefined)
+        }
         onPress={() => handlePhotoPress(item)}
         onLongPress={() => handlePhotoLongPress(item)}
         style={styles.card}

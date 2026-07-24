@@ -115,7 +115,9 @@ export default function PhotoDetailScreen() {
             color={colors.gray[400]}
             style={styles.date}
           >
-            {formattedDate}
+            {photo.uploadedBy.name
+              ? `${formattedDate} · by ${photo.uploadedBy.name}`
+              : formattedDate}
           </Text>
         </View>
 

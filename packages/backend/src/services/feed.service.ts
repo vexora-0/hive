@@ -12,7 +12,7 @@ interface FeedPhoto {
   height: number | null;
   status: string;
   created_at: string;
-  uploaded_by: string;
+  uploadedBy: { id: string; name: string | null };
   class_id: string;
   url: string;
   thumbnailUrl: string | null;
@@ -22,6 +22,26 @@ interface FeedPhoto {
 interface FeedResult {
   photos: FeedPhoto[];
   nextCursor: string | null;
+}
+
+/** Shape of the embedded uploader profile, as PostgREST types it. */
+type EmbeddedUploader =
+  | { full_name: string | null }
+  | { full_name: string | null }[]
+  | null
+  | undefined;
+
+/**
+ * Normalise an embedded profile into a display name.
+ *
+ * PostgREST types a to-one embed as an array even though it returns a single
+ * object, and the profile may be missing entirely if the uploader's account was
+ * deleted. Returns null in that case rather than an empty string, so the client
+ * can decide whether to render an attribution line at all.
+ */
+function uploaderName(uploader: EmbeddedUploader): string | null {
+  const row = Array.isArray(uploader) ? uploader[0] : uploader;
+  return row?.full_name ?? null;
 }
 
 export async function getFeed(
@@ -77,7 +97,11 @@ export async function getFeed(
   let photosQuery = supabaseAdmin
     .from('photos')
     .select(
-      'id, s3_key, thumbnail_s3_key, blurhash, width, height, status, created_at, uploaded_by, class_id, photo_student_tags!inner(student_id)',
+      // `uploader` is embedded rather than fetched per photo — the client shows
+      // who took the picture, and a second query per row would be N+1 on a page
+      // of twenty. The constraint is named explicitly so the join cannot become
+      // ambiguous if another photos → profiles foreign key is ever added.
+      'id, s3_key, thumbnail_s3_key, blurhash, width, height, status, created_at, uploaded_by, class_id, uploader:profiles!photos_uploaded_by_fkey(full_name), photo_student_tags!inner(student_id)',
     )
     .in('photo_student_tags.student_id', studentIds)
     .eq('status', 'ready')
@@ -115,6 +139,7 @@ export async function getFeed(
   //    together in a photo.
   type TaggedRow = (typeof photos extends (infer R)[] | null ? R : never) & {
     photo_student_tags?: Array<{ student_id: string }>;
+    uploader?: EmbeddedUploader;
   };
 
   const seen = new Set<string>();
@@ -152,17 +177,24 @@ export async function getFeed(
   );
 
   const feedPhotos: FeedPhoto[] = results.map((photo) => {
-    // photo_student_tags is a join artefact, not part of the API contract —
-    // strip it so it never reaches the client.
-    const rest = { ...photo } as Omit<TaggedRow, 'photo_student_tags'> &
-      Partial<Pick<TaggedRow, 'photo_student_tags'>>;
+    // photo_student_tags and uploader are join artefacts, not part of the API
+    // contract — strip them so they never reach the client. The uploader's name
+    // is re-exposed below in the shape the client actually consumes.
+    const rest = { ...photo } as Omit<TaggedRow, 'photo_student_tags' | 'uploader'> &
+      Partial<Pick<TaggedRow, 'photo_student_tags' | 'uploader'>> & { uploaded_by?: string };
     delete rest.photo_student_tags;
+    delete rest.uploader;
+    delete rest.uploaded_by;
     return {
       ...rest,
       url: signed.get(photo.s3_key) ?? '',
       thumbnailUrl: photo.thumbnail_s3_key
         ? (signed.get(photo.thumbnail_s3_key) ?? null)
         : null,
+      uploadedBy: {
+        id: photo.uploaded_by,
+        name: uploaderName(photo.uploader),
+      },
       taggedStudentIds: photoStudentMap.get(photo.id) ?? [],
     };
   });
@@ -209,7 +241,7 @@ export async function getPhotoDetails(photoId: string, userId: string) {
 
   const { data: photo, error } = await supabaseAdmin
     .from('photos')
-    .select('id, s3_key, thumbnail_s3_key, blurhash, width, height, status, created_at, uploaded_by, class_id, original_filename, mime_type, file_size_bytes')
+    .select('id, s3_key, thumbnail_s3_key, blurhash, width, height, status, created_at, uploaded_by, class_id, original_filename, mime_type, file_size_bytes, uploader:profiles!photos_uploaded_by_fkey(full_name)')
     .eq('id', photoId)
     .eq('status', 'ready')
     .single();
@@ -251,7 +283,10 @@ export async function getPhotoDetails(photoId: string, userId: string) {
     width: photo.width,
     height: photo.height,
     created_at: photo.created_at,
-    uploaded_by: photo.uploaded_by,
+    uploadedBy: {
+      id: photo.uploaded_by,
+      name: uploaderName((photo as { uploader?: EmbeddedUploader }).uploader),
+    },
     class_id: photo.class_id,
     original_filename: photo.original_filename,
     mime_type: photo.mime_type,

@@ -16,7 +16,8 @@ export interface FeedPhoto {
   createdAt: string;
   uploadedBy: {
     id: string;
-    name: string;
+    /** null when the uploader's profile no longer exists. */
+    name: string | null;
   };
   studentIds: string[];
 }
@@ -53,7 +54,7 @@ interface BackendFeedPhoto {
   width: number | null;
   height: number | null;
   created_at: string;
-  uploaded_by: string;
+  uploadedBy: { id: string; name: string | null };
   class_id: string;
   taggedStudentIds: string[];
 }
@@ -93,7 +94,7 @@ export async function getFeed(
     width: p.width,
     height: p.height,
     createdAt: p.created_at,
-    uploadedBy: { id: p.uploaded_by, name: '' },
+    uploadedBy: p.uploadedBy ?? { id: '', name: null },
     studentIds: p.taggedStudentIds ?? [],
   }));
 
@@ -118,7 +119,7 @@ interface BackendPhotoDetails {
   width: number | null;
   height: number | null;
   created_at: string;
-  uploaded_by: string;
+  uploadedBy: { id: string; name: string | null };
   class_id: string;
   original_filename: string | null;
   mime_type: string;
@@ -143,7 +144,7 @@ export async function getPhotoDetails(photoId: string): Promise<PhotoDetails> {
     width: p.width,
     height: p.height,
     createdAt: p.created_at,
-    uploadedBy: { id: p.uploaded_by, name: '' },
+    uploadedBy: p.uploadedBy ?? { id: '', name: null },
     studentIds: p.taggedStudentIds ?? [],
     originalFilename: p.original_filename,
     mimeType: p.mime_type,
