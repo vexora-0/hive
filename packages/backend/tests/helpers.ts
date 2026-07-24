@@ -1,6 +1,13 @@
 import { randomUUID } from 'crypto';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseTest, TEST_PASSWORD } from './setup';
+
+const PHOTOS_BUCKET = 'photos';
+
+/** A real 1.7 KB JPEG. Small enough to upload once per test photo. */
+const FIXTURE_JPEG = readFileSync(join(__dirname, 'fixtures', 'valid.jpg'));
 
 export interface TestUser {
   id: string;
@@ -10,6 +17,7 @@ export interface TestUser {
 }
 
 const createdUserIds: string[] = [];
+const uploadedObjectPaths: string[] = [];
 
 /**
  * Create an authenticated user and return a usable access token.
@@ -87,11 +95,15 @@ export async function linkParent(parentId: string, studentId: string): Promise<v
 }
 
 /**
- * Insert a photo row directly.
+ * Insert a photo row directly, and put a real object at its `s3_key`.
  *
  * Deliberately bypasses the upload endpoint — most tests care about visibility
- * and authorization, not image processing, and going through the real pipeline
- * would need Storage on every test.
+ * and authorization, not image processing. But the row alone is not a faithful
+ * stand-in: `confirmUpload` calls `fileExistsInStorage` and returns 404
+ * FILE_NOT_FOUND when the object is missing, so a row-only fixture made T-23
+ * fail for a reason that has nothing to do with what it tests. A photo row
+ * whose object does not exist is a state the product never produces, so the
+ * helper does not produce it either.
  *
  * `status` defaults to 'processing' so callers must opt in to 'ready', which
  * keeps the tag-before-ready ordering explicit in each test.
@@ -103,13 +115,24 @@ export async function createTestPhoto(opts: {
   status?: 'processing' | 'ready' | 'failed';
 }): Promise<string> {
   const id = randomUUID();
+  const s3Key = `photos/${opts.schoolId}/${opts.classId}/${id}.jpg`;
+  const thumbKey = `photos/${opts.schoolId}/${opts.classId}/${id}_thumb.jpg`;
+
+  for (const path of [s3Key, thumbKey]) {
+    const { error: uploadError } = await supabaseTest.storage
+      .from(PHOTOS_BUCKET)
+      .upload(path, FIXTURE_JPEG, { contentType: 'image/jpeg', upsert: true });
+    if (uploadError) throw new Error(`createTestPhoto storage: ${uploadError.message}`);
+    uploadedObjectPaths.push(path);
+  }
+
   const { error } = await supabaseTest.from('photos').insert({
     id,
     school_id: opts.schoolId,
     class_id: opts.classId,
     uploaded_by: opts.uploadedBy,
-    s3_key: `photos/${opts.schoolId}/${opts.classId}/${id}.jpg`,
-    thumbnail_s3_key: `photos/${opts.schoolId}/${opts.classId}/${id}_thumb.jpg`,
+    s3_key: s3Key,
+    thumbnail_s3_key: thumbKey,
     mime_type: 'image/jpeg',
     status: opts.status ?? 'processing',
   });
@@ -136,12 +159,23 @@ export async function setPhotoReady(photoId: string): Promise<void> {
   if (error) throw new Error(`setPhotoReady: ${error.message}`);
 }
 
-/** Remove every auth user this run created. Domain rows cascade. */
+/**
+ * Remove every artefact this run created — auth users and storage objects.
+ * Domain rows cascade from the users; storage does not, so it is removed here.
+ */
 export async function cleanupUsers(): Promise<void> {
   for (const id of createdUserIds) {
     await supabaseTest.auth.admin.deleteUser(id).catch(() => undefined);
   }
   createdUserIds.length = 0;
+
+  if (uploadedObjectPaths.length > 0) {
+    await supabaseTest.storage
+      .from(PHOTOS_BUCKET)
+      .remove(uploadedObjectPaths)
+      .catch(() => undefined);
+    uploadedObjectPaths.length = 0;
+  }
 }
 
 export const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
