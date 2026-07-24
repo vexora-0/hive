@@ -114,6 +114,15 @@ export default function UploadScreen() {
       selectionLimit: remaining,
       quality: 0.8,
       exif: false,
+      // Ask iOS for a compatible representation, which transcodes HEIC to JPEG
+      // on the device. Without it the picker hands back the original HEIC, and
+      // the server rejects it: sharp's prebuilt libvips ships libheif without
+      // an HEVC decoder, so an iPhone photo — the default format on iOS —
+      // fails with "No decoding plugin installed for this compression format".
+      // Proven against a real HEVC HEIC on 24 July 2026. iOS 14+; ignored
+      // elsewhere.
+      preferredAssetRepresentationMode:
+        ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
     });
 
     if (result.canceled || result.assets.length === 0) return;

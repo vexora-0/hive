@@ -60,13 +60,43 @@ export async function processAndUploadPhoto(
   }
 
   // 2. HEIC -> JPEG. iOS uploads HEIC by default and Android cannot display it.
-  const isHeic = format === 'heif';
+  //
+  //    Whether this works depends on the libvips build sharp is running against.
+  //    The prebuilt binaries ship libheif with the AV1 codec but NO HEVC codec,
+  //    and an iPhone HEIC is HEVC-coded. libheif parses the container — so
+  //    `metadata()` above succeeds and reports 'heif' — and only fails when the
+  //    pixels are actually decoded, here. Verified on 24 July 2026 against a real
+  //    HEVC HEIC: "No decoding plugin installed for this compression format".
+  //
+  //    So this branch converts AVIF, which shares the container, and rejects
+  //    the format it was written for. The device-side fix is in place
+  //    (`(teacher)/upload.tsx` asks the picker for a compatible representation,
+  //    so iOS transcodes before upload); this stays as the server-side backstop
+  //    for anything that arrives as HEVC anyway. To make it convert instead of
+  //    reject, the deployment needs a libvips built against libheif with
+  //    libde265 — see docs/plans/03-storage-and-media.md, "HEIC conversion does
+  //    not work".
+  const isHeif = format === 'heif';
   let finalPath = storagePath;
   let mimeType = declaredMimeType;
   let originalBuffer = buffer;
 
-  if (isHeic) {
-    originalBuffer = await sharp(buffer).jpeg({ quality: HEIC_JPEG_QUALITY }).toBuffer();
+  if (isHeif) {
+    try {
+      originalBuffer = await sharp(buffer).jpeg({ quality: HEIC_JPEG_QUALITY }).toBuffer();
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      logger.warn('HEIF decode failed — libvips has no codec for this variant', {
+        storagePath,
+        error: detail,
+      });
+      // Deliberately not the raw libvips text. A teacher needs to know what to
+      // do about it, and "bad seek to 80687" tells them nothing.
+      throw new Error(
+        'This photo is in a format the server cannot read (HEIC). ' +
+          'Please re-save it as JPEG and try again.',
+      );
+    }
     finalPath = storagePath.replace(/\.hei[cf]$/i, '.jpg');
     mimeType = 'image/jpeg';
   }
@@ -116,7 +146,7 @@ export async function processAndUploadPhoto(
     thumbnailPath,
     width,
     height,
-    converted: isHeic,
+    converted: isHeif,
   });
 
   return { storagePath: finalPath, thumbnailPath, mimeType, width, height, blurhash };
