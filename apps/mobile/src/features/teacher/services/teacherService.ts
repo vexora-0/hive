@@ -40,12 +40,23 @@ export async function requestUploadUrl(data: UploadUrlRequest): Promise<UploadUr
 /**
  * Upload photo file directly to the backend via multipart/form-data.
  * Replaces the old Supabase Storage upload + confirm steps.
+ *
+ * Uses `XMLHttpRequest` rather than `fetch` for one reason: `fetch` gives no
+ * upload progress. The bar used to jump 0.35 → 0.85 across the whole transfer,
+ * which is the only part that actually takes time — a teacher uploading twenty
+ * photos on school wifi watched a frozen bar and had no way to tell a slow
+ * upload from a stalled one. `xhr.upload.onprogress` reports bytes as they go
+ * out. (G-27)
+ *
+ * `onProgress` receives 0–1 for THIS file only; the caller maps it into
+ * whatever band it reserves for the transfer.
  */
 export async function uploadPhotoFile(
   photoId: string,
   localUri: string,
   contentType: string,
   filename: string,
+  onProgress?: (fraction: number) => void,
 ): Promise<void> {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
@@ -57,19 +68,50 @@ export async function uploadPhotoFile(
     name: filename,
   } as unknown as Blob);
 
-  const response = await fetch(`${API_URL}/api/v1/photos/${photoId}/file`, {
-    method: 'POST',
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: formData,
-  });
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_URL}/api/v1/photos/${photoId}/file`);
 
-  if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({}));
-    logger.error('Photo file upload failed', { status: response.status, errorBody, photoId });
-    throw new Error(errorBody.message ?? 'File upload failed');
-  }
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
+    // Content-Type is deliberately not set — the platform has to add the
+    // multipart boundary, and setting it by hand strips it.
+
+    if (onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && event.total > 0) {
+          onProgress(Math.min(1, event.loaded / event.total));
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress?.(1);
+        resolve();
+        return;
+      }
+      let message = 'File upload failed';
+      try {
+        message = JSON.parse(xhr.responseText)?.message ?? message;
+      } catch {
+        // Non-JSON body — a proxy error page, say. Keep the generic message.
+      }
+      logger.error('Photo file upload failed', { status: xhr.status, message, photoId });
+      reject(new Error(message));
+    };
+
+    // Covers connection failure and, separately, the user aborting. Neither
+    // reaches onload, so without these the promise would never settle.
+    xhr.onerror = () => {
+      logger.error('Photo file upload errored', { photoId });
+      reject(new Error('Network request failed'));
+    };
+    xhr.onabort = () => reject(new Error('Upload cancelled'));
+
+    xhr.send(formData);
+  });
 }
 
 /**

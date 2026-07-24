@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { retryWithBackoff } from '@/utils/retry';
 import { logger } from '@/utils/logger';
 import { MAX_UPLOAD_IMAGES } from '@/theme';
+import { useToast } from '@/components/feedback';
 import {
   requestUploadUrl,
   uploadPhotoFile,
@@ -94,6 +95,18 @@ const RETRY_OPTIONS = {
   maxDelayMs: 4000,
 };
 
+/**
+ * The slice of the progress bar the file transfer owns.
+ *
+ * 0 → 0.35 is the slot request, 0.85 → 1 is tag and confirm. Both are single
+ * short requests; the bytes are what take time, so they get half the bar.
+ */
+const TRANSFER_START = 0.35;
+const TRANSFER_BAND = 0.5;
+
+/** Smallest bar movement worth a re-render. */
+const PROGRESS_EPSILON = 0.02;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -119,6 +132,7 @@ function filenameFromUri(uri: string): string {
 export function useUpload(): UseUploadReturn {
   const [images, setImages] = useState<UploadImage[]>([]);
   const [showConfetti, setShowConfetti] = useState(false);
+  const toast = useToast();
 
   // Ref to track if upload is in progress (avoid stale closures)
   const isUploadingRef = useRef(false);
@@ -201,20 +215,44 @@ export function useUpload(): UseUploadReturn {
         updateImage(id, { photoId, s3Key, progress: 0.3 });
 
         // Step 3: Upload file to backend (saves + confirms in one step)
-        updateImage(id, { state: 'uploading', progress: 0.35 });
-        await retryWithBackoff(
-          () => uploadPhotoFile(photoId, uri, contentType, filename),
-          RETRY_OPTIONS,
-        );
-        updateImage(id, { state: 'saving', progress: 0.85 });
+        //
+        // The transfer owns TRANSFER_BAND of the bar. Everything either side of
+        // it is a single quick request, so this is the only stretch where a
+        // moving bar carries information.
+        updateImage(id, { state: 'uploading', progress: TRANSFER_START });
+        let lastReported = TRANSFER_START;
+        await retryWithBackoff(() => {
+          // A retried attempt re-sends the file from the start, so the bar
+          // rewinds with it rather than sitting at the failed attempt's mark.
+          lastReported = TRANSFER_START;
+          updateImage(id, { progress: TRANSFER_START });
+
+          return uploadPhotoFile(photoId, uri, contentType, filename, (fraction) => {
+            const next = TRANSFER_START + fraction * TRANSFER_BAND;
+            // A large file emits hundreds of progress events; re-rendering the
+            // whole grid for a sub-pixel move is wasted work.
+            if (next - lastReported < PROGRESS_EPSILON && fraction < 1) return;
+            lastReported = next;
+            updateImage(id, { progress: next });
+          });
+        }, RETRY_OPTIONS);
+        updateImage(id, { state: 'saving', progress: TRANSFER_START + TRANSFER_BAND });
 
         // Step 5: Tag students (skip if none selected)
         if (studentIds.length > 0) {
           updateImage(id, { state: 'tagging', progress: 0.88 });
-          await retryWithBackoff(
-            () => tagStudents(photoId, studentIds),
-            RETRY_OPTIONS,
-          );
+          try {
+            await retryWithBackoff(
+              () => tagStudents(photoId, studentIds),
+              RETRY_OPTIONS,
+            );
+          } catch (err) {
+            // Called out separately because the consequence is invisible: an
+            // untagged photo is one no parent will ever see, and the tile alone
+            // does not say which of the six pipeline steps failed.
+            toast.error('Could not tag students');
+            throw err;
+          }
         }
 
         // Step 6: Confirm — flips the photo to 'ready'.
@@ -241,7 +279,7 @@ export function useUpload(): UseUploadReturn {
         updateImage(id, { state: 'error', error: message });
       }
     },
-    [updateImage],
+    [updateImage, toast],
   );
 
   // ── Start upload for all idle images ────────────────────────────────
