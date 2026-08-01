@@ -10,6 +10,10 @@ export interface AuthUser {
 }
 
 declare global {
+  // Augmenting an existing global interface requires `namespace`; ES module
+  // syntax cannot reach `Express.Request`. This is the shape the Express types
+  // themselves are declared in, so the rule does not apply here.
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       user?: AuthUser;
