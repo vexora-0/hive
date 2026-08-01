@@ -8,24 +8,47 @@
 # are reviewed code and nothing more.
 #
 # Usage:
-#   BASE_URL=https://hive-backend.onrender.com \
-#   PARENT_A_TOKEN=... PARENT_B_TOKEN=... \
-#   TEACHER_X_TOKEN=... TEACHER_Y_TOKEN=... \
-#   PHOTO_OF_B=<uuid> SCHOOL_Y=<uuid> CLASS_AT_Y=<uuid> PHOTO_OF_Y=<uuid> \
+#   eval "$(pnpm --filter @hive/backend --silent verify:env)"
 #   ./scripts/verify-security.sh
 #
-# Getting the tokens: sign in as each account in the app and copy the bearer
-# token from the network log, or use supabase.auth.signInWithPassword from a
-# node one-liner. The two parents must have children at different schools, and
-# the two teachers must be at different schools — otherwise every check passes
-# vacuously.
+# `verify:env` signs in as the seeded demo accounts and prints every variable
+# below as an export line. Doing it by hand instead means setting:
 #
-# Exit code is the number of failed checks, so CI can gate on it.
+#   BASE_URL             default http://localhost:4000
+#   PARENT_A_TOKEN       a parent with children at school X
+#   PARENT_A_CHILD_IDS   comma-separated student UUIDs belonging to parent A
+#   PHOTO_OF_A           a photo tagging one of parent A's children
+#   PHOTO_OF_B           a photo tagging ONLY another family's child
+#   TEACHER_X_TOKEN      a teacher at school X
+#   TEACHER_X2_TOKEN     a SECOND teacher at school X — same school as X
+#   PHOTO_OF_X2          a photo uploaded by teacher X2
+#   SCHOOL_X             teacher X's own school
+#   SCHOOL_Y             a different school
+#   CLASS_AT_Y           a class belonging to school Y
+#   PHOTO_OF_Y           a photo uploaded at school Y
+#   ADMIN_TOKEN          an admin, to prove the guards do not over-refuse
+#   REAL_S3_KEY          an existing photos.s3_key value
+#   FORCE_500_PATH       optional; a route that reliably 500s
+#   RUN_RATE_LIMIT_CHECK optional; 1 to run §9
+#   STRICT               optional; 1 to count skips as failures
+#
+# The two teachers must be at the SAME school. G-17 is about one teacher
+# mutating another's photo; with teachers at different schools the school check
+# refuses first and the ownership check never runs, so the section passes
+# without testing what it names. Cross-school refusal is §4's job, not §5's.
+#
+# Exit code is the number of failed checks, so CI can gate on it. Skips are not
+# failures by default — set STRICT=1 to make them count, which is what CI wants.
+#
+# Note on the rate limiter: a full run is ~25 requests against a 100 per 15
+# minutes global limit. Two runs inside one window will start returning 429s.
+# The script names them when it sees them rather than reporting a broken guard.
 
 set -uo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:4000}"
 API="$BASE_URL/api/v1"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 PASS=0
 FAIL=0
@@ -46,6 +69,14 @@ check() {
   if [ "$actual" = "$expected" ]; then
     green "  PASS  $name (got $actual)"
     PASS=$((PASS + 1))
+  elif [ "$actual" = "429" ]; then
+    # Not an authorization result. The global limiter allows 100 requests per
+    # 15 minutes and sits in front of every route, so a re-run inside that
+    # window turns the whole script red for a reason that has nothing to do
+    # with what it tests.
+    red "  FAIL  $name — got 429, the rate limiter. Wait out the 15 minute"
+    red "        window or restart the backend, then re-run. Not a real result."
+    FAIL=$((FAIL + 1))
   else
     red   "  FAIL  $name — expected $expected, got $actual"
     FAIL=$((FAIL + 1))
@@ -74,6 +105,14 @@ echo "1. Reachability"
 # ---------------------------------------------------------------------------
 
 check "/health responds 200" 200 "$BASE_URL/health"
+
+# Later sections read response headers and bodies. A dead server returns
+# neither, and "no Access-Control-Allow-Origin header" is indistinguishable
+# from "correctly configured CORS" — so an unreachable target used to report a
+# PASS. Record reachability once and let those checks skip instead.
+health_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$BASE_URL/health")"
+REACHABLE=0
+[ "$health_code" != "000" ] && REACHABLE=1
 
 # ---------------------------------------------------------------------------
 echo
@@ -111,11 +150,33 @@ if require PARENT_A_TOKEN PHOTO_OF_A; then
   check "parent A reading their own child's photo → 200" 200 \
     -H "Authorization: Bearer $PARENT_A_TOKEN" "$API/feed/photos/$PHOTO_OF_A"
 
-  echo "     taggedStudentIds must contain only parent A's own children:"
-  curl -s --max-time 20 -H "Authorization: Bearer $PARENT_A_TOKEN" \
-    "$API/feed/photos/$PHOTO_OF_A" \
-    | sed -n 's/.*"taggedStudentIds":\(\[[^]]*\]\).*/       \1/p'
-  echo "     (compare against parent A's children — a foreign ID here is G-04b)"
+  # G-04b. This used to print taggedStudentIds through sed and ask the reader
+  # to eyeball it, which asserts nothing and passes silently when nobody looks.
+  if ! command -v jq >/dev/null 2>&1; then
+    skip "G-04b tag filtering" "jq is not installed"
+  elif ! require PARENT_A_CHILD_IDS; then
+    skip "G-04b tag filtering" "set PARENT_A_CHILD_IDS to parent A's student UUIDs"
+  else
+    tagged="$(curl -s --max-time 20 -H "Authorization: Bearer $PARENT_A_TOKEN" \
+      "$API/feed/photos/$PHOTO_OF_A" | jq -r '.data.taggedStudentIds[]? // empty')"
+    foreign=""
+    for id in $tagged; do
+      case ",$PARENT_A_CHILD_IDS," in
+        *",$id,"*) ;;
+        *) foreign="$foreign $id" ;;
+      esac
+    done
+    if [ -z "$tagged" ]; then
+      red "  FAIL  G-04b — no taggedStudentIds returned; the check cannot run"
+      FAIL=$((FAIL + 1))
+    elif [ -n "$foreign" ]; then
+      red "  FAIL  G-04b — response leaked another family's student IDs:$foreign"
+      FAIL=$((FAIL + 1))
+    else
+      green "  PASS  G-04b — taggedStudentIds contains only parent A's own children"
+      PASS=$((PASS + 1))
+    fi
+  fi
 else
   skip "parent A → own photo, and tag filtering" "set PARENT_A_TOKEN and PHOTO_OF_A"
 fi
@@ -161,27 +222,48 @@ fi
 echo
 echo "5. G-17 — photo mutation ownership"
 # ---------------------------------------------------------------------------
+# assertPhotoAccess requires uploaded_by == caller AND school_id == caller's
+# school. Probing it with a teacher from another school satisfies neither, so
+# the refusal proves only the school half — which §4 already covers. The
+# uploader half is only exercised by two teachers at the SAME school, and that
+# is the case IMPLEMENTATION-STATUS.md records as never verified.
 
-if require TEACHER_X_TOKEN PHOTO_OF_Y; then
-  check "teacher X confirming teacher Y's photo → 403" 403 \
-    -X POST -H "Authorization: Bearer $TEACHER_X_TOKEN" "$API/photos/$PHOTO_OF_Y/confirm"
-  check "teacher X tagging on teacher Y's photo → 403" 403 \
+FIXTURE="$REPO_ROOT/packages/backend/tests/fixtures/valid.jpg"
+
+if require TEACHER_X_TOKEN PHOTO_OF_X2; then
+  check "teacher X confirming a colleague's photo, same school → 403" 403 \
+    -X POST -H "Authorization: Bearer $TEACHER_X_TOKEN" "$API/photos/$PHOTO_OF_X2/confirm"
+  check "teacher X tagging a colleague's photo, same school → 403" 403 \
     -X POST -H "Authorization: Bearer $TEACHER_X_TOKEN" \
     -H 'Content-Type: application/json' \
     -d '{"studentIds":["00000000-0000-0000-0000-000000000000"]}' \
-    "$API/photos/$PHOTO_OF_Y/tag"
+    "$API/photos/$PHOTO_OF_X2/tag"
 
-  if [ -f packages/backend/tests/fixtures/valid.jpg ]; then
-    check "teacher X uploading a file to teacher Y's photo → 403" 403 \
+  if [ -f "$FIXTURE" ]; then
+    check "teacher X overwriting a colleague's photo file, same school → 403" 403 \
       -X POST -H "Authorization: Bearer $TEACHER_X_TOKEN" \
-      -F "file=@packages/backend/tests/fixtures/valid.jpg" \
-      "$API/photos/$PHOTO_OF_Y/file"
+      -F "file=@$FIXTURE" "$API/photos/$PHOTO_OF_X2/file"
   else
-    skip "teacher X → file upload on Y's photo" "fixture valid.jpg not found"
+    skip "teacher X → file upload on a colleague's photo" "fixture not found at $FIXTURE"
   fi
 else
-  skip "photo mutation ownership" "set TEACHER_X_TOKEN and PHOTO_OF_Y"
+  skip "photo mutation ownership (the G-17 check)" \
+       "set TEACHER_X_TOKEN and PHOTO_OF_X2 — X2 must be a teacher at the SAME school"
 fi
+
+# The cross-school variant. Weaker, because the school check refuses before
+# ownership is consulted, but it is still a regression guard worth keeping.
+if require TEACHER_X_TOKEN PHOTO_OF_Y; then
+  check "teacher X confirming another school's photo → 403" 403 \
+    -X POST -H "Authorization: Bearer $TEACHER_X_TOKEN" "$API/photos/$PHOTO_OF_Y/confirm"
+else
+  skip "teacher X → another school's photo" "set TEACHER_X_TOKEN and PHOTO_OF_Y"
+fi
+
+# The matching over-refusal check — that the owner CAN still act — is not here
+# on purpose. All three routes mutate, and this script runs against the demo
+# database. tests/authorization.test.ts covers the positive case against the
+# throwaway test project, where writing is free.
 
 # ---------------------------------------------------------------------------
 echo
@@ -206,8 +288,15 @@ echo "7. Error handling — NODE_ENV=production"
 # ---------------------------------------------------------------------------
 
 echo "     A triggered 500 must say 'Internal server error' and carry no stack."
+echo "     Only meaningful against NODE_ENV=production — in any other mode the"
+echo "     error handler returns internal messages by design."
 if require FORCE_500_PATH; then
-  body="$(curl -s --max-time 20 "$BASE_URL$FORCE_500_PATH")"
+  # Sent authenticated when a token is available. Every /api/v1/* route sits
+  # behind `authenticate`, so an anonymous probe can only ever be a 401 and
+  # this section would report on the wrong response.
+  body="$(curl -s --max-time 20 \
+    ${ADMIN_TOKEN:+-H "Authorization: Bearer $ADMIN_TOKEN"} \
+    "$BASE_URL$FORCE_500_PATH")"
   if echo "$body" | grep -qi 'internal server error'; then
     green "  PASS  500 response is generic"; PASS=$((PASS + 1))
   else
@@ -227,15 +316,25 @@ echo
 echo "8. Transport and CORS"
 # ---------------------------------------------------------------------------
 
+# A local backend is plain HTTP by design, so failing on it made every local
+# run red regardless of what the authorization checks found — and the local run
+# is the only one possible until something is deployed. Loopback is a skip;
+# anything else on the network is still a failure.
 case "$BASE_URL" in
-  https://*) green "  PASS  base URL is HTTPS"; PASS=$((PASS + 1)) ;;
-  *)         red   "  FAIL  base URL is not HTTPS — $BASE_URL"; FAIL=$((FAIL + 1)) ;;
+  https://*)
+    green "  PASS  base URL is HTTPS"; PASS=$((PASS + 1)) ;;
+  http://localhost*|http://127.0.0.1*|http://[::1]*)
+    skip "transport is HTTPS" "target is loopback — re-run against the deployed URL" ;;
+  *)
+    red "  FAIL  base URL is not HTTPS and not loopback — $BASE_URL"; FAIL=$((FAIL + 1)) ;;
 esac
 
 acao="$(curl -s -I --max-time 20 -H 'Origin: https://evil.example' "$BASE_URL/health" \
   | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2}')"
 
-if [ "$acao" = "*" ]; then
+if [ "$REACHABLE" != "1" ]; then
+  skip "CORS origin handling" "target is unreachable — an absent header proves nothing"
+elif [ "$acao" = "*" ]; then
   red "  FAIL  Access-Control-Allow-Origin is '*' — set CORS_ORIGINS explicitly (G-S10)"
   FAIL=$((FAIL + 1))
 elif [ "$acao" = "https://evil.example" ]; then
@@ -312,6 +411,15 @@ if [ "$SKIP" -gt 0 ]; then
   echo
   grey "Skipped checks are NOT passes. A run with skips does not verify"
   grey "docs/security.md §4 — supply the missing variables and re-run."
+fi
+
+# The header promises CI can gate on the exit code, but a run with every
+# variable unset skips all fifteen checks and exits 0 — a green build that
+# tested nothing. STRICT=1 makes skips count, which is what a gate needs.
+if [ "${STRICT:-0}" = "1" ] && [ "$SKIP" -gt 0 ]; then
+  echo
+  red "STRICT=1 — counting $SKIP skipped check(s) as failures."
+  FAIL=$((FAIL + SKIP))
 fi
 
 echo
