@@ -24,8 +24,17 @@ export interface CreateOrderResponse {
   items: Tables<'order_items'>[];
 }
 
+export interface OrderItemWithThumbnail extends Tables<'order_items'> {
+  /**
+   * Signed thumbnail URL, added by `GET /orders/:id`. The photos bucket is
+   * private, so this is the only way to render the image. Absent on the list
+   * endpoint and null when the photo has no object behind it.
+   */
+  thumbnailUrl?: string | null;
+}
+
 export interface OrderWithItems extends Tables<'orders'> {
-  items: Tables<'order_items'>[];
+  items: OrderItemWithThumbnail[];
 }
 
 export interface PaginatedOrdersResponse {

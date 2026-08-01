@@ -185,11 +185,21 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
         </Text>
         {order.items.map((item) => (
           <View key={item.id} style={styles.itemRow}>
-            <View style={styles.itemImagePlaceholder}>
-              <Text variant="caption" color={colors.text.tertiary} center>
-                Photo
-              </Text>
-            </View>
+            {item.thumbnailUrl ? (
+              <HiveImage
+                uri={item.thumbnailUrl}
+                style={styles.itemImage}
+                contentFit="cover"
+              />
+            ) : (
+              // No signed URL — the photo record or its stored object is
+              // missing. Keep the slot so the row does not reflow.
+              <View style={styles.itemImagePlaceholder}>
+                <Text variant="caption" color={colors.text.tertiary} center>
+                  Photo
+                </Text>
+              </View>
+            )}
             <View style={styles.itemDetails}>
               <Text variant="bodySmallBold">
                 {getProductLabel(item.product_type)}
@@ -424,6 +434,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
+  },
+  itemImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
   },
   itemImagePlaceholder: {
     width: 56,

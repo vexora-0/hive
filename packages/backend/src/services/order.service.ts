@@ -4,6 +4,7 @@ import { logger } from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
 import { createNotification } from './notification.service';
 import { PRODUCT_PRICES_CENTS } from '../constants/products';
+import { getSignedPhotoUrls } from '../utils/supabaseStorage';
 import type { CreateOrderInput } from '../validators/order.validator';
 
 
@@ -15,6 +16,11 @@ interface OrderItem {
   product_type: string;
   quantity: number;
   unit_price_cents: number;
+  /**
+   * Signed URL for the item's photo thumbnail. Only populated by
+   * `getOrderById`; null when the photo or its object is missing.
+   */
+  thumbnailUrl?: string | null;
 }
 
 interface Order {
@@ -224,7 +230,57 @@ export async function getOrderById(
     .select('id, order_id, photo_id, product_type, quantity, unit_price_cents')
     .eq('order_id', orderId);
 
-  return { ...order, items: items ?? [] } as Order;
+  return {
+    ...order,
+    items: await withThumbnailUrls(items ?? []),
+  } as Order;
+}
+
+/**
+ * Attach a signed thumbnail URL to each order item.
+ *
+ * An order item stores only `photo_id`, so the client had nothing to render and
+ * showed a grey placeholder. The bucket is private (migration `00020`), so a
+ * path is not enough — the URL has to be signed server-side.
+ *
+ * Falls back to the full-resolution object when a photo has no thumbnail yet,
+ * matching the feed: a missing thumbnail should degrade to the original rather
+ * than to an empty box. `thumbnailUrl` is camelCase to match the same field on
+ * the feed and photo endpoints, which is where the client already reads signed
+ * URLs from.
+ */
+async function withThumbnailUrls(items: OrderItem[]): Promise<OrderItem[]> {
+  if (items.length === 0) return items;
+
+  const photoIds = [...new Set(items.map((item) => item.photo_id))];
+
+  const { data: photos, error } = await supabaseAdmin
+    .from('photos')
+    .select('id, s3_key, thumbnail_s3_key')
+    .in('id', photoIds);
+
+  if (error) {
+    // A thumbnail is not worth failing the order for — the caller still gets
+    // the product, quantity and price, which is what the screen is about.
+    logger.error('Failed to load order item photos', { error: error.message });
+    return items.map((item) => ({ ...item, thumbnailUrl: null }));
+  }
+
+  const pathByPhotoId = new Map<string, string>();
+  for (const photo of photos ?? []) {
+    const path = photo.thumbnail_s3_key ?? photo.s3_key;
+    if (path) pathByPhotoId.set(photo.id, path);
+  }
+
+  const signed = await getSignedPhotoUrls([...pathByPhotoId.values()]);
+
+  return items.map((item) => {
+    const path = pathByPhotoId.get(item.photo_id);
+    return {
+      ...item,
+      thumbnailUrl: path ? (signed.get(path) ?? null) : null,
+    };
+  });
 }
 
 async function notifyAdminsOfNewOrder(
