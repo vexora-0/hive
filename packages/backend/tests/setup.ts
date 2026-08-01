@@ -37,19 +37,27 @@ if (devUrl && devUrl === TEST_URL) {
  *
  * The check above only fires when DEV_SUPABASE_URL happens to be set, so it is
  * silent on a machine that never configured it — which is exactly the machine
- * most likely to get this wrong. The demo project ref is committed at
- * `supabase/README_MIGRATIONS.md:20`, so it can be named outright.
+ * most likely to get this wrong.
  *
  * Hard-coded on purpose: a guard that reads the value it is guarding against
  * from configuration guards nothing.
+ *
+ * `udawaiykfvdcvcouiqxr` is the project this guard exists for — it holds the
+ * demo dataset. It was missing until now: the list named only the dead Phase 1
+ * project, so the guard could not fire against the one database it was written
+ * to protect. Add a ref here whenever a project starts holding data worth
+ * keeping.
  */
-const FORBIDDEN_PROJECT_REFS = ['fhvwsmtivwtmbdscdoyz'];
+const FORBIDDEN_PROJECT_REFS = [
+  'udawaiykfvdcvcouiqxr', // hive-dev — holds the demo dataset
+  'fhvwsmtivwtmbdscdoyz', // Phase 1 project, dead, still named in README_MIGRATIONS.md:20
+];
 
 for (const ref of FORBIDDEN_PROJECT_REFS) {
   if (TEST_URL.includes(ref)) {
     throw new Error(
       `REFUSING TO RUN.\n\n` +
-        `SUPABASE_URL points at project "${ref}", which is the demo project.\n` +
+        `SUPABASE_URL points at project "${ref}", which is not a test project.\n` +
         `This suite truncates every domain table and deletes auth users. ` +
         `Running it here would wipe the demo data.\n\n` +
         `Point .env.test at a separate Supabase project.`,
