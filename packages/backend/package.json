@@ -12,10 +12,9 @@
     "test:watch": "vitest",
     "clean": "rm -rf dist",
     "seed:admin": "tsx src/scripts/seedAdmin.ts",
-    "test": "vitest run",
-    "test:watch": "vitest",
     "seed:demo": "tsx src/scripts/seedDemo.ts",
-    "seed:demo:reset": "tsx src/scripts/seedDemo.ts --reset"
+    "seed:demo:reset": "tsx src/scripts/seedDemo.ts --reset",
+    "verify:env": "tsx src/scripts/printVerifyEnv.ts"
   },
   "dependencies": {
     "@sentry/node": "^10.69.0",
