@@ -48,32 +48,39 @@ Match it against the table. **This determines what you work on.** If the email d
 exists, what runs and what has been proven. Two status tables drifting apart is
 worse than one, so this file no longer restates it.
 
-### Status — 23 July
+### Status — 1 August
 
-The environment works end to end. `hive-dev` (`udawaiykfvdcvcouiqxr`) runs the
-app; `hive-test` (`sdbiuzuyipneioceqysm`) runs the suite. 19 migrations on both.
-Demo data seeded with photos. **58 of 59 tests pass.** **CI runs on every push
-and is green.** G-01, G-02, G-07, G-08 and the parent privacy boundary are all
-confirmed at runtime — see `docs/IMPLEMENTATION-STATUS.md` §4, and §5 for what
-is still unproven.
+The environment works end to end. 19 migrations apply cleanly; demo data seeds
+with photos, tags, notifications and orders. **79 of 79 tests pass.** **CI runs
+on every push and the lint step is now blocking.** G-01, G-02, G-04, G-05,
+G-07, G-08, G-17 and the parent privacy boundary are all confirmed at
+runtime — see `docs/IMPLEMENTATION-STATUS.md` §4, and §5 for what is still
+unproven.
+
+`scripts/verify-security.sh` has now been run — **26 passed, 0 failed, 3
+skipped** — which was the highest-value outstanding item. `docs/security.md` §9
+records it, including the three skips and why they are not interchangeable.
+
+**Env files are per-machine and gitignored.** On a fresh clone none exists and
+nothing runs; create them from the `.env.example` templates first.
 
 ### What is left
 
-Nothing is blocked on infrastructure any more. What remains is ordinary work:
-
-1. **T-23 is red** — Ruthwik, Plan 08. A defect in the test rather than the
-   product; `createTestPhoto` never puts an object in storage, so `/confirm`
-   404s. It is the only automated guard on G-07, so it is worth fixing properly
-   rather than relaxing.
-2. **G-27 upload progress** — Ruthwik, Plan 07 Step 5. Still a hardcoded ladder
-   rather than bytes transferred. The plan marks it optional.
-3. **Nothing is deployed** — no hosted URL, no APK. Bhargav, Plan 09 Step 6.
-4. **One inherited backend lint error** (`middleware/auth.ts`, `no-namespace`)
-   is the last thing keeping the CI lint step advisory rather than blocking.
+1. **Nothing is deployed** — no hosted URL, no APK. Bhargav, Plan 09 Step 6.
+   This is now the blocker on three verification items: the HTTPS and CORS
+   checks, and the k6 suite.
+2. **CI never runs `pnpm test`.** Lint, typecheck and build only — so 79
+   passing tests guard nothing on a pull request. Needs `hive-test` credentials
+   as repository secrets.
+3. **Nothing has been seen on a device.** Bundling proves imports resolve, not
+   that screens render. Plan 04's mobile deep-link checks are still unticked.
+4. **G-27 upload progress** — Ruthwik, Plan 07 Step 5. The plan marks it
+   optional.
+5. **Sentry has never received an error**, and **G-45 custom SMTP** is unowned.
+   Both are account signups rather than code changes.
 
 Follow `docs/environment-setup.md`; §7 is the verification checklist and asks
-for failures to be reported, not ticks. Its boot and storage items are now
-ticked with what was actually observed.
+for failures to be reported, not ticks.
 
 > This block goes stale faster than anything else in the repo — it has twice
 > described work as blocked weeks after it shipped. If you are about to rely on

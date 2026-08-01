@@ -119,13 +119,13 @@ A real server-side fix means building `sharp` from source against libheif with
 ## 5. Not verified
 
 - **Nothing is deployed.** No Render service, no public URL.
-- **Tests have never run.** The harness and ~19 backend tests exist but need a
-  separate `hive-test` Supabase project — the suite truncates every table, so
-  pointing it at the demo project wipes the data. T-23 was reported failing;
-  the cause was the fixture, not the product — `createTestPhoto` wrote a row
-  with no object behind it, and `/confirm` checks storage. The helper now
-  uploads one. The mechanism is proven live (404 without, 200 with); **the test
-  itself still has not been executed.**
+- ~~**Tests have never run.**~~ **They do — 79 of 79 pass**, including 20 new
+  authorization tests and T-23, whose fixture defect is fixed. The suite has
+  also been shown to *detect*: deleting the G-17 uploader check turns exactly
+  three tests red. Still true is that **CI does not run them** — `ci.yml` has no
+  test step. The suite truncates every table, so `.env.test` must name a
+  throwaway project; the guard in `tests/setup.ts` now lists the real demo
+  project ref, which it did not before.
 - **The upload progress bar has not been watched on a device.** The transfer now
   reports real bytes through `XMLHttpRequest`, verified by reading the code path,
   not by looking at a phone.
@@ -176,7 +176,8 @@ comparison that is always true, or a client that queues forever.
 | Drive the app by hand | all | §7 checklist in `docs/environment-setup.md` |
 | Order, admin and mobile tests | Srujan, Nagachaitanya | Harness exists; feed and photo tests written |
 | Custom SMTP | Bhargav | Default Supabase SMTP is rate-limited; OTP unreliable for a live demo |
-| One lint error | Nagachaitanya | `no-namespace` in `middleware/auth.ts` — the only thing keeping CI red |
+| ~~One lint error~~ | — | **Done** — fixed in `40a69fc`. `pnpm lint` is 0 errors in both packages and the CI step is now blocking. |
+| Add a test step to CI | Bhargav | `ci.yml` runs lint, typecheck and build but never `pnpm test`. Needs the `hive-test` credentials as repository secrets. |
 | Decide on server-side HEIC | Bhargav | Build `sharp` from source against libheif + libde265, or accept the device-side transcode as the answer. Adds build time and HEVC licensing to the deploy — a call, not a task. |
 | Order item thumbnails (8b) | Ruthwik | Order items carry only `photoId`; the order API returns no signed URL per item |
 

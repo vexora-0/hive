@@ -130,17 +130,29 @@ file, so it must never be generated for a caller who is about to be refused.
 | **Feed deduplication** | No duplicate photo IDs in a parent's feed |
 | **`pnpm test`** | **Ran for the first time** against the new `hive-test` project. **58 of 59 pass**, 1 fails. The suite executes end to end: harness, truncation, user creation, HTTP requests through Supertest |
 | **Test-database guard, armed** | `DEV_SUPABASE_URL` is now set, so guard 1 in `tests/setup.ts` actually compares. It previously did nothing |
+| **`verify-security.sh`, in full** | **Ran for the first time, 1 Aug.** 26 passed, 0 failed, 3 skipped, against a backend booted `NODE_ENV=production`. Covers G-02, G-04, G-04b, G-05, G-08 and G-17 over HTTP with real tokens. Full record and the three skips in `docs/security.md` §9 |
+| **G-17 upload ownership** | **Confirmed fixed — first time.** A teacher at the same school as the uploader gets **403** on `/confirm`, `/tag` and `/file`. Previously untestable: every probe used teachers at *different* schools, where the school check refuses first and the ownership check never runs |
+| **Plan 08 sabotage exercise** | **Done, and it found something.** With `photo.uploaded_by === user.id` deleted from `assertPhotoAccess`, exactly the 3 new same-school G-17 tests failed. `photos.test.ts`'s similarly-named test stayed **green** — its teachers are at different schools, so it never guarded G-17 at all |
+| **`pnpm test` with the new file** | **79 passed, 0 failed**, 5 files. T-23 now passes; the fixture fix landed in `2928b76` |
+| **`/health` with the database unreachable** | **503**, `"status":"degraded"`, `"checks":{"database":"error"}`. Supabase was stopped mid-run. Previously listed as untested |
+| **Rate limiter** | **429 at request 77** of the 100-per-15-minute window — the window was already partly consumed by the verification run, which is the interference the script now names explicitly |
 | **G-01 order placement** | **Confirmed fixed.** A parent placed a real order end to end: `POST /api/v1/orders` → 201 with `total_cents: 998` for 2 × `print_4x6` at 499. Integer cents, no float. Sending the same `x-idempotency-key` twice returned the **same order** rather than duplicating. Test orders removed afterwards; demo data is back to 0 orders |
 
 ---
 
 ## 5. What was NOT verified
 
-**Updated 1 Aug — an environment now exists.** `packages/backend/.env` and
-`apps/mobile/.env` are filled against Supabase project `hive`
-(`udawaiykfvdcvcouiqxr`), all 19 migrations are applied, and the backend boots
-and answers `/health` with `"database": "ok"`. What that made verifiable is in
-§4; what follows is what is still unproven.
+**Updated 1 Aug — an environment now exists.** All 19 migrations are applied and
+the backend boots and answers `/health` with `"database": "ok"`. What that made
+verifiable is in §4; what follows is what is still unproven.
+
+> **Env files are per-machine.** This section used to state that
+> `packages/backend/.env` and `apps/mobile/.env` "are filled". They are
+> gitignored, so that is a fact about one laptop, not about the repository — on
+> a fresh clone neither exists and nothing runs. Anyone picking this up creates
+> them from the `.env.example` templates first. `SUPABASE_ANON_KEY` was missing
+> from the backend template until 1 Aug, which is why minting a token for
+> `verify-security.sh` was not possible.
 
 **Demo data now exists, photos included** (`seed:demo:reset`, 1 Aug): 2 schools,
 4 classes, 9 students, 8 profiles, **6 photos with thumbnails, 9 tags,
@@ -161,13 +173,19 @@ guard does nothing unless the variable exists.
   a `.heic` input or a `.txt` renamed to `.jpg`.
 - ~~No order has been placed.~~ **Done** — see §4. A parent placed a real order
   with correct integer cents and working idempotency.
-- **G-17 upload-ownership checks are unverified** — they need two teachers at the
-  same school driving the upload endpoints, which the seed does not do.
-- **Plan 08's sabotage exercise has not been done** — revert a fix, confirm the
-  matching test fails. The suite now runs (§4), but it has still not been shown
-  to *detect* anything.
+- ~~**G-17 upload-ownership checks are unverified.**~~ **Done** — see §4. The
+  seed does provide the pair (Sarita and Dinesh are both at Bloom); nothing was
+  using it.
+- ~~**Plan 08's sabotage exercise has not been done.**~~ **Done** — see §4.
+- ~~**`verify-security.sh` has never run against a real instance.**~~ **Done** —
+  26 passed, 0 failed, 3 skipped.
 - **No error has reached Sentry.** `initSentry()` has only taken its no-op path.
-- **`verify-security.sh` has never run against a real instance.**
+  Needs a DSN; it is an account signup, not a code change.
+- **Nothing has been verified against a *deployed* instance.** The run above was
+  against a local Supabase stack — Postgres, GoTrue, Storage and all 19
+  migrations, driven through the real Express app. That proves the authorization
+  logic. It is not evidence about how `hive-dev` or any hosted project is
+  configured, and the HTTPS and CORS checks still skip for want of a hosted URL.
 - **Nothing has been seen on a device.**
 - **Nothing is deployed** — no hosted URL, no APK. CI itself *does* run: 43
   workflow runs on 1 Aug, 26 green, each building the Docker image. What has
@@ -186,7 +204,7 @@ guard does nothing unless the variable exists.
 | **Plan 10 / 11 (Bhargav's share)** | — | **Done.** README rewritten against the real stack — it described a Flutter app. Added `user-flows.md` (diagram G-6), `docs/README.md` index and `demo-script.md`. Remaining on this side is deployment only: Render, the EAS APK and the demo video. |
 | **8a, 8b** | Ruthwik / Srujan | Plan 07 polish needing API changes: the feed does not return the uploader's name, and order items carry only `photoId` so no thumbnail can be rendered. Both need an endpoint to return more, not UI work. |
 | **G-45** | unowned | Plan 01 Step 8 — custom SMTP. Supabase's default is rate-limited to a few emails an hour, so **OTP delivery will fail mid-demo**. Dashboard task, no code fix. Lower priority now that teacher/parent can sign in with a password. |
-| **T-23 fails** | Ruthwik · Plan 08 | `photos.test.ts > notifies tagged children's parents` expects 200 from `/confirm`, gets **404**. **A defect in the test, not the product** — `createTestPhoto` writes only a database row ("deliberately bypasses the upload endpoint"), but `confirmUpload` calls `fileExistsInStorage` and 404s with `FILE_NOT_FOUND` when the object is absent. The seed path produces notifications correctly, so G-07 itself is fine. Fix: have the helper put a small object at `photo.s3_key` before confirming. **The suite calls this "the most valuable test in the suite"** — it is the only automated guard on G-07, so leaving it red or weakening the assertion loses that cover. |
+| ~~**T-23 fails**~~ | Ruthwik · Plan 08 | **Closed and confirmed green.** It was a defect in the test, not the product: `createTestPhoto` wrote a row with no object behind it, and `confirmUpload` calls `fileExistsInStorage` and 404s when the object is absent. `2928b76` made the helper upload a real fixture. `photos.test.ts > notifies tagged children's parents` — the only automated guard on G-07 — now passes, as part of 79 of 79. |
 | **S-15** | Plan 11 | Supabase project ref committed; keys not rotated. |
 | — | Bhargav | ~~Create the first `.env`.~~ **Done 1 Aug** — dev environment runs, 19 migrations applied. |
 | — | Bhargav | ~~Create the `hive-test` Supabase project.~~ **Done** — `sdbiuzuyipneioceqysm`, 19 migrations applied, suite runs. |
@@ -201,7 +219,7 @@ guard does nothing unless the variable exists.
 | **CP-1** | App compiles · no "Coming Soon" · no credentials in repo | ✔ **Met.** |
 | **CP-2** | Order placeable · private storage with thumbnails · role guards · IDORs closed | ✔ **Met.** All four verified at runtime — order placed with correct cents and working idempotency, photos private with thumbnails and signed URLs, role guards returning 403, cross-school IDOR closed. |
 | **CP-3** | Demo seed on a fresh DB · test harness runs | ✔ **Met.** Seed loads schools, classes, students, parents, 6 photos with thumbnails and 16 notifications. Harness runs against a separate project. |
-| **CP-4** | 36 tests green · CI on every PR | ◐ **58 of 59 green** — target exceeded on count. One failure (T-23, a test defect). CI runs green on every push, and mobile typecheck is now a blocking step. |
+| **CP-4** | 36 tests green · CI on every PR | ✔ **Met. 79 of 79 green**, including 20 new authorization tests. T-23 is fixed. The suite has also been shown to *detect* — see the sabotage exercise in §4. CI runs on every push and the lint step is now blocking. **Caveat: CI does not run the suite** — there is no test step in `ci.yml`. |
 | **CP-5** | Deployed and reachable · Sentry receiving · docs complete | ✗ Nothing deployed. |
 | **CP-6** | Manual QA green · demo rehearsed · submission pack | ✗ |
 
@@ -209,23 +227,22 @@ guard does nothing unless the variable exists.
 
 ## 8. What to do next
 
-*Rewritten 23 July — items 1, 2, 3 and 6 of the previous list were all done and
-still listed as outstanding.*
+*Rewritten 1 Aug. Items 1, 2, 3 and 5 of the previous list are all done — as
+were items 1, 2, 3 and 6 of the list before that, on 23 July. This section goes
+stale faster than anything else here; check §4 before trusting it.*
 
-1. **Run `scripts/verify-security.sh`** against a real instance with real
-   tokens. It has never been run, and the seed now provides exactly what it
-   needs: two schools with a teacher each, and parents at different schools.
-   This is what turns §2 from "believed fixed" into "confirmed fixed", and it is
-   the highest-value item left. Nagachaitanya.
-2. **Fix T-23** — the test, not the product. `createTestPhoto` never puts an
-   object in storage, so `/confirm` 404s. It is the only automated guard on
-   G-07. Ruthwik.
-3. **Plan 08's sabotage exercise** — revert a fix, confirm the matching test
-   goes red. The suite runs, but has not been shown to *detect* anything.
-4. **Deploy.** Nothing is hosted; there is no APK. Bhargav, Plan 09 Step 6.
-5. **The one backend lint error** (`middleware/auth.ts`, `no-namespace`) is the
-   last thing keeping the CI lint step advisory rather than blocking. Unowned,
-   one line.
+1. **Deploy.** The largest remaining gap, and now the blocker on three separate
+   verification items: HTTPS and CORS still skip in `verify-security.sh`, the
+   k6 suite has no target, and there is no APK. Bhargav, Plan 09 Step 6.
+2. **Run `verify-security.sh` against the deployed URL** once it exists. The
+   1 Aug run was against a local stack, which proves the authorization logic but
+   says nothing about how a hosted project is configured. `verify:env` prints
+   the environment; `STRICT=1` makes skips count so CI can gate on it.
+3. **Add a test step to CI.** `ci.yml` runs lint, typecheck and build, but never
+   `pnpm test` — so 79 passing tests guard nothing on a pull request. Needs the
+   `hive-test` credentials as repository secrets.
+4. **Drive the app on a device.** Nothing has been seen rendered.
+5. **Sentry has never received an error.** Needs a DSN. Account signup, not code.
 6. **Plan 01 Step 8 (SMTP).** Unowned. Lower priority than it was — teacher and
    parent can now sign in with a password, so OTP is no longer the only way in.
 

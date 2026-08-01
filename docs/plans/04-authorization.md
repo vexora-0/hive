@@ -149,22 +149,28 @@ Behaviour:
 pnpm typecheck && pnpm lint && pnpm build:backend
 ```
 
-**Manual — API, using two accounts at different schools.** Grab JWTs from the app's network log or by signing in via the Supabase SDK.
+**Manual — API.** No longer done by hand: `pnpm --filter @hive/backend verify:env`
+prints the tokens and IDs, and `./scripts/verify-security.sh` runs the whole
+list. **All ticks below were made by that run on 1 August 2026** — 26 passed,
+0 failed, 3 skipped. The output is recorded in `docs/security.md` §9.
 
-- [ ] Parent A requests Parent B's child's photo → **404**
-  ```bash
-  curl -H "Authorization: Bearer $PARENT_A" $API/api/v1/feed/photos/$PHOTO_OF_B
-  ```
-- [ ] Parent A requests their **own** child's photo → 200, and `taggedStudentIds` contains **only their own children**
-- [ ] Teacher at school X lists school Y's students → **403**
-  ```bash
-  curl -H "Authorization: Bearer $TEACHER_X" $API/api/v1/schools/$SCHOOL_Y/students
-  ```
-- [ ] Same for `/classes`
-- [ ] Teacher X requests photos for a class at school Y → **403**
-- [ ] Teacher X uploads a file to teacher Y's photo ID → **403**
-- [ ] Admin can still access all schools
-- [ ] Teacher can still do everything at their own school
+- [x] Parent A requests Parent B's child's photo → **404**
+- [x] Parent A requests their **own** child's photo → 200, and `taggedStudentIds` contains **only their own children** — asserted now, not eyeballed
+- [x] Teacher at school X lists school Y's students → **403**
+- [x] Same for `/classes` → **403**
+- [x] Teacher X requests photos for a class at school Y → **403**
+- [x] Teacher X uploads a file to **a colleague's** photo ID → **403**
+- [x] Admin can still access all schools → 200
+- [x] Teacher can still do everything at their own school → 200
+
+> The sixth item as originally written said "teacher Y's photo", meaning a
+> teacher at the *other* school. That is not a test of this step. `/file`,
+> `/confirm` and `/tag` go through `assertPhotoAccess`, which requires uploader
+> **and** school to match — so a cross-school caller is refused by the school
+> half and the ownership half never executes. Step 3 is only exercised by two
+> teachers at the **same** school. Both the script and
+> `tests/authorization.test.ts` now use a same-school pair; the wording above is
+> corrected to match.
 
 **Manual — app:**
 - [ ] Sign in as parent → land on feed
@@ -204,12 +210,15 @@ This plan produces good viva material. Record for Plan 10's security document:
 
 ## Done when
 
-- [ ] All four IDOR checks above return 403/404 as expected
-- [ ] Deep-linking to another role's route redirects
-- [ ] Legitimate access for every role still works
-- [ ] Typecheck, lint, build pass
-- [ ] Merged into `main`
-- [ ] Findings recorded for Plan 10
+- [x] All four IDOR checks above return 403/404 as expected — verified 1 Aug
+- [ ] Deep-linking to another role's route redirects — **still unticked.**
+      `RoleGate` is UX only and the server half is confirmed (parent → `/admin/*`
+      is 403), but nobody has driven the app on a device
+- [x] Legitimate access for every role still works — teacher at own school 200,
+      admin cross-school 200, uploader can act on their own photo
+- [x] Typecheck, lint, build pass
+- [x] Merged into `main`
+- [x] Findings recorded for Plan 10 — `docs/security.md` §4, §8, §9
 
 ---
 
@@ -294,19 +303,31 @@ merge's typecheck caught.
 `getPhotosByClass` lost its `baseUrl` parameter in Plan 03; the school check is
 otherwise unchanged.
 
-### Not verified
+### Verified — 1 August 2026
 
-The repository contains no `.env`, so the backend cannot boot, the app cannot
-run, and no Supabase call can be made. **None of the Verification section above
-has been executed** — not one curl, not one device check. The four IDOR fixes
-and the route guards are reviewed code, not observed behaviour.
+The API half of this plan has been executed. `verify-security.sh` ran against a
+booted backend with real tokens: **26 passed, 0 failed, 3 skipped**, and
+`packages/backend/tests/authorization.test.ts` now covers the same ground on
+every test run (79 tests, 0 failures). Details in `docs/security.md` §9.
 
-What was verified: `pnpm typecheck` (backend clean throughout), `pnpm lint` (8
-problems, down from 9, all pre-existing), and a per-commit diff of the mobile
-typecheck output against the 22-error Plan 00 baseline — identical after every
-mobile change, with no error in `RoleGate.tsx`, any `_layout.tsx`, or any
-`notifications.tsx`.
+**Step 3 was never actually being tested, by anything.** Its verification line
+said "teacher Y's photo", the manual script used a cross-school pair, and
+`photos.test.ts` has a test whose name reads like cover for it but whose two
+teachers are also at different schools. `assertPhotoAccess` requires uploader
+**and** school to match, so in all three cases the school check refused first
+and the uploader check never ran.
 
-The Done-when boxes are deliberately left unticked. They should be ticked by
-whoever first runs this against a real backend with two accounts at different
-schools.
+Demonstrated rather than argued: deleting `photo.uploaded_by === user.id` from
+`assertPhotoAccess` turned exactly the three new same-school tests red and left
+the rest of the suite — including `photos.test.ts` — green. Step 3 could have
+been reverted at any point in the last month without a single test noticing.
+
+**Still not verified:** the mobile half. `RoleGate` and the three group layouts
+are reviewed code; nobody has deep-linked `hive://(admin)/dashboard` as a parent
+on a device. That box stays unticked. The server-side half of G-05 *is*
+confirmed — a parent gets 403 from `/admin/*`, and `RoleGate` was never the
+real control anyway.
+
+Two caveats on the run: it was against a **local** Supabase stack rather than a
+deployment, so it says nothing about how a hosted project is configured; and the
+HTTPS and CORS checks skip for want of a hosted URL.

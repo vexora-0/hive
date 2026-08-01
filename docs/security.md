@@ -128,16 +128,26 @@ From the Week 14 audit. Severity is the audit's.
 
 | ID | Finding | Severity | Owner |
 |---|---|---|---|
-| **G-01** | Order submission is broken three ways; no order can be placed. Not a security issue, but the largest functional gap. | — | Plan 02 |
 | **G-45** | Supabase's default SMTP is rate-limited to a handful of emails an hour, so **OTP delivery fails under any real load** — including a live demo. Unowned. | Medium | Plan 01 Step 8 |
 | **G-S10** | `CORS_ORIGINS` defaults to `*`. Must be set explicitly at deploy time. | Medium | Plan 09 |
 | **S-15** | Supabase project ref committed at `supabase/README_MIGRATIONS.md:20`; keys not yet rotated. | Low | Plan 11 |
+
+**G-01 has been closed** and is no longer listed here. A parent placed a real
+order — 201, `total_cents: 998` for 2 × `print_4x6` at 499 — and a repeated
+idempotency key returned the same order rather than a duplicate. It sat in this
+table for weeks after it was fixed.
 
 **G-02 has since been closed by Plan 03** — the static `/uploads` route is gone, the bucket is private, and files are served through short-lived signed URLs. That changes the reading of this section: photo *files* and photo *metadata* are now both controlled, where previously only the metadata layer was.
 
 One ordering makes them work together, and it is easy to break: `getPhotoDetails` runs the parent-ownership check **before** minting the signed URL. A signed URL grants access to the file itself, so generating one for a caller who is then refused would hand out exactly what the check exists to prevent. Anyone reordering that function needs to know this.
 
-**Nothing in this table has been verified against a running system.** See §8, item 9.
+**Verified against a running system on 1 August 2026.** `scripts/verify-security.sh`
+ran for the first time: **26 passed, 0 failed, 3 skipped**, and
+`packages/backend/tests/authorization.test.ts` covers the same ground on every
+test run — **79 tests pass, 0 fail**. The full record, including what the run
+does *not* cover, is in §9.
+
+One entry in this table was never actually being tested. See §9.
 
 ---
 
@@ -215,14 +225,14 @@ Stated plainly. Every one of these is a real gap.
 5. **No 2FA**, including for admin accounts.
 6. **No account lockout or breach-password checking** on the seeded password accounts.
 7. **No automated revocation.** Signing out clears the local session; the JWT remains valid until it expires.
-7. **Rate limiting is per-instance and in-memory** — `express-rate-limit`'s
+8. **Rate limiting is per-instance and in-memory** — `express-rate-limit`'s
    default store does not hold across multiple instances, so the effective
    limit multiplies by the instance count.
-8. **No password reset flow for the admin account.** Recovery means re-running
+9. **No password reset flow for the admin account.** Recovery means re-running
    `pnpm seed:admin` with new environment values.
-8. **Authorization is enforced in application code, not the database, on the API path.** This is a consequence of the service-role key and it means a new endpoint that forgets its ownership check is insecure by default. RLS would be secure by default. Rewriting the backend to use per-request user tokens would fix this class of bug outright, and is the single change that would most improve this system's security posture. It was not attempted within the project's scope.
-9. **⚠ The security fixes in §4 have not been verified against a running system.** No `.env` exists in this repository, so the backend cannot boot. The IDOR fixes and route guards are reviewed code and passing typechecks, not observed behaviour. `scripts/verify-security.sh` (Plan 11) exists to run these checks once a deployment does. Until it has been run, treat §4 as "believed fixed", not "confirmed fixed".
-10. **⚠ The test suite has never executed.** 12 of Plan 08's 36 tests are written; there is no test Supabase project to run them against, and the sabotage exercise that would prove they detect anything has not been done.
+10. **Authorization is enforced in application code, not the database, on the API path.** This is a consequence of the service-role key and it means a new endpoint that forgets its ownership check is insecure by default. RLS would be secure by default. Rewriting the backend to use per-request user tokens would fix this class of bug outright, and is the single change that would most improve this system's security posture. It was not attempted within the project's scope.
+11. **The §4 fixes are now observed behaviour, not reviewed code** — see §9 for the run and its limits. What remains true is narrower: nothing has been verified against a *deployed* instance over HTTPS, because nothing is deployed.
+12. **No audit of who has held a signed URL.** Related to item 1: because signed URLs are bearer credentials and there is no audit log, a leaked URL leaves no trace either at issue time or at use time.
 
 ---
 
@@ -237,10 +247,75 @@ rejected; a cross-family photo request must return **404**; a cross-school
 student listing must return **403**; a teacher writing to another teacher's
 photo must return **403**; and a triggered 500 must not leak a stack trace.
 
-**None of these has been executed.** There is no `.env` in the repository and
-nothing is deployed, so every remediation in §4 is written and compiled, not
-proven. `verify-security.sh` reports skipped checks separately from passes for
-exactly this reason — a run with skips does not verify this document.
+### The run — 1 August 2026
+
+`verify-security.sh` executed for the first time, against a backend booted with
+`NODE_ENV=production` over the seeded demo dataset:
+
+```
+passed 26   failed 0   skipped 3
+```
+
+| § | Checks | Result |
+|---|---|---|
+| 2 · G-02 | `/uploads/<random>`, `/uploads/<real key>` | 404, 404 — the static route is gone |
+| 3 · G-04 | parent A → another family's photo; own photo; unauthenticated | **404**, 200, 401 |
+| 3 · G-04b | `taggedStudentIds` on an entitled request | only the caller's own children |
+| 4 · G-08 | teacher → another school's students / classes / class photos | **403 ×3**; own school 200; admin 200 |
+| 5 · G-17 | teacher → a **same-school colleague's** photo `/confirm`, `/tag`, `/file` | **403 ×3** |
+| 6 · G-05 | parent → `/admin/*`; unauthenticated; garbage token | 403, 403, **401** |
+| 8 | CORS with `Origin: https://evil.example` | not reflected, not `*` |
+| 10 | secret scan, tracked `.env` files | clean |
+
+Separately confirmed in the same session:
+
+- **Rate limiting** — a 429 arrived at request 77 of a 100-per-15-minute window
+  (the window was already partly consumed by the verification run itself).
+- **`/health` under database loss** — Supabase stopped mid-run: **503**,
+  `"status":"degraded"`, `"database":"error"`. Previously untested.
+- **RLS on the client path** — the anon key against `profiles` and `photos`
+  returns `[]`, not a dump.
+- **G-10** — `seed:admin` does not echo the password.
+
+### What the run does not cover
+
+Three checks skipped, and the reasons are not interchangeable:
+
+1. **Transport (§8) — skipped, and it should be.** The target was
+   `localhost`, and nothing is deployed. HTTPS, HSTS and real CORS behaviour
+   remain unverified and cannot be verified until there is a hosted URL.
+2. **Rate limiting (§9) — opt-in, run separately.** Confirmed above.
+3. **The 500 error shape (§7) — unreachable by design, not skipped by
+   accident.** `FORCE_500_PATH` needs a route that reliably 500s
+   unauthenticated. There is none: every `/api/v1/*` route sits behind
+   `authenticate`, and that middleware answers **401** on any Supabase failure
+   — verified by stopping Supabase mid-request. So the anonymous probe can
+   never see a 500. The property itself *is* covered, by `errors.test.ts` T-34,
+   which exercises the real `errorHandler` with `NODE_ENV=production` and
+   asserts no internal message and no stack trace in the body.
+
+**The run was against a local Supabase stack**, not `hive-dev` or a deployment:
+Postgres, GoTrue, Storage and all 19 migrations, driven through the real Express
+app. That is enough to prove the authorization logic; it is not evidence about
+how any hosted project is configured. Re-run against the deployed URL when one
+exists — `verify:env` prints the environment, and `STRICT=1` makes skips count.
+
+### The check that was not checking anything
+
+`photos.test.ts` has a test named *"rejects a teacher uploading onto another
+teacher's photo"*, which reads like cover for G-17. It is not. Its two teachers
+are at **different schools**, and `assertPhotoAccess` requires uploader *and*
+school to match — so the school half refuses first and the uploader half never
+runs. Deleting the uploader check outright leaves that test green.
+
+That was demonstrated, not reasoned about: with `photo.uploaded_by === user.id`
+removed, exactly the three new same-school tests in `authorization.test.ts`
+failed and the rest of the suite — including that one — stayed green. This is
+Plan 08's sabotage exercise, and it is the first evidence that these tests
+detect anything rather than merely pass.
+
+The same flaw was in `verify-security.sh` §5, which probed G-17 with teachers at
+different schools. Both are fixed; both now use a same-school pair.
 
 ---
 
@@ -306,4 +381,5 @@ sequenceDiagram
 
 ---
 
-*Hive · Nagachaitanya · Week 22*
+*Hive · Nagachaitanya · Week 22, §4/§8/§9 rewritten 1 August 2026 after the
+first verification run.*

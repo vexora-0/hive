@@ -194,13 +194,31 @@ code that was written but never executed.
 **Observability (Plan 09)** — *verified 1 Aug against `udawaiykfvdcvcouiqxr`*
 - [x] Responses carry an `X-Request-ID` header
 - [x] Backend logs one `info` line per request with ID, status, duration
-- [ ] Stop Supabase access → `/health` returns 503 *(not tested — would need to
-      revoke the key mid-run)*
+- [x] Stop Supabase access → `/health` returns 503 — *tested 1 Aug by stopping
+      the Supabase API mid-run: **503**, `"status":"degraded"`,
+      `"checks":{"database":"error"}`, and it recovered to 200 on restart*
 
 Also seen while up: the auth-failure warning logs the parse error but **not**
 the token or `req.ip`, so the PII scrubbing added alongside the correlation IDs
 is doing its job. Sentry took its no-op path cleanly (`Sentry disabled (no
 SENTRY_DSN)`) rather than failing the boot.
+
+**Security verification (Plan 04 / Plan 11)** — *run 1 Aug, `NODE_ENV=production`*
+- [x] `scripts/verify-security.sh` — **26 passed, 0 failed, 3 skipped**. See
+      `docs/security.md` §9 for the table and for why each skip is skipped
+- [x] G-17 same-school upload ownership — **403** on `/confirm`, `/tag`, `/file`
+- [x] Rate limiter returns 429 — at request 77 of the 100-per-15-minute window
+- [ ] HTTPS and CORS against a real origin — **skipped, needs a deployment**
+- [ ] A triggered 500 carries no stack — **unreachable anonymously**; every
+      `/api/v1/*` route is behind `authenticate`, which answers 401 on any
+      Supabase failure. Covered instead by `errors.test.ts` T-34
+
+To repeat it:
+
+```bash
+eval "$(pnpm --filter @hive/backend verify:env | grep '^export')"
+./scripts/verify-security.sh          # STRICT=1 counts skips as failures
+```
 
 **Verified at boot — 1 Aug (no seed data needed)**
 - [x] `supabase db push --include-all` applies all 19 migrations to a fresh
