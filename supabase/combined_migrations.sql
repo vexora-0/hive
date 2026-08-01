@@ -1,4 +1,21 @@
 -- =============================================================================
+-- Hive — all migrations, concatenated
+--
+-- GENERATED FILE. Do not edit.
+-- Regenerate with ./scripts/build-combined-migrations.sh after adding a migration.
+--
+-- Apply order is by filename. Note the numbering is not contiguous: 00019 was
+-- never used, and 00020 was authored before 00018. Filename order is still the
+-- correct dependency order.
+--
+-- Prefer the CLI (`supabase db push --include-all`). Use this only when pasting
+-- into the SQL Editor against an EMPTY database.
+-- =============================================================================
+
+
+-- ─── 00001_create_extensions.sql ───
+
+-- =============================================================================
 -- Migration: 00001_create_extensions
 -- Description: Enable required PostgreSQL extensions for Hive
 -- =============================================================================
@@ -8,6 +25,9 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
 
 -- pgcrypto: provides gen_random_uuid() and cryptographic functions
 CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA extensions;
+
+-- ─── 00002_create_schools.sql ───
+
 -- =============================================================================
 -- Migration: 00002_create_schools
 -- Description: Create schools table - top-level organizational entity
@@ -26,6 +46,9 @@ CREATE TABLE schools (
 
 COMMENT ON TABLE schools IS 'Preschools registered on the Hive platform';
 COMMENT ON COLUMN schools.logo_url IS 'URL to the school logo image in storage';
+
+-- ─── 00003_create_profiles.sql ───
+
 -- =============================================================================
 -- Migration: 00003_create_profiles
 -- Description: Create profiles table linked to Supabase auth.users
@@ -54,6 +77,9 @@ CREATE INDEX idx_profiles_school_id ON profiles (school_id);
 COMMENT ON TABLE profiles IS 'User profiles extending Supabase auth. One profile per auth user.';
 COMMENT ON COLUMN profiles.id IS 'References auth.users.id - set automatically on signup';
 COMMENT ON COLUMN profiles.role IS 'Application role: teacher, parent, or admin';
+
+-- ─── 00004_create_classes.sql ───
+
 -- =============================================================================
 -- Migration: 00004_create_classes
 -- Description: Create classes table for organizing students within schools
@@ -79,6 +105,9 @@ CREATE INDEX idx_classes_teacher_id ON classes (teacher_id);
 
 COMMENT ON TABLE classes IS 'Classroom groups within a school, typically led by one teacher';
 COMMENT ON COLUMN classes.academic_year IS 'e.g., 2025-2026';
+
+-- ─── 00005_create_students.sql ───
+
 -- =============================================================================
 -- Migration: 00005_create_students
 -- Description: Create students table - the children enrolled at a school
@@ -103,6 +132,9 @@ CREATE INDEX idx_students_school_id ON students (school_id);
 CREATE INDEX idx_students_class_id ON students (class_id);
 
 COMMENT ON TABLE students IS 'Children enrolled in a preschool. Linked to parents via parent_student_mappings.';
+
+-- ─── 00006_create_parent_student_mappings.sql ───
+
 -- =============================================================================
 -- Migration: 00006_create_parent_student_mappings
 -- Description: Many-to-many mapping between parents and students
@@ -128,6 +160,9 @@ CREATE INDEX idx_psm_student_id ON parent_student_mappings (student_id);
 
 COMMENT ON TABLE parent_student_mappings IS 'Links parent profiles to their children. Core to privacy: parents only see photos of their own children.';
 COMMENT ON COLUMN parent_student_mappings.relationship IS 'e.g., parent, guardian, grandparent';
+
+-- ─── 00007_create_photos.sql ───
+
 -- =============================================================================
 -- Migration: 00007_create_photos
 -- Description: Create photos table - the core content entity of Hive
@@ -171,6 +206,9 @@ COMMENT ON COLUMN photos.thumbnail_s3_key IS 'Object key for the thumbnail varia
 COMMENT ON COLUMN photos.sha256_hash IS 'SHA-256 hash of the original file bytes for deduplication';
 COMMENT ON COLUMN photos.blurhash IS 'BlurHash placeholder string for progressive loading';
 COMMENT ON COLUMN photos.status IS 'processing = just uploaded; ready = thumbnail generated; failed = processing error; archived = soft-deleted';
+
+-- ─── 00008_create_photo_student_tags.sql ───
+
 -- =============================================================================
 -- Migration: 00008_create_photo_student_tags
 -- Description: Tag students in photos. This is the critical privacy link:
@@ -197,6 +235,9 @@ CREATE INDEX idx_pst_photo_id ON photo_student_tags (photo_id);
 
 COMMENT ON TABLE photo_student_tags IS 'Maps photos to the students visible in them. Drives parent-facing privacy via RLS.';
 COMMENT ON COLUMN photo_student_tags.tagged_by IS 'The teacher who tagged the student in the photo';
+
+-- ─── 00009_create_orders.sql ───
+
 -- =============================================================================
 -- Migration: 00009_create_orders
 -- Description: Create orders and order_items tables for photo print purchases
@@ -259,6 +300,9 @@ CREATE INDEX idx_order_items_order_id ON order_items (order_id);
 
 COMMENT ON TABLE order_items IS 'Individual line items within a parent order';
 COMMENT ON COLUMN order_items.product_type IS 'Type of physical or digital product';
+
+-- ─── 00010_create_notifications.sql ───
+
 -- =============================================================================
 -- Migration: 00010_create_notifications
 -- Description: In-app notifications for users (new photos, order updates, etc.)
@@ -287,6 +331,9 @@ CREATE INDEX idx_notifications_user_feed ON notifications (user_id, is_read, cre
 COMMENT ON TABLE notifications IS 'In-app notifications delivered to users';
 COMMENT ON COLUMN notifications.data IS 'Arbitrary JSON payload, e.g., {"photo_id": "...", "class_id": "..."}';
 COMMENT ON COLUMN notifications.type IS 'Category of notification for filtering and icon display';
+
+-- ─── 00011_create_rls_policies.sql ───
+
 -- =============================================================================
 -- Migration: 00011_create_rls_policies
 -- Description: Row Level Security policies for ALL tables.
@@ -374,6 +421,7 @@ $$;
 -- ---------------------------------------------------------------------------
 
 -- Admins: full CRUD on all schools
+DROP POLICY IF EXISTS schools_admin_all ON schools;
 CREATE POLICY schools_admin_all ON schools
     FOR ALL
     TO authenticated
@@ -381,6 +429,7 @@ CREATE POLICY schools_admin_all ON schools
     WITH CHECK (get_my_role() = 'admin');
 
 -- Teachers: read their own school
+DROP POLICY IF EXISTS schools_teacher_select ON schools;
 CREATE POLICY schools_teacher_select ON schools
     FOR SELECT
     TO authenticated
@@ -390,6 +439,7 @@ CREATE POLICY schools_teacher_select ON schools
     );
 
 -- Parents: read their own school
+DROP POLICY IF EXISTS schools_parent_select ON schools;
 CREATE POLICY schools_parent_select ON schools
     FOR SELECT
     TO authenticated
@@ -403,12 +453,14 @@ CREATE POLICY schools_parent_select ON schools
 -- ---------------------------------------------------------------------------
 
 -- Users can read their own profile
+DROP POLICY IF EXISTS profiles_self_select ON profiles;
 CREATE POLICY profiles_self_select ON profiles
     FOR SELECT
     TO authenticated
     USING (id = auth.uid());
 
 -- Users can update their own profile (name, avatar, phone only - not role)
+DROP POLICY IF EXISTS profiles_self_update ON profiles;
 CREATE POLICY profiles_self_update ON profiles
     FOR UPDATE
     TO authenticated
@@ -416,6 +468,7 @@ CREATE POLICY profiles_self_update ON profiles
     WITH CHECK (id = auth.uid());
 
 -- Admins: full access to all profiles
+DROP POLICY IF EXISTS profiles_admin_all ON profiles;
 CREATE POLICY profiles_admin_all ON profiles
     FOR ALL
     TO authenticated
@@ -423,6 +476,7 @@ CREATE POLICY profiles_admin_all ON profiles
     WITH CHECK (get_my_role() = 'admin');
 
 -- Teachers: read profiles in their school (to see parent/colleague names)
+DROP POLICY IF EXISTS profiles_teacher_select ON profiles;
 CREATE POLICY profiles_teacher_select ON profiles
     FOR SELECT
     TO authenticated
@@ -432,6 +486,7 @@ CREATE POLICY profiles_teacher_select ON profiles
     );
 
 -- Parents: read teacher profiles in their school (to see who uploaded photos)
+DROP POLICY IF EXISTS profiles_parent_select_teachers ON profiles;
 CREATE POLICY profiles_parent_select_teachers ON profiles
     FOR SELECT
     TO authenticated
@@ -446,6 +501,7 @@ CREATE POLICY profiles_parent_select_teachers ON profiles
 -- ---------------------------------------------------------------------------
 
 -- Admins: full access
+DROP POLICY IF EXISTS classes_admin_all ON classes;
 CREATE POLICY classes_admin_all ON classes
     FOR ALL
     TO authenticated
@@ -453,6 +509,7 @@ CREATE POLICY classes_admin_all ON classes
     WITH CHECK (get_my_role() = 'admin');
 
 -- Teachers: read classes in their school
+DROP POLICY IF EXISTS classes_teacher_select ON classes;
 CREATE POLICY classes_teacher_select ON classes
     FOR SELECT
     TO authenticated
@@ -462,6 +519,7 @@ CREATE POLICY classes_teacher_select ON classes
     );
 
 -- Parents: read classes where their child is enrolled
+DROP POLICY IF EXISTS classes_parent_select ON classes;
 CREATE POLICY classes_parent_select ON classes
     FOR SELECT
     TO authenticated
@@ -481,6 +539,7 @@ CREATE POLICY classes_parent_select ON classes
 -- ---------------------------------------------------------------------------
 
 -- Admins: full access
+DROP POLICY IF EXISTS students_admin_all ON students;
 CREATE POLICY students_admin_all ON students
     FOR ALL
     TO authenticated
@@ -488,6 +547,7 @@ CREATE POLICY students_admin_all ON students
     WITH CHECK (get_my_role() = 'admin');
 
 -- Teachers: read students in their school
+DROP POLICY IF EXISTS students_teacher_select ON students;
 CREATE POLICY students_teacher_select ON students
     FOR SELECT
     TO authenticated
@@ -497,6 +557,7 @@ CREATE POLICY students_teacher_select ON students
     );
 
 -- Parents: read only their own children
+DROP POLICY IF EXISTS students_parent_select ON students;
 CREATE POLICY students_parent_select ON students
     FOR SELECT
     TO authenticated
@@ -510,6 +571,7 @@ CREATE POLICY students_parent_select ON students
 -- ---------------------------------------------------------------------------
 
 -- Parents: read their own mappings
+DROP POLICY IF EXISTS psm_parent_select ON parent_student_mappings;
 CREATE POLICY psm_parent_select ON parent_student_mappings
     FOR SELECT
     TO authenticated
@@ -519,6 +581,7 @@ CREATE POLICY psm_parent_select ON parent_student_mappings
     );
 
 -- Admins: full CRUD
+DROP POLICY IF EXISTS psm_admin_all ON parent_student_mappings;
 CREATE POLICY psm_admin_all ON parent_student_mappings
     FOR ALL
     TO authenticated
@@ -526,6 +589,7 @@ CREATE POLICY psm_admin_all ON parent_student_mappings
     WITH CHECK (get_my_role() = 'admin');
 
 -- Teachers: read mappings for students in their school (for contact purposes)
+DROP POLICY IF EXISTS psm_teacher_select ON parent_student_mappings;
 CREATE POLICY psm_teacher_select ON parent_student_mappings
     FOR SELECT
     TO authenticated
@@ -543,6 +607,7 @@ CREATE POLICY psm_teacher_select ON parent_student_mappings
 -- ---------------------------------------------------------------------------
 
 -- Admins: full access to all photos
+DROP POLICY IF EXISTS photos_admin_all ON photos;
 CREATE POLICY photos_admin_all ON photos
     FOR ALL
     TO authenticated
@@ -550,6 +615,7 @@ CREATE POLICY photos_admin_all ON photos
     WITH CHECK (get_my_role() = 'admin');
 
 -- Teachers: SELECT ready photos in their school
+DROP POLICY IF EXISTS photos_teacher_select ON photos;
 CREATE POLICY photos_teacher_select ON photos
     FOR SELECT
     TO authenticated
@@ -559,6 +625,7 @@ CREATE POLICY photos_teacher_select ON photos
     );
 
 -- Teachers: INSERT photos into their school's classes
+DROP POLICY IF EXISTS photos_teacher_insert ON photos;
 CREATE POLICY photos_teacher_insert ON photos
     FOR INSERT
     TO authenticated
@@ -569,6 +636,7 @@ CREATE POLICY photos_teacher_insert ON photos
     );
 
 -- Teachers: UPDATE their own photos (e.g., add caption, change status)
+DROP POLICY IF EXISTS photos_teacher_update ON photos;
 CREATE POLICY photos_teacher_update ON photos
     FOR UPDATE
     TO authenticated
@@ -587,6 +655,7 @@ CREATE POLICY photos_teacher_update ON photos
 -- This is the critical privacy policy. A parent can never see a photo
 -- unless that photo has a row in photo_student_tags linking to one of
 -- the parent's children via parent_student_mappings.
+DROP POLICY IF EXISTS photos_parent_select ON photos;
 CREATE POLICY photos_parent_select ON photos
     FOR SELECT
     TO authenticated
@@ -607,6 +676,7 @@ CREATE POLICY photos_parent_select ON photos
 -- ---------------------------------------------------------------------------
 
 -- Admins: full access
+DROP POLICY IF EXISTS pst_admin_all ON photo_student_tags;
 CREATE POLICY pst_admin_all ON photo_student_tags
     FOR ALL
     TO authenticated
@@ -614,6 +684,7 @@ CREATE POLICY pst_admin_all ON photo_student_tags
     WITH CHECK (get_my_role() = 'admin');
 
 -- Teachers: INSERT tags for photos in their school
+DROP POLICY IF EXISTS pst_teacher_insert ON photo_student_tags;
 CREATE POLICY pst_teacher_insert ON photo_student_tags
     FOR INSERT
     TO authenticated
@@ -628,6 +699,7 @@ CREATE POLICY pst_teacher_insert ON photo_student_tags
     );
 
 -- Teachers: read tags for photos in their school
+DROP POLICY IF EXISTS pst_teacher_select ON photo_student_tags;
 CREATE POLICY pst_teacher_select ON photo_student_tags
     FOR SELECT
     TO authenticated
@@ -641,6 +713,7 @@ CREATE POLICY pst_teacher_select ON photo_student_tags
     );
 
 -- Teachers: DELETE tags they created (untag a student)
+DROP POLICY IF EXISTS pst_teacher_delete ON photo_student_tags;
 CREATE POLICY pst_teacher_delete ON photo_student_tags
     FOR DELETE
     TO authenticated
@@ -650,6 +723,7 @@ CREATE POLICY pst_teacher_delete ON photo_student_tags
     );
 
 -- Parents: read tags that reference their own children
+DROP POLICY IF EXISTS pst_parent_select ON photo_student_tags;
 CREATE POLICY pst_parent_select ON photo_student_tags
     FOR SELECT
     TO authenticated
@@ -663,12 +737,14 @@ CREATE POLICY pst_parent_select ON photo_student_tags
 -- ---------------------------------------------------------------------------
 
 -- Admins: read all orders
+DROP POLICY IF EXISTS orders_admin_select ON orders;
 CREATE POLICY orders_admin_select ON orders
     FOR SELECT
     TO authenticated
     USING (get_my_role() = 'admin');
 
 -- Admins: update order status
+DROP POLICY IF EXISTS orders_admin_update ON orders;
 CREATE POLICY orders_admin_update ON orders
     FOR UPDATE
     TO authenticated
@@ -676,6 +752,7 @@ CREATE POLICY orders_admin_update ON orders
     WITH CHECK (get_my_role() = 'admin');
 
 -- Parents: full CRUD on their own orders
+DROP POLICY IF EXISTS orders_parent_select ON orders;
 CREATE POLICY orders_parent_select ON orders
     FOR SELECT
     TO authenticated
@@ -684,6 +761,7 @@ CREATE POLICY orders_parent_select ON orders
         AND parent_id = auth.uid()
     );
 
+DROP POLICY IF EXISTS orders_parent_insert ON orders;
 CREATE POLICY orders_parent_insert ON orders
     FOR INSERT
     TO authenticated
@@ -692,6 +770,7 @@ CREATE POLICY orders_parent_insert ON orders
         AND parent_id = auth.uid()
     );
 
+DROP POLICY IF EXISTS orders_parent_update ON orders;
 CREATE POLICY orders_parent_update ON orders
     FOR UPDATE
     TO authenticated
@@ -706,6 +785,7 @@ CREATE POLICY orders_parent_update ON orders
         AND parent_id = auth.uid()
     );
 
+DROP POLICY IF EXISTS orders_parent_delete ON orders;
 CREATE POLICY orders_parent_delete ON orders
     FOR DELETE
     TO authenticated
@@ -720,6 +800,7 @@ CREATE POLICY orders_parent_delete ON orders
 -- ---------------------------------------------------------------------------
 
 -- Admins: read all order items
+DROP POLICY IF EXISTS order_items_admin_select ON order_items;
 CREATE POLICY order_items_admin_select ON order_items
     FOR SELECT
     TO authenticated
@@ -728,6 +809,7 @@ CREATE POLICY order_items_admin_select ON order_items
     );
 
 -- Parents: read their own order items
+DROP POLICY IF EXISTS order_items_parent_select ON order_items;
 CREATE POLICY order_items_parent_select ON order_items
     FOR SELECT
     TO authenticated
@@ -741,6 +823,7 @@ CREATE POLICY order_items_parent_select ON order_items
     );
 
 -- Parents: insert items into their own orders
+DROP POLICY IF EXISTS order_items_parent_insert ON order_items;
 CREATE POLICY order_items_parent_insert ON order_items
     FOR INSERT
     TO authenticated
@@ -755,6 +838,7 @@ CREATE POLICY order_items_parent_insert ON order_items
     );
 
 -- Parents: delete items from their own pending orders
+DROP POLICY IF EXISTS order_items_parent_delete ON order_items;
 CREATE POLICY order_items_parent_delete ON order_items
     FOR DELETE
     TO authenticated
@@ -773,12 +857,14 @@ CREATE POLICY order_items_parent_delete ON order_items
 -- ---------------------------------------------------------------------------
 
 -- Users: read their own notifications
+DROP POLICY IF EXISTS notifications_self_select ON notifications;
 CREATE POLICY notifications_self_select ON notifications
     FOR SELECT
     TO authenticated
     USING (user_id = auth.uid());
 
 -- Users: update their own notifications (mark as read)
+DROP POLICY IF EXISTS notifications_self_update ON notifications;
 CREATE POLICY notifications_self_update ON notifications
     FOR UPDATE
     TO authenticated
@@ -786,12 +872,16 @@ CREATE POLICY notifications_self_update ON notifications
     WITH CHECK (user_id = auth.uid());
 
 -- Admins: insert notifications for any user
+DROP POLICY IF EXISTS notifications_admin_insert ON notifications;
 CREATE POLICY notifications_admin_insert ON notifications
     FOR INSERT
     TO authenticated
     WITH CHECK (get_my_role() = 'admin');
 
 -- Service role / triggers can also insert (handled by SECURITY DEFINER functions)
+
+-- ─── 00012_create_triggers.sql ───
+
 -- =============================================================================
 -- Migration: 00012_create_triggers
 -- Description: Database triggers for automated behavior
@@ -959,6 +1049,9 @@ CREATE TRIGGER trg_photos_notify_teacher
     AFTER UPDATE ON photos
     FOR EACH ROW
     EXECUTE FUNCTION notify_teacher_on_upload_complete();
+
+-- ─── 00013_create_indexes.sql ───
+
 -- =============================================================================
 -- Migration: 00013_create_indexes
 -- Description: Additional composite indexes for performance
@@ -1024,11 +1117,16 @@ CREATE INDEX IF NOT EXISTS idx_pst_tagged_by
 CREATE INDEX IF NOT EXISTS idx_psm_parent_student
     ON parent_student_mappings (parent_id, student_id);
 
+-- ─── 00014_handle_new_user_trigger.sql ───
+
 -- =============================================================================
 -- Migration: 00014_handle_new_user_trigger
 -- Description: Auto-create a profile row when a new user signs up (OTP/magic link).
+--              This fixes the "stuck after onboarding" flow where no profile existed.
 -- =============================================================================
 
+-- Function runs with SECURITY DEFINER so it can INSERT into public.profiles
+-- even though the trigger fires from auth.users (no session yet).
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -1038,6 +1136,7 @@ AS $$
 DECLARE
     profile_role text;
 BEGIN
+    -- Role from signup (login screen: "I am a Teacher/Parent"). Only teacher or parent allowed; default parent.
     profile_role := lower(trim(COALESCE(NEW.raw_user_meta_data->>'role', '')));
     IF profile_role NOT IN ('teacher', 'parent') THEN
         profile_role := 'parent';
@@ -1061,22 +1160,34 @@ EXCEPTION
 END;
 $$;
 
+COMMENT ON FUNCTION public.handle_new_user() IS 'Creates a profile when a new auth user is created. Role from signup (teacher/parent) or default parent.';
+
+-- Fire after insert on auth.users (Supabase Auth creates the user on signup/OTP).
+-- Drop first so this migration is safe to run again.
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW
     EXECUTE PROCEDURE public.handle_new_user();
 
+-- ─── 00015_storage_photos_bucket.sql ───
+
 -- =============================================================================
 -- Migration: 00015_storage_photos_bucket
 -- Description: Create Supabase Storage bucket for teacher photo uploads.
+-- Public read so feed/photo URLs work; authenticated users can upload.
+-- If the INSERT fails (e.g. managed Supabase), create bucket "photos" in
+-- Dashboard: Storage -> New bucket -> name "photos", Public ON.
 -- =============================================================================
 
+-- Create the photos bucket (public so getPublicUrl works for feed)
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
   'photos',
   'photos',
   true,
-  26214400,
+  26214400,  -- 25MB
   ARRAY['image/jpeg', 'image/png', 'image/heic']
 )
 ON CONFLICT (id) DO UPDATE SET
@@ -1084,20 +1195,242 @@ ON CONFLICT (id) DO UPDATE SET
   file_size_limit = EXCLUDED.file_size_limit,
   allowed_mime_types = EXCLUDED.allowed_mime_types;
 
+-- Allow authenticated users (teachers) to upload to photos bucket
+DROP POLICY IF EXISTS "photos_authenticated_upload" ON storage.objects;
 CREATE POLICY "photos_authenticated_upload"
 ON storage.objects
 FOR INSERT
 TO authenticated
 WITH CHECK (bucket_id = 'photos');
 
+-- Allow overwrite for upsert (required for upsert: true in client)
+DROP POLICY IF EXISTS "photos_authenticated_update" ON storage.objects;
 CREATE POLICY "photos_authenticated_update"
 ON storage.objects
 FOR UPDATE
 TO authenticated
 USING (bucket_id = 'photos');
 
+-- Public read is implicit for public buckets; add SELECT so anon can read if needed
+DROP POLICY IF EXISTS "photos_public_read" ON storage.objects;
 CREATE POLICY "photos_public_read"
 ON storage.objects
 FOR SELECT
 TO public
 USING (bucket_id = 'photos');
+
+-- ─── 00016_make_sha256_hash_nullable.sql ───
+
+-- Make sha256_hash nullable since hashing is skipped on the client
+ALTER TABLE photos ALTER COLUMN sha256_hash DROP NOT NULL;
+
+-- ─── 00017_order_totals_cents.sql ───
+
+-- =============================================================================
+-- Migration: 00017_order_totals_cents
+-- Description: Store order money as integer cents (G-01).
+--
+-- total_amount was decimal(10,2) documented as USD, but the service wrote
+-- cents into it — a $4.99 print stored as 299.00 and displayed as $299.00.
+-- The mobile cart meanwhile priced in dollars. Three layers, three units.
+--
+-- Integer cents throughout; formatting to dollars happens only at render.
+-- =============================================================================
+
+ALTER TABLE orders RENAME COLUMN total_amount TO total_cents;
+ALTER TABLE orders
+    ALTER COLUMN total_cents TYPE integer USING round(total_cents)::integer,
+    ALTER COLUMN total_cents SET DEFAULT 0;
+
+ALTER TABLE order_items RENAME COLUMN unit_price TO unit_price_cents;
+ALTER TABLE order_items
+    ALTER COLUMN unit_price_cents TYPE integer USING round(unit_price_cents)::integer;
+
+COMMENT ON COLUMN orders.total_cents IS
+    'Order total in INTEGER CENTS. Never store money as a float.';
+COMMENT ON COLUMN order_items.unit_price_cents IS
+    'Unit price in INTEGER CENTS, set server-side from constants/products.ts. '
+    'The client never supplies a price.';
+
+-- The product_type CHECK already matches the catalogue; restated so the
+-- migration is self-describing and safe to re-run.
+ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_product_type_check;
+ALTER TABLE order_items ADD CONSTRAINT order_items_product_type_check
+    CHECK (product_type IN (
+        'print_4x6', 'print_5x7', 'print_8x10',
+        'digital_download', 'photo_book', 'magnet', 'mug'
+    ));
+
+-- ─── 00018_order_integrity.sql ───
+
+-- 00018 — Order integrity: honest foreign keys, and atomic order creation
+--
+-- Plan 02, Steps 7 and 8. Closes G-19 and G-37.
+--
+-- NOTE ON SCOPE: this file carries two related changes, both about an order
+-- staying internally consistent. Plan 02 reserves 00017-00019; 00017 was used
+-- for the money conversion and 00020 belongs to Plan 03, so both land here
+-- rather than claiming a number from someone else's range. Plan 02 Step 8
+-- explicitly allows this.
+--
+-- ---------------------------------------------------------------------------
+-- Part 1 — Foreign keys that could never fire (G-19)
+-- ---------------------------------------------------------------------------
+--
+-- Three columns were declared NOT NULL *and* ON DELETE SET NULL. Those are
+-- mutually exclusive: deleting the referenced row makes Postgres try to write
+-- NULL into a NOT NULL column, which raises a not-null violation instead of
+-- nulling the column. The practical effect is that **deleting any profile or
+-- photo is impossible today** — the delete fails with a confusing error rather
+-- than the intended cascade.
+--
+-- RESTRICT is the honest expression of what these columns mean:
+--   * you should not delete a teacher who still has photos without deciding
+--     what happens to the photos;
+--   * an order line must always point at a real photo, or the order history
+--     becomes unauditable.
+--
+-- RESTRICT makes that an explicit, immediate error at the point of deletion
+-- rather than a surprise.
+
+ALTER TABLE photos
+    DROP CONSTRAINT IF EXISTS photos_uploaded_by_fkey;
+
+ALTER TABLE photos
+    ADD CONSTRAINT photos_uploaded_by_fkey
+    FOREIGN KEY (uploaded_by) REFERENCES profiles (id) ON DELETE RESTRICT;
+
+ALTER TABLE photo_student_tags
+    DROP CONSTRAINT IF EXISTS photo_student_tags_tagged_by_fkey;
+
+ALTER TABLE photo_student_tags
+    ADD CONSTRAINT photo_student_tags_tagged_by_fkey
+    FOREIGN KEY (tagged_by) REFERENCES profiles (id) ON DELETE RESTRICT;
+
+ALTER TABLE order_items
+    DROP CONSTRAINT IF EXISTS order_items_photo_id_fkey;
+
+ALTER TABLE order_items
+    ADD CONSTRAINT order_items_photo_id_fkey
+    FOREIGN KEY (photo_id) REFERENCES photos (id) ON DELETE RESTRICT;
+
+-- ---------------------------------------------------------------------------
+-- Part 2 — Create an order and its items in one transaction (G-37)
+-- ---------------------------------------------------------------------------
+--
+-- The service inserted `orders`, then inserted `order_items`, and on failure
+-- issued a compensating DELETE. A crash between the two statements left an
+-- order with no items — a paid-looking record with nothing in it, and the
+-- compensating delete never ran because the process was gone.
+--
+-- A function body is a single transaction, so either both inserts land or
+-- neither does. The compensating delete is removed from the service.
+--
+-- Items arrive as a JSON array so the signature does not change every time a
+-- column is added. Prices are computed server-side before the call; this
+-- function trusts them and is not a pricing authority.
+
+CREATE OR REPLACE FUNCTION create_order_with_items(
+    p_order_id         uuid,
+    p_parent_id        uuid,
+    p_school_id        uuid,
+    p_idempotency_key  text,
+    p_shipping_address text,
+    p_notes            text,
+    p_total_cents      integer,
+    p_items            jsonb
+) RETURNS uuid
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+    v_order_id uuid;
+BEGIN
+    IF jsonb_array_length(p_items) = 0 THEN
+        RAISE EXCEPTION 'An order must contain at least one item';
+    END IF;
+
+    INSERT INTO orders (
+        id, parent_id, school_id, idempotency_key,
+        status, total_cents, shipping_address, notes
+    )
+    VALUES (
+        p_order_id, p_parent_id, p_school_id, p_idempotency_key,
+        'pending', p_total_cents, p_shipping_address, p_notes
+    )
+    RETURNING id INTO v_order_id;
+
+    -- Item ids are supplied by the caller so the response it returns matches
+    -- what was stored, without a follow-up read.
+    INSERT INTO order_items (
+        id, order_id, photo_id, product_type, quantity, unit_price_cents
+    )
+    SELECT
+        (item ->> 'id')::uuid,
+        v_order_id,
+        (item ->> 'photo_id')::uuid,
+        item ->> 'product_type',
+        (item ->> 'quantity')::integer,
+        (item ->> 'unit_price_cents')::integer
+    FROM jsonb_array_elements(p_items) AS item;
+
+    RETURN v_order_id;
+END;
+$$;
+
+COMMENT ON FUNCTION create_order_with_items IS
+    'Creates an order and its line items in a single transaction. Called by '
+    'order.service.createOrder. Prices are computed server-side before the '
+    'call — this function does not price anything.';
+
+-- ─── 00020_photos_bucket_private.sql ───
+
+-- =============================================================================
+-- Migration: 00020_photos_bucket_private
+-- Description: Close the most severe finding in the audit (G-02).
+--
+-- The photos bucket was created public (00015) with an explicit SELECT policy
+-- granted TO public. Combined with the unauthenticated /uploads static route in
+-- the API, every child's photograph was reachable by anyone holding or guessing
+-- a URL — no credential required.
+--
+-- After this migration the bucket is private. Photos are reachable only through
+-- short-lived signed URLs, which the API issues after verifying the caller is a
+-- parent of a tagged child or a teacher at the photo's school.
+-- =============================================================================
+
+-- 1. Flip the bucket to private. getPublicUrl() no longer resolves; every read
+--    must go through createSignedUrl().
+UPDATE storage.buckets
+SET public = false
+WHERE id = 'photos';
+
+-- 2. Remove the blanket public read grant.
+DROP POLICY IF EXISTS "photos_public_read" ON storage.objects;
+
+-- 3. Remove the authenticated write grants.
+--
+--    These allowed ANY authenticated user — including any parent — to write
+--    anywhere in the bucket, because the check was only `bucket_id = 'photos'`
+--    with no path or ownership constraint.
+--
+--    All uploads now go through the backend, which holds the service-role key
+--    and bypasses storage RLS. No replacement policy is required for it to work.
+DROP POLICY IF EXISTS "photos_authenticated_upload" ON storage.objects;
+DROP POLICY IF EXISTS "photos_authenticated_update" ON storage.objects;
+
+-- 4. Keep the size and MIME constraints — defence in depth alongside the
+--    application-level checks in middleware/upload.ts.
+UPDATE storage.buckets
+SET file_size_limit    = 26214400,  -- 25 MB
+    allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/heic']
+WHERE id = 'photos';
+
+COMMENT ON COLUMN photos.s3_key IS
+    'Object path in the private Supabase Storage "photos" bucket. The column '
+    'name is historical — an S3 backend was considered and abandoned. Read '
+    'access is via createSignedUrl() only.';
+
+COMMENT ON COLUMN photos.thumbnail_s3_key IS
+    'Object path of the 400px thumbnail variant, generated synchronously during '
+    'upload. Null only for photos uploaded before 00020.';

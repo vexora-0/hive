@@ -18,6 +18,7 @@
     "db:migrate": "supabase db push --include-all",
     "db:reset": "supabase db reset",
     "db:diff": "supabase db diff",
+    "db:combine": "./scripts/build-combined-migrations.sh",
     "test": "turbo run test",
     "seed": "pnpm --filter @hive/backend seed:demo",
     "seed:demo:reset": "pnpm --filter @hive/backend seed:demo:reset",

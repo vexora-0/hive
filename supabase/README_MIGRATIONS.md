@@ -32,26 +32,28 @@ This applies every file in `supabase/migrations/` in order, including the new tr
 
 ## Option B: SQL Editor (manual)
 
-> ⚠️ **`combined_migrations.sql` is out of date — it stops at `00015`.**
-> It omits `00016`, `00017`, `00018` and `00020`. Running it alone gives you a
-> database that looks complete but has a **publicly-readable photos bucket**
-> (G-02) and a **broken order flow** (G-01, G-19).
+> `combined_migrations.sql` is **regenerated and current** — all 19 migrations,
+> including `00016`–`00018` and `00020`. It previously stopped at `00015`, which
+> silently produced a publicly-readable photos bucket (G-02) and a broken order
+> flow (G-01, G-19). That is fixed.
 >
-> If you use this option you must also run, in this order, from
-> `supabase/migrations/`: `00016`, `00017`, `00018`, `00020`.
+> It is a **generated file — never edit it by hand.** After adding a migration:
 >
-> **Option A is strongly preferred** — it applies every file and records what
-> ran, so the next person can tell. Regenerating this file is a task for
-> whoever owns the schema.
+> ```bash
+> pnpm db:combine        # or ./scripts/build-combined-migrations.sh
+> ```
+>
+> **Option A is still preferred** — it records what ran, so the next person can
+> tell. Use Option B only when the CLI is unavailable.
 
 1. Open **Supabase Dashboard** → your project → **SQL Editor**.
 2. If your database is **empty** (no tables yet), run the full migration file:
    - Open `supabase/combined_migrations.sql` from this repo.
    - Copy its entire contents and paste into a new query in the SQL Editor.
    - Click **Run**.
-3. If you **already ran** `combined_migrations.sql` before and only need the new trigger:
-   - Open `supabase/migrations/00014_handle_new_user_trigger.sql`.
-   - Copy its contents, paste in the SQL Editor, and run it.
+3. If your database is **not** empty, do not use this file — it is not
+   idempotent for table creation. Apply the individual migrations you are
+   missing from `supabase/migrations/`, in filename order.
 
 ---
 
