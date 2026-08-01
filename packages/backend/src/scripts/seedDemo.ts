@@ -175,11 +175,14 @@ async function seedPhotos(ids: Record<string, string>): Promise<void> {
     const entry = plan[i];
     const file = files[i % files.length];
     const buffer = readFileSync(join(ASSETS, file));
-    const photoId = crypto.randomUUID();
+    // Deterministic, so re-running updates the same six rows instead of adding
+    // six more. crypto.randomUUID() here made the script's "safe to re-run"
+    // promise false: every run duplicated the entire photo set.
+    const photoId = `c0000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`;
     const schoolId = entry.school;
     const key = `photos/${schoolId}/${entry.class}/${photoId}.jpg`;
 
-    const { error: insertError } = await supabase.from('photos').insert({
+    const { error: insertError } = await supabase.from('photos').upsert({
       id: photoId,
       school_id: schoolId,
       class_id: entry.class,
@@ -208,11 +211,14 @@ async function seedPhotos(ids: Record<string, string>): Promise<void> {
     if (updateError) throw new Error(`photo metadata update: ${updateError.message}`);
 
     for (const studentId of entry.students) {
-      await supabase.from('photo_student_tags').insert({
-        photo_id: photoId,
-        student_id: studentId,
-        tagged_by: ids[entry.teacher],
-      });
+      await supabase.from('photo_student_tags').upsert(
+        {
+          photo_id: photoId,
+          student_id: studentId,
+          tagged_by: ids[entry.teacher],
+        },
+        { onConflict: 'photo_id,student_id' },
+      );
     }
 
     // ready LAST. notify_parents_on_photo fires on this transition and loops
@@ -263,6 +269,7 @@ async function main(): Promise<void> {
 
   log('Photos...');
   await seedPhotos(ids);
+
 
   const { count: notifications } = await supabase
     .from('notifications')
