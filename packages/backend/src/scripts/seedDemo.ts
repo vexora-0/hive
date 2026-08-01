@@ -18,6 +18,7 @@ import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { processAndUploadPhoto } from '../utils/imageProcessor';
+import { PRODUCT_PRICES_CENTS } from '../constants/products';
 
 const {
   SUPABASE_URL,
@@ -230,6 +231,92 @@ async function seedPhotos(ids: Record<string, string>): Promise<void> {
   }
 }
 
+/**
+ * Seed order history.
+ *
+ * Without this a parent's Orders tab is empty, so the ordering flow — the
+ * feature G-01 was about — cannot be shown at all.
+ *
+ * Orders go through `create_order_with_items` (migration `00018`), the same
+ * transactional path the API uses, rather than two loose inserts. Prices come
+ * from the shared catalogue, so the totals match what the app renders.
+ *
+ * Photos are looked up from what is actually tagged to each parent's children,
+ * so an order can only ever reference a photo that parent is allowed to see.
+ * That keeps the demo consistent with the privacy rule the product is built on.
+ */
+async function seedOrders(ids: Record<string, string>): Promise<void> {
+  const plan = [
+    { id: 'f0000000-0000-4000-8000-000000000001', parent: 'rajesh', school: SCHOOL.bloom, status: 'pending',
+      address: '42 Jayanagar 4th Block, Bangalore 560011',
+      items: [{ type: 'print_4x6' as const, qty: 2 }, { type: 'print_8x10' as const, qty: 1 }] },
+    { id: 'f0000000-0000-4000-8000-000000000002', parent: 'rajesh', school: SCHOOL.bloom, status: 'confirmed',
+      address: '42 Jayanagar 4th Block, Bangalore 560011',
+      items: [{ type: 'photo_book' as const, qty: 1 }] },
+    { id: 'f0000000-0000-4000-8000-000000000003', parent: 'anita', school: SCHOOL.bloom, status: 'shipped',
+      address: '9 Indiranagar 100ft Road, Bangalore 560038',
+      items: [{ type: 'magnet' as const, qty: 3 }, { type: 'mug' as const, qty: 1 }] },
+  ];
+
+  for (const order of plan) {
+    const parentId = ids[order.parent];
+    if (!parentId) continue;
+
+    const { data: existing } = await supabase.from('orders').select('id').eq('id', order.id).maybeSingle();
+    if (existing) {
+      log(`order ${order.status} already present`);
+      continue;
+    }
+
+    // Only photos this parent's children are tagged in.
+    const { data: links } = await supabase
+      .from('parent_student_mappings')
+      .select('student_id')
+      .eq('parent_id', parentId);
+    const studentIds = (links ?? []).map((l) => l.student_id);
+    if (!studentIds.length) continue;
+
+    const { data: tags } = await supabase
+      .from('photo_student_tags')
+      .select('photo_id')
+      .in('student_id', studentIds);
+    const photoIds = [...new Set((tags ?? []).map((t) => t.photo_id))];
+    if (!photoIds.length) {
+      log(`no photos for ${order.parent} — skipping ${order.status} order`);
+      continue;
+    }
+
+    const items = order.items.map((item, n) => ({
+      id: crypto.randomUUID(),
+      photo_id: photoIds[n % photoIds.length],
+      product_type: item.type,
+      quantity: item.qty,
+      unit_price_cents: PRODUCT_PRICES_CENTS[item.type],
+    }));
+    const totalCents = items.reduce((sum, i) => sum + i.unit_price_cents * i.quantity, 0);
+
+    const { error } = await supabase.rpc('create_order_with_items', {
+      p_order_id: order.id,
+      p_parent_id: parentId,
+      p_school_id: order.school,
+      p_idempotency_key: `demo-seed-${order.id}`,
+      p_shipping_address: order.address,
+      p_notes: null,
+      p_total_cents: totalCents,
+      p_items: items,
+    });
+    if (error) throw new Error(`order ${order.status}: ${error.message}`);
+
+    // The function always writes 'pending'; move the others on so order history
+    // shows a range of states rather than three identical rows.
+    if (order.status !== 'pending') {
+      await supabase.from('orders').update({ status: order.status }).eq('id', order.id);
+    }
+
+    log(`order ${order.status} — ${(totalCents / 100).toFixed(2)} (${items.length} item(s))`);
+  }
+}
+
 async function main(): Promise<void> {
   console.log('\nSeeding Hive demo data\n');
   if (RESET) await reset();
@@ -270,6 +357,8 @@ async function main(): Promise<void> {
   log('Photos...');
   await seedPhotos(ids);
 
+  log('Orders...');
+  await seedOrders(ids);
 
   const { count: notifications } = await supabase
     .from('notifications')
