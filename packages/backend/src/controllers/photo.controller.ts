@@ -63,11 +63,10 @@ export async function tagStudents(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const userId = req.user!.id;
     const { id } = req.params;
     const { studentIds } = req.body as Pick<TagStudentsInput, 'studentIds'>;
 
-    await photoService.tagStudents(userId, id, studentIds);
+    await photoService.tagStudents(id, studentIds, req.user!);
 
     res.json(success(null, 'Students tagged successfully'));
   } catch (err) {

@@ -80,24 +80,39 @@ Every plan follows the same loop:
 
 | Plan | Owner | Status | Merged |
 |---|---|---|---|
-| 00 | Bhargav | ◐ Group B done by Srujan — 7 of 8 cleared, `ClassItem` mismatch remains | ☐ |
-| 01 | shared | ◐ Steps 4, 6, 7 done (Ruthwik). Steps 1, 2, 3, 5, 8 outstanding | ◐ |
+| 00 | Bhargav | ✔ All 22 cleared — Group B by Srujan, A/C/D/E by Bhargav | ✔ |
+| 01 | shared | ◐ Steps 1–7 done (1, 3, 5 Nagachaitanya · 2 Srujan · 4, 6, 7 Ruthwik). **Step 8 (SMTP) outstanding** | ✔ |
 | 02 | Srujan | ☐ Not started | ☐ |
 | 03 | Ruthwik | ✔ Done — **runtime unverified, no `.env`** | ✔ |
-| 04 | Nagachaitanya | ☐ Not started | ☐ |
-| 05 | Ruthwik | ◐ Steps 1, 2, 3, 5 done. **Step 4 (G-34) reassigned to Nagachaitanya** | ✔ |
+| 04 | Nagachaitanya | ✔ Done — **runtime unverified**, see Deviations | ✔ |
+| 05 | Ruthwik | ✔ Steps 1, 2, 3, 5 (Ruthwik) · Step 4 / G-34 (Nagachaitanya) | ✔ |
 | 06 | Srujan | ☐ Not started | ☐ |
 | 07 | Bhargav | ☐ Not started | ☐ |
-| 08 | all four | ☐ Not started | ☐ |
-| 09 | Ruthwik | ☐ Not started — **raised in priority**, creates the first `.env` | ☐ |
-| 10 | all four | ☐ Not started | ☐ |
-| 11 | all four | ☐ Not started | ☐ |
+| 08 | all four | ◐ Harness + feed/photos (Ruthwik) + auth/errors (Nagachaitanya). **Never executed** | ◐ |
+| 09 | Bhargav | ◐ Docker, CI, health, request IDs (Ruthwik) · Sentry + PII scrubbing (Nagachaitanya). **Env setup and Render deploy outstanding** | ◐ |
+| 10 | all four | ◐ Architecture (Ruthwik) · security + auth diagram (Nagachaitanya). Rest outstanding | ◐ |
+| 11 | all four | ◐ k6 suite (Ruthwik) · `verify-security.sh` (Nagachaitanya). Neither has run | ◐ |
+
+**On branches.** Phase 2 was planned as one branch per plan with PRs into
+`develop`. `develop` was abandoned in W14 and the team moved to trunk-based
+work on `main`; the per-plan branches in earlier drafts of this table were
+never created.
+
+**Every ◐ and ✔ above means "written", not "runtime-verified".** No `.env`
+exists in this repository, so the backend cannot boot, the app cannot run, no
+Supabase query can be made and nothing is deployed. See each plan's
+`## Deviations` for exactly what was and was not executed.
 
 ### Open items needing an owner
 
-- **G-34** (`getSchools` N+1) — dropped from Plan 05 because `admin.service.ts` is Nagachaitanya's file. Needs adding to his Plan 04 or a follow-up.
-- **Nothing is runtime-verified.** No `.env` exists, so Plans 03 and 05 compile but have never run. Migration `00020` is not applied. Plan 09 should be pulled forward.
-- **`ClassItem` mismatch** — residual after Srujan's type regeneration; see Plan 00 Deviations.
+- **Plan 01 Step 8** (custom SMTP for OTP delivery) — a Supabase dashboard task.
+  Unowned. It is a demo-day failure with no code fix.
+- **No `.env` anywhere.** Plans 03, 04, 05, 08, 09 and 11 all compile and have
+  never run. Migration `00020` is not applied. This is the single highest-value
+  action available — see `docs/environment-setup.md`.
+- **G-02 is still open.** Plan 03 removed the static `/uploads` route in code,
+  but nothing has been deployed or verified, so no photo has ever been served
+  from the private bucket.
 
 ---
 
@@ -109,6 +124,7 @@ Sequential execution means no range reservation is needed, but numbers must not 
 |---|---|
 | 02 | `00017_align_product_types.sql`, `00018_order_totals_cents.sql`, `00019_fix_fk_constraints.sql` |
 | 03 | `00020_photos_bucket_private.sql` |
+| 04 | none — every fix is in the service layer, so `00022` stays unallocated |
 | 05 | — (no schema change) |
 | 06 | — (seeding is a TS script, not a migration) |
 | 07 | — |

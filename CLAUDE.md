@@ -35,6 +35,8 @@ Match it against the table. **This determines what you work on.** If the email d
 | `docs/01-PROJECT-AUDIT-AND-COMPLETION-PLAN.md` | The audit every plan derives from. 46 numbered gaps (`G-01`…`G-46`). |
 | `docs/02-FOUR-PERSON-DEVELOPMENT-AND-GIT-PLAN.md` | File ownership map and conflict protocol |
 | `docs/PROGRESS-REPORT.md` | Weekly progress report. Continues from Week 13. |
+| `docs/IMPLEMENTATION-STATUS.md` | **What actually exists right now** — gaps closed, what was executed, what was not, and what to do next. Read this before trusting any plan's status. |
+| `docs/security.md` | Threat model, the three-layer authorization design, remediation record, known limitations, auth sequence diagram. |
 
 **Plans are the source of truth.** They contain file paths, line numbers and exact fixes. Do not improvise a different approach — if a plan looks wrong, say so and record it under that plan's `## Deviations` section rather than silently doing something else.
 

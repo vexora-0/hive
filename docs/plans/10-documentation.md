@@ -230,4 +230,37 @@ docs: add progress report and documentation index
 
 ## Deviations
 
-*Record here anything that differed from this plan, and why.*
+**Only Step 5 and diagram G-3 were done, by Nagachaitanya**, matching the W22
+row in `PHASE-2-EXECUTION-PLAN.md` §4. `docs/security.md` covers all eight
+sections Step 5 asks for. The G-3 auth sequence is inline Mermaid in that
+file's appendix rather than in `architecture.md`, which does not exist yet —
+it belongs with the authorization narrative it illustrates, and can be moved
+or cross-linked when Step 2 lands.
+
+Not done: Steps 1–4 and 6–12 (README, architecture, database, API reference,
+testing, deployment, performance, limitations, progress report, the other
+seven diagrams, documentation index). Those are Bhargav's and Srujan's.
+
+**Step 5's item 7 asked to state that a secret scan returned zero hits. It did
+not, at first.** `git grep` for `Admin@123` found a live hit in
+`packages/backend/src/scripts/seedAdmin.ts` — Plan 01 Step 4, which the W14
+schedule leaves unassigned. Rather than write a security document claiming no
+committed credentials while one sat in the tree, Step 4 was implemented (commit
+`security(scripts): move admin seed credentials to environment variables`). A
+second hit in `supabase/seed.sql:9` surfaced later, when `verify-security.sh`
+scanned the whole repository rather than just `packages/` and `apps/`.
+
+The scan result reported in §7 is therefore real and current: zero JWTs, zero
+AWS keys, zero Stripe keys, zero PEM blocks, zero tracked `.env` files, zero
+hardcoded credentials.
+
+**`docs/security.md` reports open findings as prominently as closed ones.**
+Step 5's structure implies a remediation record; the document also carries an
+Open table, and states outright that **G-02 — `/uploads` served with no
+authentication — is more serious than anything the document reports as
+fixed**. Without that, a reader would reasonably conclude from §4 that photos
+are protected. They are not, until Plan 03 lands.
+
+Likewise §8 records that none of the §4 remediations have been verified
+against a running system, and that the test suite has never executed. Step 5's
+note that "honesty here reads as maturity" is taken at face value.

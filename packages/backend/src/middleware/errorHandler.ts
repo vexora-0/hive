@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { logger } from '../config/logger';
+import { Sentry, isSentryEnabled } from '../config/sentry';
 
 export class AppError extends Error {
   public readonly statusCode: number;
@@ -19,6 +20,19 @@ export class AppError extends Error {
     this.isOperational = isOperational;
     Object.setPrototypeOf(this, AppError.prototype);
   }
+}
+
+/**
+ * Send an error to Sentry, if it is configured.
+ *
+ * Only unexpected errors get here. `AppError` is deliberately excluded: a 403
+ * on a cross-school request or a 404 on an unowned photo is the authorization
+ * layer working, and reporting those would bury the real failures under
+ * thousands of events that mean "the system did its job".
+ */
+function reportToSentry(err: Error): void {
+  if (!isSentryEnabled()) return;
+  Sentry.captureException(err);
 }
 
 export function errorHandler(
@@ -68,6 +82,7 @@ export function errorHandler(
       code: supaErr.code,
       details: supaErr.details,
     });
+    reportToSentry(supaErr);
 
     res.status(500).json({
       success: false,
@@ -84,6 +99,7 @@ export function errorHandler(
     stack: err.stack,
     name: err.name,
   });
+  reportToSentry(err);
 
   res.status(500).json({
     success: false,

@@ -1,3 +1,5 @@
+// Must be first: initialises Sentry before any module it instruments loads.
+import './config/instrument';
 import 'dotenv/config';
 // Validate environment variables at startup (throws on invalid)
 import { env } from './config/env';

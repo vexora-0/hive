@@ -16,8 +16,15 @@ import {
 
 import { queryClient } from '@/lib/queryClient';
 import { ErrorBoundary, ToastProvider } from '@/components/feedback';
-import { useAuthStore } from '@/features/auth/stores/authStore';
 import { useSession } from '@/features/auth/hooks/useSession';
+import { initSentry, Sentry } from '@/lib/sentry';
+
+// ---------------------------------------------------------------------------
+// Error reporting — before the tree mounts, so start-up crashes are captured.
+// No-op unless EXPO_PUBLIC_SENTRY_DSN is set.
+// ---------------------------------------------------------------------------
+
+initSentry();
 
 // ---------------------------------------------------------------------------
 // Keep the splash screen visible until fonts are loaded and auth is resolved.
@@ -29,7 +36,7 @@ SplashScreen.preventAutoHideAsync();
 // Root Layout
 // ---------------------------------------------------------------------------
 
-export default function RootLayout() {
+function RootLayout() {
   // ── Fonts ───────────────────────────────────────────────────────────
   const [fontsLoaded, fontError] = useFonts({
     Baloo2_700Bold,
@@ -39,9 +46,10 @@ export default function RootLayout() {
   });
 
   // ── Auth ────────────────────────────────────────────────────────────
+  // Only the loading flag is needed here — it gates the splash screen. Which
+  // group a user may enter is decided by <RoleGate> inside each group layout,
+  // so that deep links are covered too.
   const { isLoading: authLoading } = useSession();
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const role = useAuthStore((s) => s.role);
 
   // ── Hide splash when ready ─────────────────────────────────────────
   const isReady = (fontsLoaded || !!fontError) && !authLoading;
@@ -64,39 +72,39 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <ErrorBoundary>
             <ToastProvider>
-            <Stack screenOptions={{ headerShown: false }}>
-              {/* Auth group — shown when not authenticated */}
-              <Stack.Screen
-                name="(auth)"
-                options={{ headerShown: false }}
-              />
+              <Stack screenOptions={{ headerShown: false }}>
+                {/* Auth group — shown when not authenticated */}
+                <Stack.Screen
+                  name="(auth)"
+                  options={{ headerShown: false }}
+                />
 
-              {/* Role-based groups — shown when authenticated */}
-              <Stack.Screen
-                name="(teacher)"
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen
-                name="(parent)"
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen
-                name="(admin)"
-                options={{ headerShown: false }}
-              />
+                {/* Role-based groups — shown when authenticated */}
+                <Stack.Screen
+                  name="(teacher)"
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                  name="(parent)"
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                  name="(admin)"
+                  options={{ headerShown: false }}
+                />
 
-              {/* Catch-all index redirect */}
-              <Stack.Screen
-                name="index"
-                options={{ headerShown: false }}
-              />
+                {/* Catch-all index redirect */}
+                <Stack.Screen
+                  name="index"
+                  options={{ headerShown: false }}
+                />
 
-              {/* 404 */}
-              <Stack.Screen
-                name="+not-found"
-                options={{ headerShown: false }}
-              />
-            </Stack>
+                {/* 404 */}
+                <Stack.Screen
+                  name="+not-found"
+                  options={{ headerShown: false }}
+                />
+              </Stack>
             </ToastProvider>
           </ErrorBoundary>
         </QueryClientProvider>
@@ -114,3 +122,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
+
+// ---------------------------------------------------------------------------
+// Export
+// ---------------------------------------------------------------------------
+
+/**
+ * Wrapped so that React render errors escaping <ErrorBoundary> — and errors in
+ * the boundary itself — still reach Sentry. Without a DSN, Sentry.wrap is a
+ * pass-through.
+ */
+export default Sentry.wrap(RootLayout);

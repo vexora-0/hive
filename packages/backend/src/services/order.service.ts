@@ -246,6 +246,9 @@ async function notifyAdminsOfNewOrder(
   itemCount: number,
   totalCents: number,
 ): Promise<void> {
+  // Scoped to the order's school. Platform admins seeded by seedAdmin.ts have
+  // school_id = null and so are deliberately not notified here; Plan 06's seed
+  // introduces school-scoped admins who will be.
   const { data: admins } = await supabaseAdmin
     .from('profiles')
     .select('id')

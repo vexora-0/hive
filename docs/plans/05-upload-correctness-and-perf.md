@@ -221,7 +221,7 @@ fix(upload): compute added image count from current state
 | 1 — tag before ready (G-07) | **Done.** Backend half landed in Plan 03; the mobile pipeline now adds a `confirming` state and calls `confirmUpload` after tagging. |
 | 2 — feed query rewrite (G-14) | **Done.** |
 | 3 — delete dead `getParentFeed` (G-15) | **Done in Plan 03.** |
-| 4 — `getSchools` N+1 (G-34) | **NOT DONE — belongs to Nagachaitanya.** |
+| 4 — `getSchools` N+1 (G-34) | **Done** by Nagachaitanya in W24. Two batched queries replace two-per-school; 3 round trips regardless of page size. `_count` shape unchanged, so `SchoolCard.tsx` is untouched. Not runtime-verified. |
 | 5 — upload concurrency (G-35) | **Done**, plus the `addImages` stale-closure count. |
 
 **Step 4 was not done deliberately.** It lives in `services/admin.service.ts`,

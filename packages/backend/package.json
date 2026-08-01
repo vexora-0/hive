@@ -7,7 +7,9 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint src/",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "clean": "rm -rf dist",
     "seed:admin": "tsx src/scripts/seedAdmin.ts",
     "test": "vitest run",
@@ -16,6 +18,7 @@
     "seed:demo:reset": "tsx src/scripts/seedDemo.ts --reset"
   },
   "dependencies": {
+    "@sentry/node": "^10.69.0",
     "@supabase/supabase-js": "^2.43.0",
     "blurhash": "^2.0.5",
     "cors": "^2.8.5",

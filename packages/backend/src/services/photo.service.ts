@@ -228,35 +228,15 @@ export async function confirmUpload(
 }
 
 export async function tagStudents(
-  userId: string,
   photoId: string,
   studentIds: string[],
+  user: { id: string; role: string; schoolId: string | null },
 ): Promise<void> {
-  // 1. Verify photo exists
-  const { data: photo, error: photoError } = await supabaseAdmin
-    .from('photos')
-    .select('school_id')
-    .eq('id', photoId)
-    .single();
-
-  if (photoError || !photo) {
-    throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
-  }
-
-  // 2. Verify user (teacher) is at the same school
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('school_id')
-    .eq('id', userId)
-    .single();
-
-  if (!profile || profile.school_id !== photo.school_id) {
-    throw new AppError(
-      'You can only tag students in photos from your school',
-      403,
-      'FORBIDDEN',
-    );
-  }
+  // 1. Load the photo and verify ownership, using the same guard as /file and
+  //    /confirm. This supersedes the separate profile/school lookup that used
+  //    to live here — ownership already implies the caller is at the photo's
+  //    school, and the old check did not verify the uploader at all.
+  const photo = await assertPhotoAccess(photoId, user);
 
   // 3. Verify all students belong to the same school
   const { data: students, error: studentsError } = await supabaseAdmin
@@ -284,7 +264,7 @@ export async function tagStudents(
   const tags = studentIds.map((studentId) => ({
     photo_id: photoId,
     student_id: studentId,
-    tagged_by: userId,
+    tagged_by: user.id,
   }));
 
   const { error: tagError } = await supabaseAdmin
@@ -305,21 +285,33 @@ export async function tagStudents(
   logger.info('Students tagged', {
     photoId,
     studentCount: studentIds.length,
-    userId,
+    userId: user.id,
   });
 }
 
 /**
  * Verify the caller may act on this photo.
  *
- * Admins may act anywhere. A teacher must be at the photo's school; the file
- * and confirm endpoints previously checked nothing, so any teacher could
- * overwrite any other teacher's photo by ID. (G-17)
+ * Admins may act anywhere. A teacher must be **the uploader, and at the
+ * photo's school**. The file and confirm endpoints previously checked nothing
+ * but status, so any teacher could overwrite any other teacher's photo by
+ * supplying its ID. (G-17)
+ *
+ * The school check alone is not enough. G-17 as written in the audit is
+ * "Teacher A can overwrite the file content of any other teacher's photo — at
+ * their own school, or, combined with G-08, any school." A school-scoped guard
+ * closes only the cross-school half and leaves same-school overwrite open,
+ * which is the more likely scenario in practice: colleagues share a school.
+ *
+ * Uploader scope is applied to tagging too, so one guard covers /file,
+ * /confirm and /tag. Letting a colleague tag your photo is a defensible
+ * product choice, but nothing in the app needs it, and one rule across three
+ * routes is easier to keep correct than two that differ subtly.
  */
 async function assertPhotoAccess(
   photoId: string,
   user: { id: string; role: string; schoolId: string | null },
-): Promise<{ s3_key: string; status: string; mime_type: string }> {
+): Promise<{ s3_key: string; status: string; mime_type: string; school_id: string }> {
   const { data: photo, error } = await supabaseAdmin
     .from('photos')
     .select('s3_key, status, mime_type, school_id, uploaded_by')
@@ -329,9 +321,25 @@ async function assertPhotoAccess(
   if (error || !photo) {
     throw new AppError('Photo not found', 404, 'PHOTO_NOT_FOUND');
   }
-  if (user.role !== 'admin' && photo.school_id !== user.schoolId) {
+
+  if (user.role === 'admin') {
+    return photo;
+  }
+
+  const isOwner =
+    user.role === 'teacher' &&
+    photo.uploaded_by === user.id &&
+    photo.school_id === user.schoolId;
+
+  if (!isOwner) {
+    logger.warn('Blocked photo mutation', {
+      photoId,
+      userId: user.id,
+      role: user.role,
+    });
     throw new AppError('You do not have access to this photo', 403, 'FORBIDDEN');
   }
+
   return photo;
 }
 

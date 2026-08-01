@@ -230,4 +230,84 @@ ci: add test task to the turbo pipeline
 
 ## Deviations
 
-*Record here anything that differed from this plan, and why.*
+**Partially implemented — 12 of 36 tests, by Nagachaitanya.** The schedule
+(`PHASE-2-EXECUTION-PLAN.md` §4) gives this stream the harness (W18) and the
+auth, RBAC and error tests (W19–W20). Written:
+
+| File | Tests | Status |
+|---|---|---|
+| `tests/setup.ts`, `tests/helpers.ts`, `vitest.config.ts`, fixtures | — | written |
+| `tests/auth.test.ts` | T-1…T-5, plus 6 variants | written, never run |
+| `tests/errors.test.ts` | T-26 (17 cases), T-33, T-34, plus envelope checks | written, never run |
+
+Not written: `photos.test.ts`, `feed.test.ts`, `orders.test.ts`,
+`admin.test.ts` (Ruthwik and Srujan), and all of Step 3's mobile tests
+(Bhargav). Those depend on Plans 02, 03 and 05, which have not started.
+
+**`typecheck` now runs two passes.** The base `tsconfig.json` keeps
+`rootDir: "./src"` so `build` still emits cleanly, so a second
+`tsconfig.test.json` with `rootDir: "."` covers `src`, `tests` and
+`vitest.config.ts`. `pnpm typecheck` runs both. This satisfies the plan's
+"typecheck still passes with test files included" without breaking the build.
+
+**`globals: true` was dropped** from the vitest config. Every test imports
+`describe`/`it`/`expect` from `vitest` explicitly, which avoids needing a
+`types` entry that resolves `vitest/globals` and `node` — the latter is not a
+direct dependency of `@hive/backend` and adding it to satisfy a type lookup
+would be noise.
+
+**`fileParallelism: false`** in addition to the plan's `singleFork`. Both are
+needed: `singleFork` shares one process, but files can still interleave.
+
+**Fixtures.** `valid.jpg` is a real 800×600 JPEG generated with `sharp` — 3 KB
+rather than the plan's ~50 KB, because a flat-colour image compresses that far
+and the size is irrelevant to what it tests. `notanimage.jpg` is text with a
+`.jpg` extension. `large.jpg` is deliberately absent; T-21 should generate it
+at test time rather than put 25 MB in git history.
+
+**Turbo `test` task uses `cache: false`.** The result depends on live database
+state turbo cannot see, so a cached pass would be wrong the first time anyone
+changed a migration.
+
+Incidentally: `require('sharp')` loads on macOS/arm64. That is the check
+`CLAUDE.md` puts on Plan 03 before Ruthwik starts.
+
+### After merging with Ruthwik's harness
+
+Two harnesses were written independently. **Ruthwik's was kept**, because
+`feed.test.ts` and `photos.test.ts` already depended on its API. Consequences:
+
+- `auth.test.ts` and `errors.test.ts` were adapted to it — `cleanupUsers()`
+  rather than `cleanup()`, and `tagStudentsBodySchema` rather than the
+  `tagStudentsSchema` that Plan 05's payload validation renamed. T-26 gained a
+  case for the new 50-student tag cap.
+- **One guard from this stream's harness was carried across.** Ruthwik's version
+  only refuses when `DEV_SUPABASE_URL` happens to be set, which is silent on a
+  machine that never configured it — exactly the machine most likely to get this
+  wrong. The hard-coded demo project ref check now sits alongside it.
+- `vitest.config.ts`, `tsconfig.test.json` and the second typecheck pass are
+  from this stream; his fixtures replaced the duplicate ones.
+
+Coverage after the merge: `auth.test.ts` and `errors.test.ts` (Nagachaitanya),
+`feed.test.ts` and `photos.test.ts` (Ruthwik). Still missing: `orders.test.ts`,
+`admin.test.ts` and all of Step 3's mobile tests.
+
+### Not verified
+
+**`pnpm test` has never been executed.** There is no `.env.test` and no test
+Supabase project, so the suite cannot reach a database. Twelve tests are
+written; zero have run.
+
+**The sabotage exercise in the Verification section has not been done.** The
+plan is right that it is the only proof the tests test anything, and it takes
+ten minutes — but it needs a working suite first. Whoever creates the test
+project should do it before ticking anything here.
+
+Two things *were* executed and passed:
+
+- **The database guard, both branches.** With no `.env.test` the suite refuses
+  and names the file to create. With `SUPABASE_URL` pointed at the demo project
+  ref it refuses with an explicit warning that running would wipe demo data.
+- **`tsc` over the test files**, via the second typecheck pass.
+
+The Done-when boxes stay unticked.

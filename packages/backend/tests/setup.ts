@@ -32,6 +32,35 @@ if (devUrl && devUrl === TEST_URL) {
   );
 }
 
+/**
+ * Second guard, for the case the one above cannot cover.
+ *
+ * The check above only fires when DEV_SUPABASE_URL happens to be set, so it is
+ * silent on a machine that never configured it — which is exactly the machine
+ * most likely to get this wrong. The demo project ref is committed at
+ * `supabase/README_MIGRATIONS.md:20`, so it can be named outright.
+ *
+ * Hard-coded on purpose: a guard that reads the value it is guarding against
+ * from configuration guards nothing.
+ */
+const FORBIDDEN_PROJECT_REFS = ['fhvwsmtivwtmbdscdoyz'];
+
+for (const ref of FORBIDDEN_PROJECT_REFS) {
+  if (TEST_URL.includes(ref)) {
+    throw new Error(
+      `REFUSING TO RUN.\n\n` +
+        `SUPABASE_URL points at project "${ref}", which is the demo project.\n` +
+        `This suite truncates every domain table and deletes auth users. ` +
+        `Running it here would wipe the demo data.\n\n` +
+        `Point .env.test at a separate Supabase project.`,
+    );
+  }
+}
+
+if (process.env.NODE_ENV === 'production') {
+  throw new Error('REFUSING TO RUN: NODE_ENV is production.');
+}
+
 export const supabaseTest: SupabaseClient = createClient(TEST_URL, TEST_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
