@@ -8,8 +8,11 @@
 # are reviewed code and nothing more.
 #
 # Usage:
-#   eval "$(pnpm --filter @hive/backend --silent verify:env)"
+#   eval "$(pnpm --filter @hive/backend verify:env | grep '^export')"
 #   ./scripts/verify-security.sh
+#
+# The grep is not decoration: pnpm prints its own banner on stdout when run
+# with --filter, and eval chokes on it.
 #
 # `verify:env` signs in as the seeded demo accounts and prints every variable
 # below as an export line. Doing it by hand instead means setting:

@@ -1,8 +1,12 @@
 /**
  * Print the environment scripts/verify-security.sh needs, as export lines.
  *
- *   eval "$(pnpm --filter @hive/backend --silent verify:env)"
+ *   eval "$(pnpm --filter @hive/backend verify:env | grep '^export')"
  *   ./scripts/verify-security.sh
+ *
+ * The grep matters — pnpm writes its own banner to stdout under --filter, and
+ * eval fails on it. Everything this script prints to stdout is an export line;
+ * the human-readable summary goes to stderr for the same reason.
  *
  * Until now there was no way to obtain a demo token short of signing in on a
  * device and copying the bearer out of a network log, which is why a script

@@ -14,3 +14,7 @@ demo/
 projectidea.md
 System Architecture & Technical Design.md
 .env.test
+
+# Written by `supabase start`. start-secrets holds generated local keys.
+supabase/.branches/
+supabase/.temp/
