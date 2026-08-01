@@ -155,22 +155,34 @@ Once the above works, these are the checks nobody has been able to perform.
 **Report what actually happens, including failures** — several of these exercise
 code that was written but never executed.
 
-**Storage and image processing (Plan 03)**
-- [ ] Teacher uploads a photo — completes without error
-- [ ] Supabase → Storage → `photos` contains **both** the original and `_thumb.jpg`
-- [ ] The `photos` row has non-null `thumbnail_s3_key`, `blurhash`, `width`, `height`
-- [ ] Copy a photo URL from the network tab, open in a private window → **works**
-- [ ] Strip the `?token=` query → **403**, not the image
-- [ ] `curl localhost:4000/uploads/anything` → **404** (route deleted)
-- [ ] Upload a HEIC file → stored as `.jpg`, renders on Android
-- [ ] Rename a `.txt` to `.jpg` and upload → **400**
+**Storage and image processing (Plan 03)** — *verified 1 Aug via `seed:demo:reset`*
+- [x] Photo processing completes without error — 6 of 6
+- [x] Storage holds **both** the original and `_thumb.jpg`
+- [x] `photos` rows have non-null `thumbnail_s3_key`, `blurhash`, `width`, `height`,
+      and `status = ready`
+- [x] A signed photo URL fetches **200** from an unauthenticated client
+- [x] Strip the `?token=` query → **400**, not the image *(400 rather than the
+      403 the plan predicted — Supabase rejects the malformed request before
+      authorising it; the security property holds either way)*
+- [x] `curl localhost:4000/uploads/anything` → **404** (route deleted)
+- [ ] Upload a HEIC file → stored as `.jpg` — **not tested**, every seed asset is
+      already a JPEG (`converted:false` on all six)
+- [ ] Rename a `.txt` to `.jpg` and upload → **400** — **not tested**
 
-**Upload ordering and feed (Plan 05)** — *highest risk, least verified*
-- [ ] Upload tagging a student whose parent you can log in as
-- [ ] **Parent's Alerts shows "New photo of \<child\>"** — this is the G-07 fix
-- [ ] Feed paginates past 20 items with no duplicates and none missing
-- [ ] A photo tagged with two of the parent's children appears **once**
-- [ ] A second parent does **not** see the first child's photos
+> These went through the seed script, which calls the photo service directly.
+> The HTTP path — `POST /photos`, the multipart step, `/tag`, `/confirm` — has
+> not been driven by a client yet.
+
+**Upload ordering and feed (Plan 05)** — *verified 1 Aug*
+- [x] Photos tagged to students whose parents can be logged in as — 9 tags
+- [x] **Parent's alerts show "New photo of \<child\>"** — the G-07 fix. 16
+      notifications, correct parent, correct child name ("New photo of Diya
+      Kumar"). The seed's zero-notification warning no longer fires
+- [ ] Feed paginates past 20 items — **not tested**, only 6 photos seeded
+- [x] No duplicate photo IDs in a parent's feed
+- [x] **A second parent does not see the first child's photos.** 6 photos exist;
+      Rajesh (Bloom, two children) sees 2, Vikram (Little Stars) sees 1, **zero
+      overlap**
 
 **Observability (Plan 09)** — *verified 1 Aug against `udawaiykfvdcvcouiqxr`*
 - [x] Responses carry an `X-Request-ID` header
