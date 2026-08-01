@@ -29,13 +29,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Still non-blocking: the backend carries one inherited lint error
-      # (middleware/auth.ts, @typescript-eslint/no-namespace). See
-      # docs/plans/BASELINE.md. Remove continue-on-error when that reaches zero
-      # — it is a one-line fix and the last thing keeping this step advisory.
+      # Now blocking. The no-namespace error in middleware/auth.ts was the
+      # condition the previous comment set for removing continue-on-error, and
+      # it was fixed in 40a69fc. Both packages are at 0 errors; warnings do not
+      # fail the step.
       - name: Lint
         run: pnpm lint
-        continue-on-error: true
 
       - name: Typecheck backend
         run: pnpm --filter @hive/backend typecheck
