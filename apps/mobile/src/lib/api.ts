@@ -38,6 +38,14 @@ export async function apiRequest<T>(endpoint: string, options: RequestOptions = 
     throw new ApiError(response.status, errorBody.message ?? 'Request failed', errorBody);
   }
 
+  // A 204 carries no body, so response.json() would throw on the empty string.
+  // The DELETE routes (archive a photo, untag a student) answer 204, and their
+  // callers want the rejection to mean "the request failed" — not "the request
+  // succeeded and then parsing blew up".
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json();
 }
 
