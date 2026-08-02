@@ -239,8 +239,8 @@ Stated plainly. Every one of these is a real gap.
 ## 9. Verification
 
 The runtime checklist lives in `docs/environment-setup.md` §7 and in
-`scripts/verify-security.sh`, which runs it against a deployed instance and
-exits with the failure count.
+`scripts/verify-security.sh`, which runs it against any reachable instance —
+local or deployed — and exits with the failure count.
 
 The checks that matter most: an unsigned or expired Storage URL must be
 rejected; a cross-family photo request must return **404**; a cross-school
@@ -255,6 +255,10 @@ photo must return **403**; and a triggered 500 must not leak a stack trace.
 ```
 passed 26   failed 0   skipped 3
 ```
+
+**Reproduced from cold on 2 August** — stack stopped and restarted, database
+truncated by the test suite, re-seeded, backend rebooted — same result. So this
+is a repeatable procedure, not a one-off reading.
 
 | § | Checks | Result |
 |---|---|---|
