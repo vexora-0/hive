@@ -5,6 +5,8 @@ import { AppError } from '../middleware/errorHandler';
 import type {
   CreateOrderInput,
   GetOrdersInput,
+  GetSchoolOrdersInput,
+  UpdateOrderStatusInput,
 } from '../validators/order.validator';
 
 export async function createOrder(
@@ -72,6 +74,78 @@ export async function getOrderById(
     const order = await orderService.getOrderById(id, parentId);
 
     res.json(success(order));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function cancelOrder(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const parentId = req.user!.id;
+    const { id } = req.params;
+
+    const order = await orderService.cancelOrder(id, parentId);
+
+    res.json(success(order, 'Order cancelled'));
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /admin/orders — the fulfilment queue for one school.
+ *
+ * A platform admin has no school of their own, so there is nothing to scope
+ * to. Rather than silently listing every school's orders, ask for the school
+ * explicitly; the admin UI already knows which school it is looking at.
+ */
+export async function getSchoolOrders(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const query = req.query as unknown as GetSchoolOrdersInput;
+    const { cursor, limit, status } = query;
+    const schoolId = req.user!.schoolId ?? query.schoolId;
+
+    if (!schoolId) {
+      throw new AppError(
+        'schoolId query parameter is required for an admin without a school',
+        400,
+        'VALIDATION_ERROR',
+      );
+    }
+
+    const result = await orderService.getOrdersForSchool(
+      schoolId,
+      cursor,
+      limit,
+      status,
+    );
+
+    res.json(paginated(result.orders, result.nextCursor));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateOrderStatus(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params;
+    const { status } = req.body as UpdateOrderStatusInput;
+
+    const order = await orderService.updateOrderStatus(id, status, req.user!);
+
+    res.json(success(order, 'Order status updated'));
   } catch (err) {
     next(err);
   }

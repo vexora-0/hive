@@ -4,6 +4,7 @@ import { roleGuard } from '../middleware/roleGuard';
 import { validate } from '../middleware/validate';
 import { idempotency } from '../middleware/idempotency';
 import { createOrderSchema, getOrdersSchema } from '../validators/order.validator';
+import { uuidIdParam } from '../validators/params.validator';
 import * as orderController from '../controllers/order.controller';
 
 const router: import("express").Router = Router();
@@ -33,6 +34,14 @@ router.get(
   '/:id',
   roleGuard('parent'),
   orderController.getOrderById,
+);
+
+// PATCH /orders/:id/cancel - Cancel a pending order (parent only, own order)
+router.patch(
+  '/:id/cancel',
+  roleGuard('parent'),
+  validate(uuidIdParam, 'params'),
+  orderController.cancelOrder,
 );
 
 export default router;

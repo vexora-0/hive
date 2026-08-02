@@ -12,7 +12,13 @@ import {
   createStudentSchema,
   mapParentSchema,
 } from '../validators/admin.validator';
+import {
+  getSchoolOrdersSchema,
+  updateOrderStatusSchema,
+} from '../validators/order.validator';
+import { uuidIdParam } from '../validators/params.validator';
 import * as adminController from '../controllers/admin.controller';
+import * as orderController from '../controllers/order.controller';
 
 const router: import("express").Router = Router();
 
@@ -22,6 +28,21 @@ router.use(roleGuard('admin'));
 
 // GET /admin/dashboard - Dashboard statistics
 router.get('/dashboard', adminController.getDashboardStats);
+
+// GET /admin/orders - Fulfilment queue for a school
+router.get(
+  '/orders',
+  validate(getSchoolOrdersSchema, 'query'),
+  orderController.getSchoolOrders,
+);
+
+// PATCH /admin/orders/:id/status - Advance an order through fulfilment
+router.patch(
+  '/orders/:id/status',
+  validate(uuidIdParam, 'params'),
+  validate(updateOrderStatusSchema, 'body'),
+  orderController.updateOrderStatus,
+);
 
 // GET /admin/users - List users with search/filter
 router.get(

@@ -24,7 +24,7 @@ function tabIcon(
 // ---------------------------------------------------------------------------
 
 /**
- * Admin tab layout — 5 tabs: Dashboard, Users, Schools, Notifications, Profile.
+ * Admin tab layout — 6 tabs: Dashboard, Users, Schools, Orders, Alerts, Profile.
  */
 export default function AdminLayout() {
   return (
@@ -56,6 +56,13 @@ export default function AdminLayout() {
         options={{
           title: 'Schools',
           tabBarIcon: tabIcon('school-outline', 'school'),
+        }}
+      />
+      <Tabs.Screen
+        name="orders"
+        options={{
+          title: 'Orders',
+          tabBarIcon: tabIcon('receipt-outline', 'receipt'),
         }}
       />
       <Tabs.Screen

@@ -1,5 +1,5 @@
 import { apiRequest } from '@/lib/api';
-import type { UserRole, Tables } from '@/types/supabase';
+import type { UserRole, Tables, OrderStatus } from '@/types/supabase';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -45,6 +45,19 @@ export interface AdminSchool {
     teachers: number;
   };
   classes: Array<{ id: string; name: string; grade: string | null }>;
+}
+
+/** A row in the admin fulfilment queue. Items are not included — the list is
+ *  about status and value, and loading items for every row would be N+1. */
+export interface AdminOrder {
+  id: string;
+  parent_id: string;
+  school_id: string;
+  status: OrderStatus;
+  shipping_address: string | null;
+  notes: string | null;
+  total_cents: number;
+  created_at: string;
 }
 
 export interface CreateSchoolData {
@@ -204,6 +217,51 @@ export async function getSchools(
     nextCursor: res.cursor,
     total: res.data.length,
   };
+}
+
+/**
+ * Fetch the fulfilment queue for a school, newest first.
+ *
+ * `schoolId` is only needed for a platform admin, who has no school of their
+ * own — a school-scoped admin is served their own school by the server.
+ */
+export async function getSchoolOrders(
+  opts: { cursor?: string; limit?: number; status?: OrderStatus; schoolId?: string } = {},
+): Promise<PaginatedResponse<AdminOrder>> {
+  const params = new URLSearchParams();
+  if (opts.cursor) params.set('cursor', opts.cursor);
+  if (opts.status) params.set('status', opts.status);
+  if (opts.schoolId) params.set('schoolId', opts.schoolId);
+  params.set('limit', String(opts.limit ?? 20));
+
+  const res = await apiRequest<{
+    success: true;
+    data: AdminOrder[];
+    cursor: string | null;
+  }>(`/admin/orders?${params.toString()}`, { method: 'GET' });
+
+  return {
+    data: res.data,
+    nextCursor: res.cursor,
+    total: res.data.length,
+  };
+}
+
+/**
+ * Advance an order through fulfilment.
+ *
+ * The server rejects any transition that is not a step forwards, and notifies
+ * the parent on every accepted one.
+ */
+export async function updateOrderStatus(
+  orderId: string,
+  status: OrderStatus,
+): Promise<AdminOrder> {
+  const res = await apiRequest<{ success: true; data: AdminOrder }>(
+    `/admin/orders/${orderId}/status`,
+    { method: 'PATCH', body: { status } },
+  );
+  return res.data;
 }
 
 /**

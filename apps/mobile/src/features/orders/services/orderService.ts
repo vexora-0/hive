@@ -106,4 +106,18 @@ export const orderService = {
     const res = await apiRequest<{ success: true; data: OrderWithItems }>(`/orders/${orderId}`);
     return res.data;
   },
+
+  /**
+   * Cancel one of your own orders.
+   *
+   * The server only allows this while the order is still `pending`; once an
+   * admin has confirmed it, prints may already be in production.
+   */
+  cancelOrder: async (orderId: string): Promise<OrderWithItems> => {
+    const res = await apiRequest<{ success: true; data: OrderWithItems }>(
+      `/orders/${orderId}/cancel`,
+      { method: 'PATCH' },
+    );
+    return res.data;
+  },
 };

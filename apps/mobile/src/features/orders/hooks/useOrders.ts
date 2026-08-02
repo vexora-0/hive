@@ -88,3 +88,34 @@ export function useOrderDetail(orderId: string) {
     enabled: !!orderId,
   });
 }
+
+// ---------------------------------------------------------------------------
+// useCancelOrder
+// ---------------------------------------------------------------------------
+
+/**
+ * `useCancelOrder` -- cancels a pending order.
+ *
+ * Invalidates both the list and the detail: the sheet the parent is looking at
+ * has to show the new status, and the row behind it has to stop saying
+ * "pending".
+ */
+export function useCancelOrder() {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+
+  return useMutation({
+    mutationFn: (orderId: string) => orderService.cancelOrder(orderId),
+
+    onSuccess: (_data, orderId) => {
+      queryClient.invalidateQueries({ queryKey: orderKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: orderKeys.detail(orderId) });
+      toast.success('Order cancelled');
+    },
+
+    onError: (error: unknown) =>
+      toast.error(
+        apiErrorMessage(error, 'Could not cancel this order. Please try again.'),
+      ),
+  });
+}

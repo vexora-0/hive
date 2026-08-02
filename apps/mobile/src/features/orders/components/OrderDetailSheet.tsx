@@ -9,12 +9,12 @@ import {
 
 import { formatCents } from '../constants/products';
 import { colors, spacing, layout } from '@/theme';
-import { Text } from '@/components/ui';
+import { Text, Button } from '@/components/ui';
 import { HiveImage } from '@/components/media';
 import type { OrderStatus, ProductType } from '@/types/supabase';
 
-import { useOrderDetail } from '../hooks/useOrders';
-import { Modal } from '@/components/feedback';
+import { useOrderDetail, useCancelOrder } from '../hooks/useOrders';
+import { Modal, ConfirmDialog } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -97,6 +97,18 @@ function getStatusStepIndex(status: OrderStatus): number {
 export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
   const { data: order, isLoading } = useOrderDetail(orderId ?? '');
   const isVisible = orderId != null;
+
+  // ── Cancelling ───────────────────────────────────────────────────
+  // Only offered while the order is still pending; the server refuses any
+  // later, because prints may already be in production by then.
+  const cancelOrder = useCancelOrder();
+  const [confirmingCancel, setConfirmingCancel] = React.useState(false);
+  const canCancel = order?.status === 'pending';
+
+  const handleConfirmCancel = useCallback(() => {
+    setConfirmingCancel(false);
+    if (orderId) cancelOrder.mutate(orderId);
+  }, [orderId, cancelOrder]);
 
   // ── Status timeline ──────────────────────────────────────────────
   const renderTimeline = () => {
@@ -300,6 +312,17 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
                 </Text>
               </View>
             </View>
+
+            {canCancel && (
+              <Button
+                variant="outline"
+                onPress={() => setConfirmingCancel(true)}
+                loading={cancelOrder.isPending}
+                style={styles.cancelButton}
+              >
+                Cancel Order
+              </Button>
+            )}
           </ScrollView>
         ) : (
           <View style={styles.loadingContainer}>
@@ -308,6 +331,19 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
             </Text>
           </View>
         )}
+
+        {/* Nested inside the sheet on purpose — a ConfirmDialog rendered as a
+            sibling Modal never appears on iOS. */}
+        <ConfirmDialog
+          visible={confirmingCancel}
+          title="Cancel this order?"
+          message="The order will not be printed or delivered. You can place a new one at any time."
+          confirmLabel="Cancel Order"
+          cancelLabel="Keep Order"
+          destructive
+          onConfirm={handleConfirmCancel}
+          onCancel={() => setConfirmingCancel(false)}
+        />
           </View>
         </Pressable>
       </Pressable>
@@ -458,6 +494,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.surface,
     borderRadius: layout.cardRadius,
     padding: spacing.md,
+  },
+
+  cancelButton: {
+    marginTop: spacing.lg,
   },
 
   // Total
