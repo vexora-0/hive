@@ -13,7 +13,6 @@ import { Text, Button } from '@/components/ui';
 import { TextInput } from '@/components/ui';
 import { HiveImage } from '@/components/media';
 import type { ProductType } from '@/types/supabase';
-import { useAuthStore } from '@/features/auth/stores/authStore';
 
 import { PRODUCT_PRICES_CENTS, formatCents } from '../constants/products';
 import { useCreateOrder } from '../hooks/useOrders';
@@ -73,16 +72,17 @@ export function OrderBottomSheet({
   isVisible,
   onClose,
 }: OrderBottomSheetProps) {
-  const profile = useAuthStore((s) => s.profile);
   const createOrder = useCreateOrder();
 
   // ── Local state ─────────────────────────────────────────────────────
   const [step, setStep] = useState<Step>('product');
   const [selectedType, setSelectedType] = useState<ProductType | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [shippingAddress, setShippingAddress] = useState(
-    profile?.phone ?? '', // pre-fill if available
-  );
+  // Starts empty. This used to pre-fill from `profile.phone`, so every parent
+  // with a number on file began the order flow with their phone number sitting
+  // in the shipping-address box — and nothing in the profile holds an address
+  // to pre-fill it with instead.
+  const [shippingAddress, setShippingAddress] = useState('');
   const [notes, setNotes] = useState('');
   const [orderSuccess, setOrderSuccess] = useState(false);
 
