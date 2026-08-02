@@ -11,6 +11,7 @@ import { apiErrorMessage } from '@/utils/errorMessage';
 import {
   getSchools,
   createSchool as createSchoolApi,
+  updateSchool as updateSchoolApi,
   createClass as createClassApi,
   type AdminSchool,
   type CreateSchoolData,
@@ -81,6 +82,24 @@ export function useAdminSchools() {
     [createMutation],
   );
 
+  // ── Update school mutation ─────────────────────────────────────────
+  const updateMutation = useMutation({
+    mutationFn: ({ schoolId, data }: { schoolId: string; data: CreateSchoolData }) =>
+      updateSchoolApi(schoolId, data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: SCHOOLS_KEY });
+      toast.success(`${variables.data.name} updated`);
+    },
+    onError: (error) =>
+      toast.error(apiErrorMessage(error, 'Could not update school.')),
+  });
+
+  const updateSchool = useCallback(
+    (schoolId: string, schoolData: CreateSchoolData) =>
+      updateMutation.mutateAsync({ schoolId, data: schoolData }),
+    [updateMutation],
+  );
+
   // ── Create class mutation ──────────────────────────────────────────
   const createClassMutation = useMutation({
     mutationFn: ({ schoolId, data }: { schoolId: string; data: CreateClassData }) =>
@@ -109,6 +128,8 @@ export function useAdminSchools() {
     refetch,
     createSchool,
     isCreating: createMutation.isPending,
+    updateSchool,
+    isUpdating: updateMutation.isPending,
     createClass,
     isCreatingClass: createClassMutation.isPending,
   };

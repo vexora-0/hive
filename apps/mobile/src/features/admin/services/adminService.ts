@@ -265,6 +265,22 @@ export async function updateOrderStatus(
 }
 
 /**
+ * Update a school's details.
+ *
+ * Only the fields supplied are written, so this doubles as a partial update.
+ */
+export async function updateSchool(
+  schoolId: string,
+  data: CreateSchoolData,
+): Promise<Tables<'schools'>> {
+  const res = await apiRequest<{ success: true; data: Tables<'schools'> }>(
+    `/admin/schools/${schoolId}`,
+    { method: 'PATCH', body: data },
+  );
+  return res.data;
+}
+
+/**
  * Create a new school.
  */
 export async function createSchool(

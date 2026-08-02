@@ -4,6 +4,7 @@ import { logger } from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
 import type {
   CreateSchoolInput,
+  UpdateSchoolInput,
   CreateStudentInput,
   MapParentInput,
   GetUsersInput,
@@ -327,6 +328,55 @@ export async function createSchool(
 
   logger.info('School created', { schoolId: school.id, name: data.name });
   return created as School;
+}
+
+/**
+ * Update a school's details.
+ *
+ * `updateSchoolSchema` has existed since the validators were written and no
+ * route ever used it — a school's name or address could be set once at
+ * creation and never corrected. (M-9)
+ *
+ * `email` is accepted by the schema but the `schools` table has no such
+ * column, so it is dropped here exactly as `createSchool` drops it. Every
+ * field is optional, so only what was sent is written.
+ */
+export async function updateSchool(
+  schoolId: string,
+  data: UpdateSchoolInput,
+): Promise<School> {
+  const patch: Record<string, string | null> = {};
+  if (data.name !== undefined) patch.name = data.name;
+  if (data.address !== undefined) patch.address = data.address;
+  if (data.phone !== undefined) patch.phone = data.phone;
+  if (data.logoUrl !== undefined) patch.logo_url = data.logoUrl;
+
+  if (Object.keys(patch).length === 0) {
+    throw new AppError('No fields to update', 400, 'NO_FIELDS');
+  }
+
+  patch.updated_at = new Date().toISOString();
+
+  const { data: updated, error } = await supabaseAdmin
+    .from('schools')
+    .update(patch)
+    .eq('id', schoolId)
+    .select('id, name, address, phone, logo_url, created_at')
+    .maybeSingle();
+
+  if (error) {
+    logger.error('Failed to update school', { error: error.message, schoolId });
+    throw new AppError('Failed to update school', 500, 'UPDATE_FAILED');
+  }
+
+  // maybeSingle returns null rather than erroring when nothing matched, which
+  // is the difference between "no such school" (404) and a real failure (500).
+  if (!updated) {
+    throw new AppError('School not found', 404, 'SCHOOL_NOT_FOUND');
+  }
+
+  logger.info('School updated', { schoolId, fields: Object.keys(patch) });
+  return updated as School;
 }
 
 // ---------------------------------------------------------------------------

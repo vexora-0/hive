@@ -3,6 +3,7 @@ import * as adminService from '../services/admin.service';
 import { success, paginated } from '../utils/apiResponse';
 import type {
   CreateSchoolInput,
+  UpdateSchoolInput,
   CreateStudentInput,
   MapParentInput,
   UpdateUserRoleInput,
@@ -93,6 +94,21 @@ export async function createSchool(
     const data = req.body as CreateSchoolInput;
     const school = await adminService.createSchool(data);
     res.status(201).json(success(school, 'School created'));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateSchool(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params;
+    const data = req.body as UpdateSchoolInput;
+    const school = await adminService.updateSchool(id, data);
+    res.json(success(school, 'School updated'));
   } catch (err) {
     next(err);
   }

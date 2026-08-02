@@ -28,6 +28,12 @@ export interface AddSchoolSheetProps {
   onSubmit: (data: CreateSchoolData) => void;
   /** Whether submission is in progress. */
   isSubmitting?: boolean;
+  /**
+   * Existing values to edit. When present the sheet switches to edit mode:
+   * same fields, same validation, different title and button label. A school's
+   * details could previously be set once at creation and never corrected.
+   */
+  initialValues?: CreateSchoolData | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -35,7 +41,7 @@ export interface AddSchoolSheetProps {
 // ---------------------------------------------------------------------------
 
 /**
- * `<AddSchoolSheet>` -- a bottom sheet form for creating a new school.
+ * `<AddSchoolSheet>` -- a bottom sheet form for creating or editing a school.
  *
  * Fields: name (required), address (optional), phone (optional).
  */
@@ -44,20 +50,25 @@ export function AddSchoolSheet({
   onClose,
   onSubmit,
   isSubmitting = false,
+  initialValues = null,
 }: AddSchoolSheetProps) {
+  const isEditing = initialValues != null;
+
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   const [nameError, setNameError] = useState<string | undefined>();
 
+  // Re-seed every time the sheet opens, so a cancelled edit does not leak into
+  // the next school the admin opens.
   useEffect(() => {
     if (isVisible) {
-      setName('');
-      setAddress('');
-      setPhone('');
+      setName(initialValues?.name ?? '');
+      setAddress(initialValues?.address ?? '');
+      setPhone(initialValues?.phone ?? '');
       setNameError(undefined);
     }
-  }, [isVisible]);
+  }, [isVisible, initialValues]);
 
   const handleSubmit = useCallback(() => {
     const trimmedName = name.trim();
@@ -94,7 +105,7 @@ export function AddSchoolSheet({
               showsVerticalScrollIndicator={false}
             >
               <Text variant="h3" style={styles.title}>
-                Add School
+                {isEditing ? 'Edit School' : 'Add School'}
               </Text>
 
               <TextInput
@@ -136,7 +147,7 @@ export function AddSchoolSheet({
                 disabled={!name.trim()}
                 style={styles.submitButton}
               >
-                Create School
+                {isEditing ? 'Save Changes' : 'Create School'}
               </Button>
             </ScrollView>
           </Pressable>

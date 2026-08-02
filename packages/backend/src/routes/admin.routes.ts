@@ -4,6 +4,7 @@ import { roleGuard } from '../middleware/roleGuard';
 import { validate } from '../middleware/validate';
 import {
   createSchoolSchema,
+  updateSchoolSchema,
   updateUserRoleSchema,
   assignUserToSchoolSchema,
   getUsersSchema,
@@ -77,6 +78,14 @@ router.post(
   '/schools',
   validate(createSchoolSchema, 'body'),
   adminController.createSchool,
+);
+
+// PATCH /admin/schools/:id - Update school details
+router.patch(
+  '/schools/:id',
+  validate(uuidIdParam, 'params'),
+  validate(updateSchoolSchema, 'body'),
+  adminController.updateSchool,
 );
 
 // ── Class detail & teacher assignment ──────────────────────────────────

@@ -44,12 +44,15 @@ export default function SchoolsScreen() {
     refetch,
     createSchool,
     isCreating,
+    updateSchool,
+    isUpdating,
     createClass,
     isCreatingClass,
   } = useAdminSchools();
 
   // ── Add school / add class sheet state ─────────────────────────────
   const [addSheetVisible, setAddSheetVisible] = useState(false);
+  const [editingSchool, setEditingSchool] = useState<AdminSchool | null>(null);
   const [addClassSchool, setAddClassSchool] = useState<AdminSchool | null>(null);
 
   const handleAddPress = useCallback(() => {
@@ -73,6 +76,25 @@ export default function SchoolsScreen() {
       }
     },
     [createSchool],
+  );
+
+  // ── Editing an existing school ────────────────────────────────────
+  const handleEditPress = useCallback((school: AdminSchool) => {
+    setEditingSchool(school);
+  }, []);
+
+  const handleEditSubmit = useCallback(
+    async (data: CreateSchoolData) => {
+      if (!editingSchool) return;
+      try {
+        await updateSchool(editingSchool.id, data);
+        setEditingSchool(null);
+      } catch {
+        // Surfaced by the hook's onError toast; the sheet stays open so the
+        // typed values survive a retry.
+      }
+    },
+    [editingSchool, updateSchool],
   );
 
   const handleAddClassPress = useCallback((school: AdminSchool) => {
@@ -114,11 +136,12 @@ export default function SchoolsScreen() {
     ({ item }: { item: AdminSchool }) => (
       <SchoolCard
         school={item}
+        onPress={handleEditPress}
         onAddClass={handleAddClassPress}
         onClassPress={handleClassPress}
       />
     ),
-    [handleAddClassPress, handleClassPress],
+    [handleEditPress, handleAddClassPress, handleClassPress],
   );
 
   const renderSeparator = useCallback(
@@ -190,6 +213,23 @@ export default function SchoolsScreen() {
         onClose={handleAddClose}
         onSubmit={handleAddSubmit}
         isSubmitting={isCreating}
+      />
+
+      {/* Edit school bottom sheet — same form, seeded with existing values */}
+      <AddSchoolSheet
+        isVisible={editingSchool !== null}
+        initialValues={
+          editingSchool
+            ? {
+                name: editingSchool.name,
+                address: editingSchool.address ?? undefined,
+                phone: editingSchool.phone ?? undefined,
+              }
+            : null
+        }
+        onClose={() => setEditingSchool(null)}
+        onSubmit={handleEditSubmit}
+        isSubmitting={isUpdating}
       />
 
       {/* Add class sheet */}

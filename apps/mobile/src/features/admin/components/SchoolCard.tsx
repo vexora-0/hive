@@ -19,7 +19,7 @@ import type { AdminSchool } from '@/features/admin/services/adminService';
 export interface SchoolCardProps {
   /** The school data to display. */
   school: AdminSchool;
-  /** Called when the card header is pressed. */
+  /** Called when the card header is pressed. Used to edit the school. */
   onPress?: (school: AdminSchool) => void;
   /** Called when "Add class" is pressed. */
   onAddClass?: (school: AdminSchool) => void;
@@ -65,6 +65,7 @@ export function SchoolCard({ school, onPress, onAddClass, onClassPress }: School
         onPress={handlePress}
         style={styles.header}
         accessibilityRole="button"
+        accessibilityLabel={onPress ? `Edit ${school.name}` : school.name}
       >
         <View style={styles.iconCircle}>
           <Ionicons name="school" size={22} color={colors.primary.amber} />
@@ -84,6 +85,16 @@ export function SchoolCard({ school, onPress, onAddClass, onClassPress }: School
             </Text>
           )}
         </View>
+
+        {/* Only shown when the card is actually editable — otherwise the
+            header is not pressable and a pencil would be a lie. */}
+        {onPress && (
+          <Ionicons
+            name="create-outline"
+            size={18}
+            color={colors.text.tertiary}
+          />
+        )}
       </Pressable>
 
       {/* Stats row */}
