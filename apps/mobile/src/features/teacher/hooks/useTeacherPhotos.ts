@@ -1,8 +1,9 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { apiRequest } from '@/lib/api';
 import { logger } from '@/utils/logger';
 import { STALE_TIME_MS, FEED_PAGE_SIZE } from '@/theme';
+import { archivePhoto, untagStudent } from '../services/teacherService';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -95,4 +96,44 @@ export function useTeacherPhotos(classId: string) {
     refetch: query.refetch,
     error: query.error,
   };
+}
+
+/**
+ * `useArchivePhoto` -- removes a photo from this class's grid and from every
+ * parent's feed.
+ *
+ * The server soft-deletes, so an order already placed against the photo keeps
+ * its thumbnail. Invalidates rather than optimistically removing: archiving is
+ * rare and a wrong optimistic removal is worse here than a half-second wait.
+ */
+export function useArchivePhoto(classId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (photoId: string) => archivePhoto(photoId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teacher-photos', classId] });
+    },
+    onError: (error) => {
+      logger.error('Failed to archive photo', { error: String(error) });
+    },
+  });
+}
+
+/**
+ * `useUntagStudent` -- revokes one family's access to one photo.
+ */
+export function useUntagStudent(classId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ photoId, studentId }: { photoId: string; studentId: string }) =>
+      untagStudent(photoId, studentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teacher-photos', classId] });
+    },
+    onError: (error) => {
+      logger.error('Failed to untag student', { error: String(error) });
+    },
+  });
 }

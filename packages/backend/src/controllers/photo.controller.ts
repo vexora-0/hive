@@ -74,6 +74,38 @@ export async function tagStudents(
   }
 }
 
+export async function archivePhoto(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params;
+
+    await photoService.archivePhoto(id, req.user!);
+
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function untagStudent(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id, studentId } = req.params;
+
+    await photoService.untagStudent(id, studentId, req.user!);
+
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getPhotos(
   req: Request,
   res: Response,

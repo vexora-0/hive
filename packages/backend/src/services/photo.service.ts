@@ -289,6 +289,90 @@ export async function tagStudents(
 }
 
 /**
+ * Soft-delete a photo by moving it to 'archived'.
+ *
+ * Deliberately not a hard delete. `order_items.photo_id` is ON DELETE RESTRICT
+ * (migration 00018), so removing a photo somebody has ordered would fail at the
+ * database; and dropping the storage objects would blank out the thumbnails in
+ * that parent's order history. 'archived' has been in the photos CHECK
+ * constraint since 00007 and was, until now, unreachable — this is the write it
+ * was added for. (G-41)
+ *
+ * Nothing needs to change on the parent side: both queries in feed.service
+ * filter `status = 'ready'`, so the photo leaves every parent's feed the moment
+ * this returns.
+ */
+export async function archivePhoto(
+  photoId: string,
+  user: { id: string; role: string; schoolId: string | null },
+): Promise<void> {
+  const photo = await assertPhotoAccess(photoId, user);
+
+  // 'processing' is excluded because an upload may still be in flight against
+  // this row; saveUploadedFile would then fail on a photo the teacher thinks
+  // they removed. 'archived' is excluded because it is already done.
+  if (photo.status !== 'ready' && photo.status !== 'failed') {
+    throw new AppError(
+      `Cannot archive a photo in '${photo.status}' state`,
+      400,
+      'INVALID_STATE',
+    );
+  }
+
+  const { error } = await supabaseAdmin
+    .from('photos')
+    .update({ status: 'archived', updated_at: new Date().toISOString() })
+    .eq('id', photoId);
+
+  if (error) {
+    logger.error('Failed to archive photo', { error: error.message, photoId });
+    throw new AppError('Failed to archive photo', 500, 'UPDATE_FAILED');
+  }
+
+  logger.info('Photo archived', { photoId, userId: user.id });
+}
+
+/**
+ * Remove one student's tag from a photo.
+ *
+ * The tag is the only path from a parent to a photo, so this is the correction
+ * for tagging the wrong child — it revokes that family's access without
+ * touching anybody else's. RLS policy `pst_teacher_delete` (migration 00011)
+ * was written for exactly this and had no caller.
+ *
+ * Guarded by `assertPhotoAccess`, the same rule as tagging: the uploader, at
+ * their own school, or an admin.
+ */
+export async function untagStudent(
+  photoId: string,
+  studentId: string,
+  user: { id: string; role: string; schoolId: string | null },
+): Promise<void> {
+  await assertPhotoAccess(photoId, user);
+
+  const { error, count } = await supabaseAdmin
+    .from('photo_student_tags')
+    .delete({ count: 'exact' })
+    .eq('photo_id', photoId)
+    .eq('student_id', studentId);
+
+  if (error) {
+    logger.error('Failed to untag student', {
+      error: error.message,
+      photoId,
+      studentId,
+    });
+    throw new AppError('Failed to untag student', 500, 'DELETE_FAILED');
+  }
+
+  if (count === 0) {
+    throw new AppError('Tag not found', 404, 'NOT_FOUND');
+  }
+
+  logger.info('Student untagged', { photoId, studentId, userId: user.id });
+}
+
+/**
  * Verify the caller may act on this photo.
  *
  * Admins may act anywhere. A teacher must be **the uploader, and at the
@@ -367,6 +451,9 @@ export async function getPhotosByClass(
     .from('photos')
     .select('id, s3_key, thumbnail_s3_key, blurhash, width, height, status, created_at, uploaded_by, class_id')
     .eq('class_id', classId)
+    // Archived photos are removed from the teacher's grid. The parent feed
+    // needs no equivalent — it already filters `status = 'ready'`.
+    .neq('status', 'archived')
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(limit + 1);

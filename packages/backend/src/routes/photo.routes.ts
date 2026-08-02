@@ -7,6 +7,10 @@ import {
   getPhotosSchema,
   tagStudentsBodySchema,
 } from '../validators/photo.validator';
+import {
+  uuidIdParam,
+  uuidPhotoAndStudentParams,
+} from '../validators/params.validator';
 import * as photoController from '../controllers/photo.controller';
 import { photoUpload } from '../middleware/upload';
 
@@ -44,6 +48,22 @@ router.post(
   roleGuard('teacher', 'admin'),
   validate(tagStudentsBodySchema, 'body'),
   photoController.tagStudents,
+);
+
+// DELETE /photos/:id - Archive a photo (uploader or admin)
+router.delete(
+  '/:id',
+  roleGuard('teacher', 'admin'),
+  validate(uuidIdParam, 'params'),
+  photoController.archivePhoto,
+);
+
+// DELETE /photos/:id/tag/:studentId - Remove one student's tag (uploader or admin)
+router.delete(
+  '/:id/tag/:studentId',
+  roleGuard('teacher', 'admin'),
+  validate(uuidPhotoAndStudentParams, 'params'),
+  photoController.untagStudent,
 );
 
 // GET /photos - Get photos for a class (teacher only)

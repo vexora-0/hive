@@ -29,3 +29,15 @@ export const uuidClassAndStudentParams = z.object({
   classId: z.string().uuid('classId must be a valid UUID'),
   studentId: z.string().uuid('studentId must be a valid UUID'),
 });
+
+/**
+ * `DELETE /photos/:id/tag/:studentId`.
+ *
+ * Both IDs reach a `.eq()` filter on `photo_student_tags`, and unlike the
+ * tag/confirm routes there is no prior lookup that would turn a malformed one
+ * into a clean 404 — `assertPhotoAccess` runs on `:id` only.
+ */
+export const uuidPhotoAndStudentParams = z.object({
+  id: z.string().uuid('id must be a valid UUID'),
+  studentId: z.string().uuid('studentId must be a valid UUID'),
+});

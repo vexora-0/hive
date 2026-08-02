@@ -10,12 +10,15 @@ import { ClassSelector, type ClassItem } from '@/components/forms/ClassSelector'
 import { PolaroidCard } from '@/components/media';
 import { MasonryGrid } from '@/components/media';
 import { HoneycombFAB } from '@/components/animation';
-import { EmptyState, SkeletonShimmer } from '@/components/feedback';
+import { EmptyState, SkeletonShimmer, ConfirmDialog, useToast } from '@/components/feedback';
 import { HeaderBar } from '@/components/navigation';
 
 import { useAuthStore } from '@/features/auth/stores/authStore';
 import { useClasses } from '@/features/teacher/hooks/useClasses';
-import { useTeacherPhotos } from '@/features/teacher/hooks/useTeacherPhotos';
+import {
+  useTeacherPhotos,
+  useArchivePhoto,
+} from '@/features/teacher/hooks/useTeacherPhotos';
 import type { Photo } from '@/features/teacher/hooks/useTeacherPhotos';
 
 // ---------------------------------------------------------------------------
@@ -109,6 +112,28 @@ export default function DashboardScreen() {
     router.push('/(teacher)/upload');
   }, [router]);
 
+  // ── Removing a photo ────────────────────────────────────────────────
+  // Long-press is the entry point: this is destructive and rare, so it should
+  // not sit under the same tap that opens a photo.
+  const toast = useToast();
+  const archive = useArchivePhoto(selectedClassId ?? '');
+  const [pendingRemoval, setPendingRemoval] = useState<Photo | null>(null);
+
+  const handleConfirmRemoval = useCallback(async () => {
+    const photo = pendingRemoval;
+    if (!photo) return;
+    setPendingRemoval(null);
+
+    try {
+      await archive.mutateAsync(photo.id);
+      toast.success('Photo removed');
+    } catch {
+      // The hook logs the detail; the teacher needs to know it did not happen,
+      // because the grid will still show the photo and that reads as success.
+      toast.error('Could not remove the photo. Please try again.');
+    }
+  }, [pendingRemoval, archive, toast]);
+
   // ── Render item ─────────────────────────────────────────────────────
   const renderPhoto = useCallback(
     ({ item }: { item: Photo }) => (
@@ -117,6 +142,7 @@ export default function DashboardScreen() {
         uri={item.thumbnailUri ?? item.uri}
         blurhash={item.blurhash}
         caption={item.caption}
+        onLongPress={() => setPendingRemoval(item)}
         style={styles.polaroid}
       />
     ),
@@ -180,6 +206,16 @@ export default function DashboardScreen() {
                 color={colors.white}
               />
             }
+          />
+
+          <ConfirmDialog
+            visible={pendingRemoval !== null}
+            title="Remove this photo?"
+            message="It will disappear from your class grid and from every parent's feed. Any print order already placed for it is not affected."
+            confirmLabel="Remove"
+            destructive
+            onConfirm={handleConfirmRemoval}
+            onCancel={() => setPendingRemoval(null)}
           />
         </View>
       )}

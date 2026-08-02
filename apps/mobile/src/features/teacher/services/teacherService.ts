@@ -138,6 +138,34 @@ export async function tagStudents(
 }
 
 /**
+ * Archive a photo.
+ *
+ * A soft delete server-side: the photo leaves this grid and every parent's
+ * feed, but the stored objects stay so that any order already placed against
+ * it still renders. Only the teacher who uploaded it (or an admin) may do this.
+ */
+export async function archivePhoto(photoId: string): Promise<void> {
+  await apiRequest(`/photos/${photoId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Remove one student's tag from a photo.
+ *
+ * This is the correction for tagging the wrong child — it revokes that one
+ * family's access and leaves everybody else's alone.
+ */
+export async function untagStudent(
+  photoId: string,
+  studentId: string,
+): Promise<void> {
+  await apiRequest(`/photos/${photoId}/tag/${studentId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
  * Fetch students belonging to a particular class from supabase.
  */
 export async function getClassStudents(classId: string): Promise<StudentItem[]> {
