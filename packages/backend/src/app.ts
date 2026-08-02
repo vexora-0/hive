@@ -15,6 +15,7 @@ import orderRoutes from './routes/order.routes';
 import notificationRoutes from './routes/notification.routes';
 import adminRoutes from './routes/admin.routes';
 import schoolsRoutes from './routes/schools.routes';
+import profileRoutes from './routes/profile.routes';
 
 const app: Express = express();
 
@@ -115,6 +116,7 @@ app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/schools', schoolsRoutes);
+app.use('/api/v1/me', profileRoutes);
 
 // 404 handler for unmatched routes
 app.use((_req, res) => {
