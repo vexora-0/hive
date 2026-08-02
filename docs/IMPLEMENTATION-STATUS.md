@@ -59,6 +59,7 @@ is to agree file ownership before starting, not after.
 | **G-16** | Medium | PostgREST filter injection in admin user search. | Nagachaitanya |
 | **G-34** | Medium | `getSchools` issued two count queries per school — 41 round trips for a 20-school page. Now 3, regardless of page size. | Nagachaitanya |
 | **G-L3/L4** | Low | `auth.ts` logged client IPs and raw error objects. | both |
+| **G-41** | Medium | No photo deletion. A teacher who uploaded the wrong child's photo could not remove it, and `status='archived'` was unreachable from any code path. Closed 2 Aug — see §9. | Nagachaitanya |
 | — | — | 22 mobile typecheck errors. **The app now compiles.** | Bhargav + Srujan |
 
 **All of the above are written and type-checked. Almost none has been
@@ -219,7 +220,7 @@ guard does nothing unless the variable exists.
 | **CP-1** | App compiles · no "Coming Soon" · no credentials in repo | ✔ **Met.** |
 | **CP-2** | Order placeable · private storage with thumbnails · role guards · IDORs closed | ✔ **Met.** All four verified at runtime — order placed with correct cents and working idempotency, photos private with thumbnails and signed URLs, role guards returning 403, cross-school IDOR closed. |
 | **CP-3** | Demo seed on a fresh DB · test harness runs | ✔ **Met.** Seed loads schools, classes, students, parents, 6 photos with thumbnails and 16 notifications. Harness runs against a separate project. |
-| **CP-4** | 36 tests green · CI on every PR | ✔ **Met. 79 of 79 green**, including 20 new authorization tests. T-23 is fixed. The suite has also been shown to *detect* — see the sabotage exercise in §4. CI runs on every push and the lint step is now blocking. **Caveat: CI does not run the suite** — there is no test step in `ci.yml`. |
+| **CP-4** | 36 tests green · CI on every PR | ✔ **Met. 155 of 155 green** as of 2 Aug, including 20 authorization tests and the `orders`/`admin` files Plan 08 specified but nobody wrote. T-23 is fixed. The suite has also been shown to *detect* — see the sabotage exercise in §4. **Caveat: the CI test step is `continue-on-error`** until `TEST_SUPABASE_*` exist as repository secrets, so the suite still gates nothing on a PR. |
 | **CP-5** | Deployed and reachable · Sentry receiving · docs complete | ✗ Nothing deployed. |
 | **CP-6** | Manual QA green · demo rehearsed · submission pack | ✗ |
 
@@ -238,13 +239,69 @@ stale faster than anything else here; check §4 before trusting it.*
    1 Aug run was against a local stack, which proves the authorization logic but
    says nothing about how a hosted project is configured. `verify:env` prints
    the environment; `STRICT=1` makes skips count so CI can gate on it.
-3. **Add a test step to CI.** `ci.yml` runs lint, typecheck and build, but never
-   `pnpm test` — so 79 passing tests guard nothing on a pull request. Needs the
-   `hive-test` credentials as repository secrets.
+3. **Make the CI test step blocking.** The step exists as of 2 Aug but carries
+   `continue-on-error: true`, because it needs `TEST_SUPABASE_URL`,
+   `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` as **repository
+   secrets** before it can go red on failure. Until somebody adds them, 155
+   passing tests still guard nothing on a pull request.
 4. **Drive the app on a device.** Nothing has been seen rendered.
 5. **Sentry has never received an error.** Needs a DSN. Account signup, not code.
 6. **Plan 01 Step 8 (SMTP).** Unowned. Lower priority than it was — teacher and
    parent can now sign in with a password, so OTP is no longer the only way in.
+
+---
+
+## 9. Object lifecycles completed — 2 August
+
+Until this point **every core object was create-only**. That was the largest
+functional gap left in the product, and it is not one the 46-gap audit framed
+as a single item:
+
+| Object | Create | Read | Update | Delete |
+|---|---|---|---|---|
+| Photo | ✔ | ✔ | ✗ → **✔** | ✗ → **✔** (archive) |
+| Photo tag | ✔ | ✔ | — | ✗ → **✔** (untag) |
+| Order | ✔ | ✔ | ✗ → **✔** (status) | ✗ → **✔** (cancel) |
+| Profile | ✔ signup | ✔ | ✗ → **✔** | — |
+| School | ✔ | ✔ | ✗ → **✔** | — |
+
+**Seven endpoints added.** `DELETE /photos/:id`,
+`DELETE /photos/:id/tag/:studentId`, `PATCH /orders/:id/cancel`,
+`GET /admin/orders`, `PATCH /admin/orders/:id/status`,
+`PATCH /admin/schools/:id`, `GET`+`PATCH /me`. Documented in `api.md`.
+
+**No migration was needed.** `'archived'`, all six order statuses and the
+`'order_status'` notification type were already in their CHECK constraints and
+simply had no code path reaching them. Reserved migration `00022` is still
+unused.
+
+**Three latent bugs fixed on the way:**
+
+- `notifyAdminsOfNewOrder` filtered `school_id = <school>`, but the only admin
+  any seed creates is a platform admin with `school_id = null` — so the "new
+  order" notification had **never reached a single user**. There is now a test
+  asserting it does.
+- `OrderBottomSheet` pre-filled the shipping address from `profile.phone`.
+- `apiRequest` called `response.json()` unconditionally, so any `204` would
+  have thrown. Nothing returned 204 before; two routes do now.
+
+**`order_status` finally has a producer.** It had been in the notifications
+CHECK constraint since migration `00010` with nothing creating one. Order
+status transitions are forward-only and enforced server-side; a delivered
+order cannot be walked back.
+
+**Tests: 79 → 155, all green**, run against a live local stack on 2 Aug —
+`orders.test.ts` (26) and `admin.test.ts` (39) are the two files Plan 08
+specified and nobody had written, plus 11 archive/untag cases in
+`photos.test.ts`. Each of the ten commits was verified to typecheck
+independently in a scratch worktree, not just the final tree.
+
+**What this did *not* do.** DEC-10 was respected: photo captions and photo
+download remain out of scope, so `photos.caption` is still written by nothing
+and the "Coming Soon" badge on `PhotoActionSheet` is still honest. No student
+role was added — children see photos through a parent's feed. And **none of
+the new UI has been rendered on a device**, which is the same caveat that
+applies to everything in §5.
 
 ---
 
