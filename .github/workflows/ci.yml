@@ -15,6 +15,21 @@ jobs:
     name: Lint, typecheck, build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
+    # The order tests exercise the idempotency middleware, which is Redis-backed
+    # and deliberately fails open. Without Redis it would wave a duplicate
+    # request through to a UNIQUE violation on orders.idempotency_key, so the
+    # replay test would fail for the wrong reason.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 3s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -43,6 +58,23 @@ jobs:
       # is the condition the previous comment set for removing this.
       - name: Typecheck mobile
         run: pnpm --filter @hive/mobile typecheck
+
+      # Not blocking yet. The suite needs a real Supabase project — it signs
+      # users in to mint JWTs and truncates tables between files — so it cannot
+      # run until TEST_SUPABASE_* are set as repository secrets, pointing at
+      # hive-test and nothing else. `continue-on-error` comes off once this has
+      # been green on a push, the same two-step used for lint (294b166) and
+      # mobile typecheck (1c9d035).
+      #
+      # Until then the 79+ tests still guard nothing on a pull request, which
+      # is the honest state of it.
+      - name: Test backend
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+        run: pnpm --filter @hive/backend test
 
       - name: Build backend
         run: pnpm build:backend
