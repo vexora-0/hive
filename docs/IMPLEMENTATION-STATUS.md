@@ -221,7 +221,7 @@ guard does nothing unless the variable exists.
 | **CP-1** | App compiles · no "Coming Soon" · no credentials in repo | ✔ **Met.** |
 | **CP-2** | Order placeable · private storage with thumbnails · role guards · IDORs closed | ✔ **Met.** All four verified at runtime — order placed with correct cents and working idempotency, photos private with thumbnails and signed URLs, role guards returning 403, cross-school IDOR closed. |
 | **CP-3** | Demo seed on a fresh DB · test harness runs | ✔ **Met.** Seed loads schools, classes, students, parents, 6 photos with thumbnails and 16 notifications. Harness runs against a separate project. |
-| **CP-4** | 36 tests green · CI on every PR | ✔ **Met. 155 of 155 green**, re-run 9 Aug (7 files, 102s). Includes 20 authorization tests and the `orders`/`admin` files Plan 08 specified but nobody wrote. T-23 is fixed. The suite has also been shown to *detect* — see the sabotage exercise in §4. **Two caveats:** the CI test step is `continue-on-error` until `TEST_SUPABASE_*` exist as repository secrets, so the suite still gates nothing on a PR; and the count is unchanged since 2 Aug, so none of the 9 Aug fixes in §10 is covered by it. One known flake — see §10. |
+| **CP-4** | 36 tests green · CI on every PR | ✔ **Met. 178 of 178 green**, re-run 9 Aug (8 files). Includes 20 authorization tests and the `orders`/`admin` files Plan 08 specified but nobody wrote. T-23 is fixed. The suite has also been shown to *detect* — see the sabotage exercise in §4. **Two caveats:** the CI test step is `continue-on-error` until `TEST_SUPABASE_*` exist as repository secrets, so the suite still gates nothing on a PR; and only the cursor fix in §10 added tests, so the rest of the 9 Aug work is not covered by it. One known flake — see §10. |
 | **CP-5** | Deployed and reachable · Sentry receiving · docs complete | ✗ Nothing deployed. |
 | **CP-6** | Manual QA green · demo rehearsed · submission pack | ✗ |
 
@@ -235,7 +235,7 @@ Items 1, 2, 3 and 5 of the previous list were all done by then, as were items 1,
 than anything else here; check §4 before trusting it.*
 
 0. **Cover the 9 August round with tests.** §10 changed 56 files and added no
-   tests; the suite is at 155 before and after. The ordering, idempotency-cache
+   tests; the suite stayed at 155 across all twelve. The ordering, idempotency-cache
    and cursor-validation fixes are all server-side and testable with the
    existing harness, so this is cheap and it is the only one of these items that
    needs nobody's account or credit card.
@@ -249,7 +249,7 @@ than anything else here; check §4 before trusting it.*
 3. **Make the CI test step blocking.** The step exists as of 2 Aug but carries
    `continue-on-error: true`, because it needs `TEST_SUPABASE_URL`,
    `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` as **repository
-   secrets** before it can go red on failure. Until somebody adds them, 155
+   secrets** before it can go red on failure. Until somebody adds them, 178
    passing tests still guard nothing on a pull request.
 4. **Drive the app on a device.** Nothing has been seen rendered.
 5. **Sentry has never received an error.** Needs a DSN. Account signup, not code.
@@ -326,7 +326,7 @@ succeeded, or failed as the wrong kind of failure.
 | `pnpm typecheck` | Clean, both packages |
 | `pnpm lint` | 0 errors, 30 warnings (3 backend, 27 mobile) |
 | `pnpm build:backend` | Succeeds |
-| `pnpm test` | **155 passed, 0 failed**, 7 files, 102s, against `hive-test` |
+| `pnpm test` | **178 passed, 0 failed**, 8 files, against `hive-test` |
 | `ls supabase/migrations` | 19 files at `68721ae` — `00001`–`00018` and `00020`. `00019` was reserved and never used, so the sequence has a hole the count does not show. Work in flight on other branches adds to this |
 
 **Known flake.** `orders.test.ts > rejects setting a status back to pending`
@@ -559,7 +559,10 @@ inherit the state.
 
 The same caveat as §5, and it applies to all of the above:
 
-- **No test was added.** The suite is 155 before and 155 after. Every fix here
+- **Almost no test was added.** The suite was 155 before and after the first
+  twelve commits. The follow-up round that fixed the regressions those commits
+  introduced added `tests/cursor.test.ts` (23 cases), taking it to 178 — so the
+  keyset-pagination fix is covered and essentially nothing else here is. Every other fix
   is guarded by review and typecheck only, including the server-side ones that
   the existing harness could cover cheaply — the ordering fixes, the
   idempotency-cache change, the cursor validation, the admin no-ops.

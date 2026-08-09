@@ -59,7 +59,7 @@ them yourself before relying on them:
 | `pnpm typecheck` | Clean, both packages |
 | `pnpm lint` | **0 errors**, 30 warnings — 3 backend (`no-explicit-any` in `admin.service.ts`), 27 mobile (mostly unused imports) |
 | `pnpm build:backend` | Succeeds |
-| `pnpm test` | **155 passed, 0 failed**, 7 files, 102s, against `hive-test` |
+| `pnpm test` | **178 passed, 0 failed**, 8 files, against `hive-test` |
 | `ls supabase/migrations` | **19 files** at `68721ae` — `00001`–`00018` and `00020`. `00019` was reserved and never used; the count is right, the sequence has a hole |
 
 The suite has **one known flake**: `orders.test.ts > rejects setting a status
@@ -75,7 +75,7 @@ parent privacy boundary are confirmed at runtime — see
 **9 August brought twelve fix commits** (`f426251..HEAD`, 56 files, +1495/−333)
 across ordering, upload, auth, the admin console and the API error surface.
 `docs/IMPLEMENTATION-STATUS.md` §10 records what each one was. **None of them
-added a test** — the suite is at 155 both before and after — so that round is
+added a test** — the suite stood at 155 across all twelve — so that round is
 guarded by nothing but review and typecheck.
 
 `scripts/verify-security.sh` was run on 1 August — **26 passed, 0 failed, 3
@@ -95,7 +95,7 @@ nothing runs; create them from the `.env.example` templates first.
    run — `.github/workflows/ci.yml` has run `pnpm --filter @hive/backend test`
    since 2 August — but it cannot go red until `TEST_SUPABASE_URL`,
    `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` exist as repository
-   secrets. Until then 155 passing tests still guard nothing on a pull request.
+   secrets. Until then 178 passing tests still guard nothing on a pull request.
    Lint, typecheck and build are blocking.
 3. **Nothing has been seen on a device.** Bundling proves imports resolve, not
    that screens render. Plan 04's mobile deep-link checks are still unticked,
