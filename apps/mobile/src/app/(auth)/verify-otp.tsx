@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, layout, MAX_OTP_ATTEMPTS } from '@/theme';
 import { Text, Button } from '@/components/ui';
 import { ScreenContainer } from '@/components/layout';
+import { EmptyState } from '@/components/feedback';
 import { OTPInput, type OTPInputHandle } from '@/components/forms/OTPInput';
 import { useOTP } from '@/features/auth/hooks/useOTP';
 
@@ -49,7 +50,6 @@ export default function VerifyOTPScreen() {
   // ── Handlers ─────────────────────────────────────────────────────────
   const handleOTPComplete = useCallback(
     async (code: string) => {
-      if (!email) return;
       const success = await verifyOTP(email, code);
       if (!success) {
         // Clear the input so the user can try again
@@ -60,14 +60,25 @@ export default function VerifyOTPScreen() {
   );
 
   const handleResend = useCallback(async () => {
-    if (!email || !canResend) return;
+    if (!canResend) return;
     await sendOTP(email, signInRole);
     otpRef.current?.clear();
   }, [email, signInRole, canResend, sendOTP]);
 
-  const handleBack = useCallback(() => {
-    router.back();
+  const goToLogin = useCallback(() => {
+    router.replace('/(auth)/login' as never);
   }, [router]);
+
+  const handleBack = useCallback(() => {
+    // `back()` is a no-op with nothing on the stack, and this screen can be the
+    // first one — see the deep-link note below. Without the fallback the back
+    // arrow does nothing at all in exactly the case the user most needs it.
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    goToLogin();
+  }, [router, goToLogin]);
 
   // ── Derived display values ────────────────────────────────────────────
   const formatTime = (seconds: number): string => {
@@ -76,6 +87,26 @@ export default function VerifyOTPScreen() {
     if (m > 0) return `${m}:${s.toString().padStart(2, '0')}`;
     return `${s}s`;
   };
+
+  // ── No email: the screen cannot do anything ──────────────────────────
+  // Both handlers need the address the code was sent to — Supabase verifies the
+  // token against it — so without the param this screen was inert: it rendered
+  // "We sent a code to" followed by nothing, and typing all six digits produced
+  // no error, no spinner and no request. This is reachable, not theoretical:
+  // app.json declares the `hive` scheme, so `hive:///verify-otp` opens the route
+  // directly with no params, and there `router.back()` has no stack to pop
+  // either. Fail visibly and hand the user the only route out.
+  if (!email) {
+    return (
+      <ScreenContainer style={styles.missingEmail}>
+        <EmptyState
+          title="This link is incomplete"
+          message="We don't know which email address to verify. Start again from sign in and we'll send you a fresh code."
+          action={{ label: 'Back to sign in', onPress: goToLogin }}
+        />
+      </ScreenContainer>
+    );
+  }
 
   // ── Render ─────────────────────────────────────────────────────────
   return (
@@ -205,6 +236,11 @@ export default function VerifyOTPScreen() {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
+  missingEmail: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   content: {
     flex: 1,
     paddingHorizontal: spacing.lg,

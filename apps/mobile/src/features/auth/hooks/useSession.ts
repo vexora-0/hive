@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { useOnForeground } from '@/hooks/useAppState';
+import { useAppState } from '@/hooks/useAppState';
 import { useAuthStore } from '../stores/authStore';
-import { fetchUserProfile } from '../services/authService';
+import type { ProfileWithRole } from '../services/authService';
 import { getRoleRoute } from '@/types/navigation';
+import { logger } from '@/utils/logger';
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -16,7 +17,8 @@ import { getRoleRoute } from '@/types/navigation';
  *
  * - `SIGNED_IN` : fetches profile, stores it, and navigates to the role route.
  * - `SIGNED_OUT`: clears auth store.
- * - On foreground: refreshes the session silently.
+ * - On foreground: restarts token auto-refresh and re-checks the session.
+ * - On background: stops token auto-refresh.
  *
  * Mount this **once** near the app root (e.g. in the root layout).
  */
@@ -54,6 +56,10 @@ export function useSession() {
           setSession(session);
 
           if (session?.user) {
+            // Captured now, compared once the fetch returns — see the guard
+            // below.
+            const userId = session.user.id;
+
             // Deliberately NOT awaited inside the callback.
             //
             // auth-js emits SIGNED_IN from inside its own `_initialize`, and
@@ -67,13 +73,26 @@ export function useSession() {
             // the app on a blank splash screen with no error and no way out but
             // a force quit. Detaching the work breaks that chain.
             void (async () => {
-              let result: Awaited<ReturnType<typeof fetchUserProfile>>;
+              let result: ProfileWithRole | null;
               try {
-                result = await fetchUserProfile(session.user.id);
+                // Shared with `initialize()`, which asks for the same profile at
+                // the same moment on a cold start.
+                result = await useAuthStore.getState().loadProfile(userId);
               } catch {
                 // The fetch failed rather than finding nothing. Leave the user
                 // where they are — sending them to onboarding here is what made
                 // a flaky network look like a brand-new account.
+                return;
+              }
+
+              // Because this is detached, a sign-out can land while the fetch is
+              // still out — and a slow network, the reason for detaching, is
+              // precisely when that happens. SIGNED_OUT clears the store and
+              // routes to login; the late resolution then wrote the profile back
+              // and replaced the route with a role home screen belonging to a
+              // user who no longer has a session, so every request from that
+              // screen 401'd. Whoever the store points at now wins.
+              if (useAuthStore.getState().session?.user?.id !== userId) {
                 return;
               }
 
@@ -116,8 +135,33 @@ export function useSession() {
     };
   }, [router, setSession, setProfile, setRole]);
 
-  // ── Refresh session when app returns to foreground ────────────────────
-  useOnForeground(() => {
+  // ── Follow the app between foreground and background ──────────────────
+  //
+  // auth-js only manages its own refresh ticker on platforms that have
+  // `document.visibilityState`. React Native has none, so it takes the "assume
+  // always foreground" branch: it starts a bare `setInterval` at init and never
+  // stops it. But the OS suspends JS timers for a backgrounded app, so the
+  // ticker simply does not run while the app is away — and an access token
+  // lives an hour. Reopening the app the next morning therefore restored a
+  // session whose token had expired hours ago, and nothing refreshed it until
+  // the interval happened to come round again; every request until then got a
+  // 401. Supabase's React Native guidance is to drive this from AppState, which
+  // is what this does. `startAutoRefresh` also runs one tick immediately, so
+  // the token is renewed before the first screen refetches.
+  useAppState((state) => {
+    if (state !== 'active') {
+      // Backgrounded: stop the ticker rather than leave it to fire requests the
+      // OS will not let complete.
+      supabase.auth.stopAutoRefresh().catch((err) => {
+        logger.error('Could not stop Supabase auto-refresh', err);
+      });
+      return;
+    }
+
+    supabase.auth.startAutoRefresh().catch((err) => {
+      logger.error('Could not restart Supabase auto-refresh', err);
+    });
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session && isAuthenticated) {
         // Session expired while backgrounded — sign out and redirect

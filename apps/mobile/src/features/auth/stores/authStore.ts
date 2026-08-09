@@ -3,6 +3,57 @@ import type { Session, User } from '@supabase/supabase-js';
 import type { Tables, UserRole } from '@/types/supabase';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/utils/logger';
+import { fetchUserProfile, type ProfileWithRole } from '../services/authService';
+
+// ---------------------------------------------------------------------------
+// Bootstrap timeouts
+// ---------------------------------------------------------------------------
+
+/**
+ * How long bootstrap will wait on any single network step before giving up on
+ * it and letting the app render.
+ *
+ * The root layout renders `null` while `isLoading` is true, and supabase-js
+ * sets no fetch timeout on its requests, so an unanswered read — hotel wifi, a
+ * captive portal, a dropped connection — held `isLoading` true for as long as
+ * the socket stayed open and left the user on a blank splash screen with no
+ * error and no way out but a force quit. Every await in `initialize` is capped
+ * so that state cannot be reached.
+ */
+const BOOTSTRAP_TIMEOUT_MS = 8000;
+
+/** Distinguishes "we stopped waiting" from a legitimate `null` result. */
+const TIMED_OUT = Symbol('timed-out');
+
+function withTimeout<T>(
+  work: Promise<T>,
+  ms: number,
+): Promise<T | typeof TIMED_OUT> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve(TIMED_OUT), ms);
+    work.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err: unknown) => {
+        clearTimeout(timer);
+        reject(err instanceof Error ? err : new Error(String(err)));
+      },
+    );
+  });
+}
+
+/**
+ * Profile reads currently in flight, keyed by user id.
+ *
+ * A cold start asks for the same profile twice — once from `initialize()`, once
+ * from the detached fetch in the `SIGNED_IN` listener — and both land within
+ * milliseconds of each other. Sharing the promise makes that one round trip.
+ * Entries are dropped as soon as they settle, so this never serves a stale
+ * profile; it only collapses concurrent callers.
+ */
+const profileRequests = new Map<string, Promise<ProfileWithRole | null>>();
 
 // ---------------------------------------------------------------------------
 // Sign-out cleanup
@@ -43,6 +94,12 @@ interface AuthStoreActions {
   setProfile: (profile: Tables<'profiles'> | null) => void;
   /** Override the resolved user role. */
   setRole: (role: UserRole | null) => void;
+  /**
+   * Fetch the profile for `userId`, sharing the request with any identical one
+   * already in flight. Resolves `null` when no profile row exists yet; rejects
+   * when the read fails — the two mean different things.
+   */
+  loadProfile: (userId: string) => Promise<ProfileWithRole | null>;
   /** Sign the user out of Supabase and reset all local auth state. */
   signOut: () => Promise<void>;
   /** Bootstrap: check for an existing session and hydrate profile / role. */
@@ -80,6 +137,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }),
 
   setRole: (role) => set({ role }),
+
+  loadProfile: (userId) => {
+    const pending = profileRequests.get(userId);
+    if (pending) return pending;
+
+    const request = fetchUserProfile(userId).finally(() => {
+      profileRequests.delete(userId);
+    });
+    profileRequests.set(userId, request);
+    return request;
+  },
 
   signOut: async () => {
     // auth-js returns early — before clearing the stored session — when the
@@ -125,31 +193,59 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       set({ isLoading: true });
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const restored = await withTimeout(
+        supabase.auth.getSession().then(({ data }) => data.session),
+        BOOTSTRAP_TIMEOUT_MS,
+      );
 
-      if (!session) {
-        set({ isLoading: false, isAuthenticated: false });
+      if (restored === TIMED_OUT) {
+        // `getSession()` waits on auth-js's own initialisation, which can
+        // include a token refresh over the network. Stop waiting and let the
+        // app render: `isAuthenticated` is still false, so the user lands on
+        // login, and if the session does turn up later the auth state listener
+        // picks it up. Leave the stored state untouched — we learned nothing
+        // about it, so asserting "signed out" here would be a guess.
+        logger.warn('Timed out restoring the session; continuing to login');
+        return;
+      }
+
+      if (!restored) {
+        set({ isAuthenticated: false });
         return;
       }
 
       set({
-        session,
-        user: session.user,
+        session: restored,
+        user: restored.user,
         isAuthenticated: true,
       });
 
-      // Fetch the user's profile and role
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
+      // Fetch the user's profile and role. Capped separately: the session is
+      // already restored by this point, and a profile that never arrives must
+      // not cost the user the splash screen. `app/index.tsx` sends a session
+      // with an unresolved role to login, which fetches it again.
+      let profile: ProfileWithRole | null | typeof TIMED_OUT;
+      try {
+        profile = await withTimeout(
+          get().loadProfile(restored.user.id),
+          BOOTSTRAP_TIMEOUT_MS,
+        );
+      } catch (err) {
+        // A failed read is not "this account has no profile", and it is not a
+        // reason to discard a session that Supabase just handed us. Render, and
+        // let the next screen retry.
+        logger.error('Could not load the profile during bootstrap', err);
+        return;
+      }
+
+      if (profile === TIMED_OUT) {
+        logger.warn('Timed out loading the profile; continuing without a role');
+        return;
+      }
 
       if (profile) {
         set({
-          profile,
+          profile: profile.profile,
           role: profile.role,
         });
       }

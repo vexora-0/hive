@@ -57,6 +57,7 @@ export function useOTP(): UseOTPReturn {
   const resendCooldownUntil = useOtpThrottleStore((s) => s.resendCooldownUntil);
   const recordFailure = useOtpThrottleStore((s) => s.recordFailure);
   const beginResendCooldown = useOtpThrottleStore((s) => s.startResendCooldown);
+  const clearExpired = useOtpThrottleStore((s) => s.clearExpired);
   const resetThrottle = useOtpThrottleStore((s) => s.reset);
 
   // Re-derived once a second so the displayed countdowns tick down. The values
@@ -78,12 +79,27 @@ export function useOTP(): UseOTPReturn {
 
   // ── Countdown ticker ───────────────────────────────────────────────
   // One interval for both countdowns, running only while one is active.
+  //
+  // `clearExpired` is what makes "only while active" true. The deadlines are
+  // the effect's dependencies, and nothing but a successful verification used
+  // to null them, so the interval outlived the countdown: from the first "Send
+  // code" the screen re-rendered every second for the rest of its mounted life,
+  // rebuilding `sendOTP` and `verifyOTP` on each tick because they depend on
+  // `lockoutRemaining`. Nulling an expired deadline re-runs this effect, which
+  // then takes the early return and leaves no interval behind.
   useEffect(() => {
     if (lockoutUntil === null && resendCooldownUntil === null) return;
 
-    const id = setInterval(() => forceTick((n) => n + 1), 1000);
+    // A deadline can also have passed while this screen was unmounted or the
+    // app was backgrounded; don't make the user wait a tick to find out.
+    clearExpired();
+
+    const id = setInterval(() => {
+      clearExpired();
+      forceTick((n) => n + 1);
+    }, 1000);
     return () => clearInterval(id);
-  }, [lockoutUntil, resendCooldownUntil]);
+  }, [lockoutUntil, resendCooldownUntil, clearExpired]);
 
   const startResendCooldown = useCallback(() => {
     beginResendCooldown(RESEND_COOLDOWN_SEC);
