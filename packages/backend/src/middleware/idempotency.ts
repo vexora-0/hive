@@ -58,20 +58,26 @@ export async function idempotency(
     // Intercept res.json to cache the response
     const originalJson = res.json.bind(res);
     res.json = ((body: unknown) => {
-      const responseToCache: CachedResponse = {
-        status: res.statusCode,
-        body,
-      };
+      // Only a success is replayable. Caching a failure would pin the client to
+      // it for the full TTL: a 400 from the validator downstream of here, or a
+      // transient 500, would be replayed for 24 hours even after the client had
+      // corrected the payload — and retrying with the same key is exactly what
+      // a well-behaved client does. On failure we just drop the lock so the
+      // next attempt runs for real.
+      const isSuccess = res.statusCode >= 200 && res.statusCode < 300;
 
-      redis
-        .set(cacheKey, JSON.stringify(responseToCache), 'EX', IDEMPOTENCY_TTL)
-        .then(() => redis.del(lockKey))
-        .catch((err) => {
-          logger.error('Failed to cache idempotent response', {
-            key: idempotencyKey,
-            error: err.message,
-          });
+      const settle = isSuccess
+        ? redis
+            .set(cacheKey, JSON.stringify({ status: res.statusCode, body } satisfies CachedResponse), 'EX', IDEMPOTENCY_TTL)
+            .then(() => redis.del(lockKey))
+        : redis.del(lockKey);
+
+      settle.catch((err) => {
+        logger.error('Failed to settle idempotent response', {
+          key: idempotencyKey,
+          error: err instanceof Error ? err.message : String(err),
         });
+      });
 
       return originalJson(body);
     }) as Response['json'];
