@@ -1,6 +1,7 @@
 # Phase 2 — Implementation Status
 
-**As of:** Week 24 (18 July 2026), after merging all four streams into `main`.
+**As of:** 9 August 2026. Originally written Week 24 (18 July), after merging
+all four streams into `main`; §9 and §10 continue it.
 **Single source of truth for status.** `CLAUDE.md` links here rather than
 restating it; two status tables drifting apart is worse than one.
 **Covers:** everything committed during Phase 2.
@@ -103,7 +104,7 @@ file, so it must never be generated for a caller who is about to be refused.
 |---|---|
 | `pnpm --filter @hive/backend typecheck` | Clean, including `tests/` |
 | `pnpm --filter @hive/mobile typecheck` | **0 errors** — was 22 |
-| `pnpm lint` | 4 problems (1 error, 3 warnings), all pre-existing |
+| `pnpm lint` | **0 errors, 30 warnings** as of 9 Aug (3 backend, 27 mobile). The one error — `no-namespace` in `middleware/auth.ts` — was fixed in `40a69fc`; this row read "1 error" until then |
 | `pnpm build:backend` | Succeeds |
 | Test-database guard, both branches | Refuses with no `.env.test`; refuses when `SUPABASE_URL` names the demo project |
 | Sentry `beforeSend` against a synthetic event | JWT, two emails, client IP, signed storage URL, `/uploads` URL, password field and hostname all redacted; user-agent and a student's first name preserved |
@@ -200,7 +201,7 @@ guard does nothing unless the variable exists.
 |---|---|---|
 | ~~**G-01**~~ | Srujan · Plan 02 | **Closed and verified 22 July.** A parent placed a real order: 201, `total_cents: 998` for 2 × `print_4x6`, and a repeated idempotency key returned the same order instead of a duplicate. This entry previously read "no order can be placed" long after it had been fixed. |
 | ~~**G-11**~~ | Srujan · Plan 06 | **Closed.** `seed:demo:reset` loads 2 schools, 4 classes, 9 students, 8 profiles, 6 photos with thumbnails, 9 tags and 16 notifications. |
-| **G-27** | Ruthwik · Plan 07 Step 5 | Upload progress is a hardcoded `0.1 → 0.3 → 0.35 → 0.85` ladder, not bytes transferred. Lives in `useUpload.ts` / `teacherService.ts`, both Ruthwik's. The plan marks this its one optional step. |
+| ~~**G-27**~~ | Ruthwik · Plan 07 Step 5 | **Closed 9 Aug.** Upload progress is no longer a hardcoded `0.1 → 0.3 → 0.35 → 0.85` ladder. `uploadPhotoFile` in `teacherService.ts` uses `XMLHttpRequest` rather than `fetch` — `fetch` exposes no upload progress — and reports `event.loaded / event.total` from `xhr.upload.onprogress`; `useUpload.ts` maps that fraction into the band it reserves for the transfer. Not yet seen moving on a device. |
 | ~~G-26, G-28…G-33~~ | Bhargav · Plan 07 | **Done.** Toasts on all nine admin mutations, confirm dialogs on all six destructive actions, empty states, onboarding and 404 placeholders replaced, schools routes split into validator/service/controller, controllers all throw `AppError`. See the plan's Deviations. |
 | **Plan 10 / 11 (Bhargav's share)** | — | **Done.** README rewritten against the real stack — it described a Flutter app. Added `user-flows.md` (diagram G-6), `docs/README.md` index and `demo-script.md`. Remaining on this side is deployment only: Render, the EAS APK and the demo video. |
 | **8a, 8b** | Ruthwik / Srujan | Plan 07 polish needing API changes: the feed does not return the uploader's name, and order items carry only `photoId` so no thumbnail can be rendered. Both need an endpoint to return more, not UI work. |
@@ -220,7 +221,7 @@ guard does nothing unless the variable exists.
 | **CP-1** | App compiles · no "Coming Soon" · no credentials in repo | ✔ **Met.** |
 | **CP-2** | Order placeable · private storage with thumbnails · role guards · IDORs closed | ✔ **Met.** All four verified at runtime — order placed with correct cents and working idempotency, photos private with thumbnails and signed URLs, role guards returning 403, cross-school IDOR closed. |
 | **CP-3** | Demo seed on a fresh DB · test harness runs | ✔ **Met.** Seed loads schools, classes, students, parents, 6 photos with thumbnails and 16 notifications. Harness runs against a separate project. |
-| **CP-4** | 36 tests green · CI on every PR | ✔ **Met. 155 of 155 green** as of 2 Aug, including 20 authorization tests and the `orders`/`admin` files Plan 08 specified but nobody wrote. T-23 is fixed. The suite has also been shown to *detect* — see the sabotage exercise in §4. **Caveat: the CI test step is `continue-on-error`** until `TEST_SUPABASE_*` exist as repository secrets, so the suite still gates nothing on a PR. |
+| **CP-4** | 36 tests green · CI on every PR | ✔ **Met. 155 of 155 green**, re-run 9 Aug (7 files, 102s). Includes 20 authorization tests and the `orders`/`admin` files Plan 08 specified but nobody wrote. T-23 is fixed. The suite has also been shown to *detect* — see the sabotage exercise in §4. **Two caveats:** the CI test step is `continue-on-error` until `TEST_SUPABASE_*` exist as repository secrets, so the suite still gates nothing on a PR; and the count is unchanged since 2 Aug, so none of the 9 Aug fixes in §10 is covered by it. One known flake — see §10. |
 | **CP-5** | Deployed and reachable · Sentry receiving · docs complete | ✗ Nothing deployed. |
 | **CP-6** | Manual QA green · demo rehearsed · submission pack | ✗ |
 
@@ -228,10 +229,16 @@ guard does nothing unless the variable exists.
 
 ## 8. What to do next
 
-*Rewritten 1 Aug. Items 1, 2, 3 and 5 of the previous list are all done — as
-were items 1, 2, 3 and 6 of the list before that, on 23 July. This section goes
-stale faster than anything else here; check §4 before trusting it.*
+*Rewritten 1 Aug, re-checked 9 Aug — every item below was still true on 9 Aug.
+Items 1, 2, 3 and 5 of the previous list were all done by then, as were items 1,
+2, 3 and 6 of the list before that, on 23 July. This section goes stale faster
+than anything else here; check §4 before trusting it.*
 
+0. **Cover the 9 August round with tests.** §10 changed 56 files and added no
+   tests; the suite is at 155 before and after. The ordering, idempotency-cache
+   and cursor-validation fixes are all server-side and testable with the
+   existing harness, so this is cheap and it is the only one of these items that
+   needs nobody's account or credit card.
 1. **Deploy.** The largest remaining gap, and now the blocker on three separate
    verification items: HTTPS and CORS still skip in `verify-security.sh`, the
    k6 suite has no target, and there is no APK. Bhargav, Plan 09 Step 6.
@@ -302,6 +309,272 @@ and the "Coming Soon" badge on `PhotoActionSheet` is still honest. No student
 role was added — children see photos through a parent's feed. And **none of
 the new UI has been rendered on a device**, which is the same caveat that
 applies to everything in §5.
+
+---
+
+## 10. Correctness sweep — 9 August
+
+Twelve commits, `f426251..HEAD`, 56 files, +1495/−333. These are not new
+features. They are defects found by reading the paths the audit's 46 gaps had
+already been declared closed on — mostly cases where a request *looked* like it
+succeeded, or failed as the wrong kind of failure.
+
+### Verified on 9 August
+
+| Check | Result |
+|---|---|
+| `pnpm typecheck` | Clean, both packages |
+| `pnpm lint` | 0 errors, 30 warnings (3 backend, 27 mobile) |
+| `pnpm build:backend` | Succeeds |
+| `pnpm test` | **155 passed, 0 failed**, 7 files, 102s, against `hive-test` |
+| `ls supabase/migrations` | 19 files at `68721ae` — `00001`–`00018` and `00020`. `00019` was reserved and never used, so the sequence has a hole the count does not show. Work in flight on other branches adds to this |
+
+**Known flake.** `orders.test.ts > rejects setting a status back to pending`
+fails intermittently in the full parallel run and passes when `orders.test.ts`
+is run alone (26/26, confirmed 9 Aug). It did not fire in the 9 Aug full run,
+which is luck rather than evidence. Recorded here rather than left for the next
+person to rediscover as a regression.
+
+### Ordering
+
+- **A blank note failed validation.** The order sheet sent `notes: null` for the
+  untouched optional field; `createOrderSchema` used `.optional()`, which
+  accepts `undefined` but not `null`. Every order placed without a note returned
+  400 "Validation failed". Fixed on both sides — the client omits the key when
+  the field is blank, and the schema takes `.nullish()` so an already-installed
+  build keeps working. G-01 was recorded as closed and verified on 22 July; the
+  order that verified it carried a note.
+- **An empty shipping address failed the same opaque way.** Place Order is now
+  disabled until an address is entered, with the reason shown on the field.
+- **The idempotency cache replayed failures.** The response interceptor stored
+  whatever status the handler produced for 24 hours, and `validate` runs
+  downstream of the middleware on `POST /orders` — so a 400 from the schema, or
+  a transient 500, was cached against the key and served back on every retry.
+  Retrying with the same key after correcting the payload is what a
+  well-behaved client does, so this pinned the client to its own first mistake.
+  Only 2xx is cached now; a failure drops the lock.
+- **`createOrder` never checked the photo's status.** Tag ownership was checked;
+  status was not, so an archived photo — one a teacher had deliberately
+  removed — or one still processing could be ordered from a stale feed.
+  `order_items.photo_id` is `ON DELETE RESTRICT`, so such an order is permanent.
+
+### Admin console
+
+- **`GET /admin/orders` threw 400 on every load.** It required a school, but the
+  seeded admin has a role and no school and the admin UI has no school picker.
+  The screen rendered the 400 through its empty state as "No orders yet", so the
+  fulfilment queue looked empty rather than broken. A school-less admin is a
+  platform admin and now gets every school's orders — the rule
+  `updateOrderStatus` already applied.
+- **Three mutations were silent no-ops.** `assignTeacher`,
+  `removeStudentFromClass` and `removeParentMapping` issued an update or delete
+  and checked only `error`. PostgREST does not treat "matched no rows" as an
+  error, so a nonexistent ID returned 200 "Parent mapping removed" having
+  changed nothing. The unlink case is the one that matters: the console showed
+  the parent removed while they could still see the child's photos.
+- **Cross-school integrity was unchecked in two places.** `assignTeacher` never
+  compared the teacher's school to the class's, and `createStudent` took the
+  school from the body and the class from the route param without checking they
+  agreed. A mismatch is silent but live — the roster is filtered by `school_id`,
+  so the child never appears in their own teacher's list and cannot be tagged in
+  their own class's photos.
+- **`getSchools` read neither count query's error**, so a failure rendered as
+  "0 students, 0 teachers" — a plausible number indistinguishable from the
+  truth. This endpoint has now shipped that bug three times.
+- **Linking a parent to a student did not set their school.** A parent signs up
+  with no school (the signup trigger cannot know one) and `createOrder` refuses
+  anyone without a `school_id`. Nothing else ever set it, so a real parent could
+  be linked to their child, browse the feed and still be unable to order a
+  print. Only the demo seed, which writes `school_id` directly, hid this. The
+  mapping now back-fills it, and rejects a non-parent account — the role was
+  already being fetched and then ignored, and the photo feed is scoped by
+  `parent_student_mappings` alone, so mapping a teacher or admin account handed
+  it that child's photos.
+
+### Upload pipeline
+
+- **Two concurrent uploads could file one child's photo under another's.**
+  Multer's temp filename was `tmp_${Date.now()}` — millisecond resolution, no
+  per-request entropy — and the client uploads three photos at once. Two
+  requests entering the file part in the same millisecond got the same path;
+  `diskStorage` truncates on open, so one request's bytes replaced the other's
+  and the loser's cleanup deleted the file the winner was still reading. Now a
+  `randomUUID()`.
+- **Tagging was labelled "Optional".** The parent feed is an inner join on
+  `photo_student_tags` and nothing in the app can tag a photo after upload, so
+  an untagged photo was invisible to every parent, notified nobody, and could
+  never be fixed. It is now required.
+- **`retryWithBackoff` retried everything, including 4xx.** On the file step
+  that re-sent the whole image three times, so an unsupported photo cost a
+  teacher 24MB of mobile data to fail. It now retries only 5xx, 408, 429 and
+  network-level failures — which required the file upload to reject with an
+  `ApiError` so its status is visible to that decision at all.
+- **Retrying duplicated rows and objects.** A retry restarted at step one and
+  shadowed the photo id, so a photo that failed at tag or confirm — file already
+  uploaded, objects already in the bucket — got a second row and a second pair
+  of objects on every attempt, while the first stayed in `processing` forever.
+  Retries reuse the existing slot, which required `/confirm` to become
+  idempotent: it answered 400 for an already-ready photo, so a confirm whose
+  response was lost left the photo permanently un-completable.
+- **The Upload button did nothing after a partial failure.** `startUpload`
+  filtered for `'idle'` only, and set the in-progress flag before returning
+  early, so it stuck. It now retries the failures.
+- **Every photo failed validation before a byte moved on Android.** `fileSize`
+  and `contentType` were required in shapes `ImagePickerAsset` does not always
+  supply — both are optional and Android omits them, so the client sent `0`.
+  `fileSize` is now optional and advisory (it was never checked against the
+  actual upload; multer enforces the real ceiling) and the content type is
+  derived from the extension when the picker reports none.
+- **Oversized and unsupported files came back as 500 `DATABASE_ERROR`.** A
+  `MulterError` carries a string `code` and no status, so it matched the "has a
+  string code, therefore Postgres" test in `errorHandler` — with a Sentry event
+  for what is plainly client error. Multer errors are now handled ahead of the
+  Supabase branch (413 for the size limit, 400 otherwise) and the `fileFilter`
+  rejects with an `AppError` naming the offending type.
+- **Abandoned uploads were unclearable.** Every killed app or dropped network
+  leaves a `processing` row and there is no sweeper; those rows listed in the
+  teacher's grid as blank tiles, and `archivePhoto` explicitly refused
+  `processing`. A row is now archivable once it is older than
+  `STALE_PROCESSING_MS` (30 minutes — comfortably longer than the client's
+  two-minute deadline plus retries), which preserves the reason that exclusion
+  existed.
+- **G-27 upload progress is real bytes now** — see §6.
+
+### Auth and cold start
+
+- **The app could hang on a blank splash screen with no way out but a force
+  quit.** auth-js emits `SIGNED_IN` from inside its own `_initialize`, and
+  `_notifyAllSubscribers` awaits whatever the callback returns; the callback was
+  `async` and awaited a profile fetch. That held `initializePromise` open, which
+  `getSession()` waits on, which `authStore.initialize()` awaits before clearing
+  `isLoading`, which the root layout renders `null` until — and supabase-js sets
+  no fetch timeout. The profile fetch is now detached from the callback.
+- **The role redirect was dead code.** The same ordering guaranteed `isLoading`
+  was still true when the handler called `router.replace`, so expo-router threw
+  "Attempted to navigate before mounting the Root Layout component" on every
+  launch. It now waits for a mounted navigator.
+- **Sign-out did not sign the user out.** auth-js returns before clearing the
+  stored session when the revoke request fails on the network, and the result
+  was ignored — the UI said signed out while the session stayed in SecureStore
+  and the next launch restored it. On a shared preschool tablet that is the
+  wrong way to fail. It now falls back to a local-scope sign-out, and clears the
+  query cache and cart, which nothing did: signing in as a second parent showed
+  the first parent's feed, notifications and orders from cache, and inherited
+  their pending order.
+- **Any 401 signed the user out of the whole app**, including the backend's
+  `PROFILE_NOT_FOUND` and a token momentarily stale at the refresh boundary —
+  and the unread-count poll runs every 30s from every screen, so there was
+  always a request in flight to trigger it. A 401 now attempts a refresh first.
+  API calls also carry a 30s deadline; without one a stalled connection never
+  settled, so React Query's retry never fired and the spinner never stopped.
+- **A transient network error looked like a brand-new account.**
+  `fetchUserProfile` collapsed "no row" and "the request failed" into `null`,
+  dropping a signed-in parent into the marketing carousel — which, on a second
+  failure, bounced to a login screen whose own effect retried the same failing
+  call. That is a loop. It is now an error with a retry.
+- **OTP lockout and resend cooldown lived in per-component state**, and login
+  and verify-otp each create their own instance: the cooldown started on one
+  screen and the user arrived at the other with it already expired, and five
+  wrong codes could be reset by tapping back. Both now live in one store, keyed
+  on deadlines so they survive unmounts and backgrounding.
+
+### API surface
+
+- **Rate limiting was set as if a request were a page view.** 100 per 15
+  minutes, while opening the parent feed alone costs a feed page, an unread
+  count, a notification list and a profile read — and it was keyed purely on IP,
+  so a block of carrier-NAT'd mobile users shared one budget. Now keyed on a
+  hash of the bearer token when present, with a realistic ceiling and `/health`
+  exempt so a busy NAT range cannot pull an instance out of rotation.
+- **CORS `credentials: true` alongside `origin: '*'` is rejected by every
+  browser**, so the permissive default broke browser clients rather than
+  permitting them. Credentials are only meaningful with an allow-list.
+- **Nine admin routes and both feed routes passed an ID to Postgres
+  unvalidated**, returning 500 for a plainly malformed request.
+  `params.validator` already exported schemas for most of them and no route used
+  them. `dateOfBirth` was likewise unchecked against a `date` column.
+- **All seven cursor decode sites caught only the JSON parse**, so a cursor
+  decoding to valid JSON of the wrong shape put the string `"undefined"` into a
+  PostgREST filter — a 500. The decoded values are interpolated into filter
+  expressions where commas and parentheses are structural, so the shape is now
+  validated centrally: a UUID and an ISO instant, neither of which can carry
+  structure.
+- **A slow database could kill the instance the health check exists to report
+  on.** The probe raced its Supabase query against a 2s timer; `Promise.race`
+  abandons the loser, it does not cancel it, so a query that lost and then
+  rejected had nothing attached to handle it — and `index.ts` responds to an
+  unhandled rejection by exiting. The probe now carries its own catch before it
+  is raced.
+- **The upload path read a file of up to 25MB with `readFileSync`**, and the
+  client sends three at once, so every other request on the instance — including
+  `/health` — stalled for the duration of each one.
+- **`createNotification` wrote `null` into a NOT NULL jsonb column** when given
+  no payload, and the school schemas accepted an `email` field the table has no
+  column for, so the API answered "School updated" having discarded it.
+- **React Query retried 4xx responses two extra times**, which cannot change a
+  refusal.
+
+### Screens that misinformed
+
+Six screens fetched data and ignored the query's error:
+
+- Photo detail and admin class detail gated on `isLoading || !data`, so a failed
+  or refused request span forever with no way out.
+- The parent feed reported a backend outage as "No photos yet" — telling a
+  parent their child has no photos.
+- The admin dashboard fell through to `?? 0` and drew "Schools 0 / Users 0 /
+  Revenue 0", which reads as real data.
+- The teacher dashboard offered "Upload your first photos" for a class that may
+  already have them.
+- Admin users had no loading and no empty state: first paint and an empty result
+  were both a blank area.
+
+Each now distinguishes loading, error and empty, with a retry where one makes
+sense. Admin user search is also debounced — it was issuing a request per
+keystroke.
+
+Separately, the parent orders screen only opened the order sheet once the photo
+had loaded, so a failed lookup meant tapping "Order Print" navigated to the tab
+and did nothing at all; and the `photoId` param was cleared to `undefined`,
+which a params merge can drop rather than unset, so ordering the same photo
+twice in one session never reopened the sheet.
+
+Photo URLs are signed with a one-hour expiry and the feed had no path to re-mint
+them: `refetchOnWindowFocus` was off, and on native it would have done nothing
+anyway because React Query's focus tracking is built on browser events and
+nothing was driving its focus manager. A parent who left the feed mounted and
+backgrounded the app for an hour came back to a grid of images the storage layer
+refused, with no error state and no retry. The focus manager is now wired to
+`AppState` (`lib/queryClient.ts`) and the feed refetches on foreground.
+
+Notifications: tapping one only marked it read, though every payload already
+carries a `photo_id` and the photo route exists — it now opens the photo. The
+unread count was polled every 30 seconds and rendered nowhere, since this tab
+bar is custom and ignores react-navigation's `tabBarBadge`; there is now a
+badge. Swipe-to-dismiss animated a row to opacity 0 and left it in the list, so
+it came back invisible — and FlashList recycles cells, so untouched rows could
+inherit the state.
+
+### What this round did NOT prove
+
+The same caveat as §5, and it applies to all of the above:
+
+- **No test was added.** The suite is 155 before and 155 after. Every fix here
+  is guarded by review and typecheck only, including the server-side ones that
+  the existing harness could cover cheaply — the ordering fixes, the
+  idempotency-cache change, the cursor validation, the admin no-ops.
+- **None of the mobile work has been rendered on a device.** The cold-start
+  hang, the sign-out fallback, the upload retry path, the notification badge,
+  the progress bar and the six error states have been typechecked and read, not
+  seen. The auth fixes in particular describe races and lifecycle ordering,
+  which are exactly the class of defect that a typecheck cannot observe.
+- **`verify-security.sh` has not been re-run.** The 1 Aug run predates changes
+  to the rate limiter, CORS and the error handler — three of the things it
+  checks.
+- **The rate-limit rekeying is untested under load.** Keying on a hash of the
+  bearer token is a behaviour change to a security control, verified by reading.
+- **Nothing is deployed.** No hosted URL, no APK, no `eas.json` in the tree.
+  Unchanged since §5.
 
 ---
 

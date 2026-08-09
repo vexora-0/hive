@@ -48,36 +48,68 @@ Match it against the table. **This determines what you work on.** If the email d
 exists, what runs and what has been proven. Two status tables drifting apart is
 worse than one, so this file no longer restates it.
 
-### Status — 1 August
+### Status — 9 August
 
-The environment works end to end. 19 migrations apply cleanly; demo data seeds
-with photos, tags, notifications and orders. **79 of 79 tests pass.** **CI runs
-on every push and the lint step is now blocking.** G-01, G-02, G-04, G-05,
-G-07, G-08, G-17 and the parent privacy boundary are all confirmed at
-runtime — see `docs/IMPLEMENTATION-STATUS.md` §4, and §5 for what is still
-unproven.
+Every number below was re-run on 9 August rather than copied forward, at commit
+`68721ae`. Other people's work was in flight in the tree at the time, so re-run
+them yourself before relying on them:
 
-`scripts/verify-security.sh` has now been run — **26 passed, 0 failed, 3
-skipped** — which was the highest-value outstanding item. `docs/security.md` §9
-records it, including the three skips and why they are not interchangeable.
+| Check | Result |
+|---|---|
+| `pnpm typecheck` | Clean, both packages |
+| `pnpm lint` | **0 errors**, 30 warnings — 3 backend (`no-explicit-any` in `admin.service.ts`), 27 mobile (mostly unused imports) |
+| `pnpm build:backend` | Succeeds |
+| `pnpm test` | **155 passed, 0 failed**, 7 files, 102s, against `hive-test` |
+| `ls supabase/migrations` | **19 files** at `68721ae` — `00001`–`00018` and `00020`. `00019` was reserved and never used; the count is right, the sequence has a hole |
+
+The suite has **one known flake**: `orders.test.ts > rejects setting a status
+back to pending` fails intermittently in the full parallel run and passes when
+`orders.test.ts` runs alone (26/26). It did not fire in the 9 August run. Treat
+a lone red on that test as unproven, not as proof of a regression.
+
+The environment works end to end; demo data seeds with photos, tags,
+notifications and orders. G-01, G-02, G-04, G-05, G-07, G-08, G-17 and the
+parent privacy boundary are confirmed at runtime — see
+`docs/IMPLEMENTATION-STATUS.md` §4, and §5 for what is still unproven.
+
+**9 August brought twelve fix commits** (`f426251..HEAD`, 56 files, +1495/−333)
+across ordering, upload, auth, the admin console and the API error surface.
+`docs/IMPLEMENTATION-STATUS.md` §10 records what each one was. **None of them
+added a test** — the suite is at 155 both before and after — so that round is
+guarded by nothing but review and typecheck.
+
+`scripts/verify-security.sh` was run on 1 August — **26 passed, 0 failed, 3
+skipped**. `docs/security.md` §9 records it, including the three skips and why
+they are not interchangeable. It has **not** been re-run since the 9 August
+changes, several of which touch the rate limiter, CORS and the error handler.
 
 **Env files are per-machine and gitignored.** On a fresh clone none exists and
 nothing runs; create them from the `.env.example` templates first.
 
 ### What is left
 
-1. **Nothing is deployed** — no hosted URL, no APK. Bhargav, Plan 09 Step 6.
-   This is now the blocker on three verification items: the HTTPS and CORS
-   checks, and the k6 suite.
-2. **CI never runs `pnpm test`.** Lint, typecheck and build only — so 79
-   passing tests guard nothing on a pull request. Needs `hive-test` credentials
-   as repository secrets.
+1. **Nothing is deployed** — no hosted URL, no APK, no `eas.json` in the tree.
+   Bhargav, Plan 09 Step 6. This is the blocker on three verification items:
+   the HTTPS and CORS checks in `verify-security.sh`, and the k6 suite.
+2. **The CI test step is `continue-on-error: true`.** It does exist and does
+   run — `.github/workflows/ci.yml` has run `pnpm --filter @hive/backend test`
+   since 2 August — but it cannot go red until `TEST_SUPABASE_URL`,
+   `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` exist as repository
+   secrets. Until then 155 passing tests still guard nothing on a pull request.
+   Lint, typecheck and build are blocking.
 3. **Nothing has been seen on a device.** Bundling proves imports resolve, not
-   that screens render. Plan 04's mobile deep-link checks are still unticked.
-4. **G-27 upload progress** — Ruthwik, Plan 07 Step 5. The plan marks it
-   optional.
-5. **Sentry has never received an error**, and **G-45 custom SMTP** is unowned.
+   that screens render. Plan 04's mobile deep-link checks are still unticked,
+   and the whole 9 August mobile round — auth cold start, sign-out, upload
+   retry, notification badge — has only been typechecked.
+4. **Sentry has never received an error**, and **G-45 custom SMTP** is unowned.
    Both are account signups rather than code changes.
+
+**Two items that were on this list are done.** G-27 upload progress is real:
+`teacherService.uploadPhotoFile` uses `XMLHttpRequest` and reports
+`event.loaded / event.total` from `xhr.upload.onprogress`, and `useUpload.ts`
+maps it into the band it reserves for the transfer. The `no-namespace` lint
+error in `middleware/auth.ts` was fixed in `40a69fc`, which is why the CI lint
+step is blocking rather than advisory.
 
 Follow `docs/environment-setup.md`; §7 is the verification checklist and asks
 for failures to be reported, not ticks.
