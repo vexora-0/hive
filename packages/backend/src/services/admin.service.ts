@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
+import { decodeCursor } from '../utils/cursor';
 import type {
   CreateSchoolInput,
   UpdateSchoolInput,
@@ -125,14 +126,10 @@ export async function getUsers(
   }
 
   if (cursor) {
-    try {
-      const decoded = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-      query = query.or(
-        `created_at.lt.${decoded.createdAt},and(created_at.eq.${decoded.createdAt},id.lt.${decoded.id})`,
-      );
-    } catch {
-      throw new AppError('Invalid cursor', 400, 'INVALID_CURSOR');
-    }
+    const decoded = decodeCursor(cursor);
+    query = query.or(
+      `created_at.lt.${decoded.createdAt},and(created_at.eq.${decoded.createdAt},id.lt.${decoded.id})`,
+    );
   }
 
   const { data: users, error } = await query;
@@ -229,14 +226,10 @@ export async function getSchools(
     .limit(limit + 1);
 
   if (cursor) {
-    try {
-      const decoded = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-      query = query.or(
-        `created_at.lt.${decoded.createdAt},and(created_at.eq.${decoded.createdAt},id.lt.${decoded.id})`,
-      );
-    } catch {
-      throw new AppError('Invalid cursor', 400, 'INVALID_CURSOR');
-    }
+    const decoded = decodeCursor(cursor);
+    query = query.or(
+      `created_at.lt.${decoded.createdAt},and(created_at.eq.${decoded.createdAt},id.lt.${decoded.id})`,
+    );
   }
 
   const { data: schools, error } = await query;
@@ -261,6 +254,17 @@ export async function getSchools(
       .in('school_id', schoolIds)
       .eq('role', 'teacher'),
   ]);
+
+  // Neither result's error was read, so a failed count query silently became
+  // "0 students, 0 teachers" — a plausible number that is indistinguishable
+  // from the truth. This endpoint has already shipped that class of bug twice.
+  if (studentRows.error || teacherRows.error) {
+    logger.error('Failed to count school members', {
+      studentError: studentRows.error?.message,
+      teacherError: teacherRows.error?.message,
+    });
+    throw new AppError('Failed to fetch schools', 500, 'QUERY_FAILED');
+  }
 
   const tally = (rows: { school_id: string | null }[] | null) => {
     const counts = new Map<string, number>();
@@ -479,16 +483,50 @@ export async function assignTeacher(
     if (!profile || profile.role !== 'teacher') {
       throw new AppError('Teacher not found', 404, 'TEACHER_NOT_FOUND');
     }
+
+    // A teacher may only run a class at their own school. Without this an
+    // admin could put a teacher in front of another school's children — and
+    // the class roster, with dates of birth, comes with it.
+    const { data: klass } = await supabaseAdmin
+      .from('classes')
+      .select('school_id')
+      .eq('id', classId)
+      .single();
+
+    if (!klass) {
+      throw new AppError('Class not found', 404, 'CLASS_NOT_FOUND');
+    }
+
+    const { data: teacherProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('school_id')
+      .eq('id', teacherId)
+      .single();
+
+    if (teacherProfile?.school_id !== klass.school_id) {
+      throw new AppError(
+        'That teacher belongs to a different school',
+        400,
+        'SCHOOL_MISMATCH',
+      );
+    }
   }
 
-  const { error } = await supabaseAdmin
+  // `count`, not just `error`: an update matching no rows is not an error in
+  // PostgREST, so a nonexistent classId used to return "Teacher assigned"
+  // having changed nothing.
+  const { error, count } = await supabaseAdmin
     .from('classes')
-    .update({ teacher_id: teacherId })
+    .update({ teacher_id: teacherId }, { count: 'exact' })
     .eq('id', classId);
 
   if (error) {
     logger.error('Failed to assign teacher', { error: error.message, classId, teacherId });
     throw new AppError('Failed to assign teacher', 500, 'UPDATE_FAILED');
+  }
+
+  if (!count) {
+    throw new AppError('Class not found', 404, 'CLASS_NOT_FOUND');
   }
 
   logger.info('Teacher assigned', { classId, teacherId });
@@ -499,6 +537,32 @@ export async function assignTeacher(
 // ---------------------------------------------------------------------------
 
 export async function createStudent(data: CreateStudentInput) {
+  // The class and the school arrive from different places — `schoolId` from the
+  // body, `classId` from the route param on the add-to-class endpoint — and
+  // nothing checked they agreed. A mismatch is silent but live: the roster is
+  // filtered by school_id, so the child never appears in their own teacher's
+  // list, and tagging them in their own class's photos is refused as an
+  // invalid student.
+  if (data.classId) {
+    const { data: klass } = await supabaseAdmin
+      .from('classes')
+      .select('school_id')
+      .eq('id', data.classId)
+      .single();
+
+    if (!klass) {
+      throw new AppError('Class not found', 404, 'CLASS_NOT_FOUND');
+    }
+
+    if (klass.school_id !== data.schoolId) {
+      throw new AppError(
+        'That class belongs to a different school',
+        400,
+        'SCHOOL_MISMATCH',
+      );
+    }
+  }
+
   const student = {
     id: uuidv4(),
     full_name: data.fullName,
@@ -526,15 +590,26 @@ export async function removeStudentFromClass(
   classId: string,
   studentId: string,
 ): Promise<void> {
-  const { error } = await supabaseAdmin
+  // Both filters must match, so zero rows means the student is not in that
+  // class — which the caller asked to change and must be told about, rather
+  // than being sent a 200 for work that did not happen.
+  const { error, count } = await supabaseAdmin
     .from('students')
-    .update({ class_id: null })
+    .update({ class_id: null }, { count: 'exact' })
     .eq('id', studentId)
     .eq('class_id', classId);
 
   if (error) {
     logger.error('Failed to remove student from class', { error: error.message });
     throw new AppError('Failed to remove student', 500, 'UPDATE_FAILED');
+  }
+
+  if (!count) {
+    throw new AppError(
+      'That student is not in this class',
+      404,
+      'STUDENT_NOT_IN_CLASS',
+    );
   }
 
   logger.info('Student removed from class', { classId, studentId });
@@ -660,15 +735,22 @@ export async function removeParentMapping(
   studentId: string,
   parentId: string,
 ): Promise<void> {
-  const { error } = await supabaseAdmin
+  const { error, count } = await supabaseAdmin
     .from('parent_student_mappings')
-    .delete()
+    .delete({ count: 'exact' })
     .eq('parent_id', parentId)
     .eq('student_id', studentId);
 
   if (error) {
     logger.error('Failed to remove parent mapping', { error: error.message });
     throw new AppError('Failed to remove mapping', 500, 'DELETE_FAILED');
+  }
+
+  // Revoking access is exactly the operation where "it said it worked" must
+  // mean it worked: a silent no-op leaves the parent still able to see the
+  // child's photos while the console shows them unlinked.
+  if (!count) {
+    throw new AppError('That parent is not linked to this student', 404, 'MAPPING_NOT_FOUND');
   }
 
   logger.info('Parent mapping removed', { parentId, studentId });

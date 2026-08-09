@@ -25,6 +25,15 @@ export const uuidUserIdParam = z.object({
   userId: z.string().uuid('userId must be a valid UUID'),
 });
 
+export const uuidClassIdParam = z.object({
+  classId: z.string().uuid('classId must be a valid UUID'),
+});
+
+export const uuidStudentAndParentParams = z.object({
+  studentId: z.string().uuid('studentId must be a valid UUID'),
+  parentId: z.string().uuid('parentId must be a valid UUID'),
+});
+
 export const uuidClassAndStudentParams = z.object({
   classId: z.string().uuid('classId must be a valid UUID'),
   studentId: z.string().uuid('studentId must be a valid UUID'),

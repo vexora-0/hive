@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as feedService from '../services/feed.service';
+import type { GetFeedInput } from '../validators/feed.validator';
 import { paginated, success } from '../utils/apiResponse';
 
 export async function getFeed(
@@ -9,21 +10,10 @@ export async function getFeed(
 ): Promise<void> {
   try {
     const userId = req.user!.id;
-    const { studentId, cursor, limit } = req.query as {
-      studentId?: string;
-      cursor?: string;
-      limit?: string;
-    };
+    // Validated and clamped by `getFeedSchema` on the route.
+    const { studentId, cursor, limit } = req.query as unknown as GetFeedInput;
 
-    const parsedLimit = limit ? parseInt(limit, 10) : 20;
-    const clampedLimit = Math.min(Math.max(parsedLimit || 20, 1), 50);
-
-    const result = await feedService.getFeed(
-      userId,
-      studentId,
-      cursor,
-      clampedLimit,
-    );
+    const result = await feedService.getFeed(userId, studentId, cursor, limit);
 
     res.json(paginated(result.photos, result.nextCursor));
   } catch (err) {

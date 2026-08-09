@@ -17,7 +17,13 @@ import {
   getSchoolOrdersSchema,
   updateOrderStatusSchema,
 } from '../validators/order.validator';
-import { uuidIdParam } from '../validators/params.validator';
+import {
+  uuidIdParam,
+  uuidClassIdParam,
+  uuidStudentIdParam,
+  uuidClassAndStudentParams,
+  uuidStudentAndParentParams,
+} from '../validators/params.validator';
 import * as adminController from '../controllers/admin.controller';
 import * as orderController from '../controllers/order.controller';
 
@@ -55,6 +61,7 @@ router.get(
 // PATCH /admin/users/:id/role - Update user role
 router.patch(
   '/users/:id/role',
+  validate(uuidIdParam, 'params'),
   validate(updateUserRoleSchema, 'body'),
   adminController.updateUserRole,
 );
@@ -62,6 +69,7 @@ router.patch(
 // PATCH /admin/users/:id/school - Assign user to school
 router.patch(
   '/users/:id/school',
+  validate(uuidIdParam, 'params'),
   validate(assignUserToSchoolSchema, 'body'),
   adminController.assignUserToSchool,
 );
@@ -91,11 +99,16 @@ router.patch(
 // ── Class detail & teacher assignment ──────────────────────────────────
 
 // GET /admin/classes/:classId - Class detail with students and teacher
-router.get('/classes/:classId', adminController.getClassDetail);
+router.get(
+  '/classes/:classId',
+  validate(uuidClassIdParam, 'params'),
+  adminController.getClassDetail,
+);
 
 // PATCH /admin/classes/:classId/teacher - Assign/unassign teacher
 router.patch(
   '/classes/:classId/teacher',
+  validate(uuidClassIdParam, 'params'),
   validate(assignTeacherSchema, 'body'),
   adminController.assignTeacher,
 );
@@ -103,6 +116,7 @@ router.patch(
 // POST /admin/classes/:classId/students - Add student to class
 router.post(
   '/classes/:classId/students',
+  validate(uuidClassIdParam, 'params'),
   validate(createStudentSchema, 'body'),
   adminController.addStudentToClass,
 );
@@ -110,6 +124,7 @@ router.post(
 // DELETE /admin/classes/:classId/students/:studentId - Remove student from class
 router.delete(
   '/classes/:classId/students/:studentId',
+  validate(uuidClassAndStudentParams, 'params'),
   adminController.removeStudentFromClass,
 );
 
@@ -125,11 +140,16 @@ router.post(
 // ── Parent-student mapping ─────────────────────────────────────────────
 
 // GET /admin/students/:studentId/parents - List parents for a student
-router.get('/students/:studentId/parents', adminController.getStudentParents);
+router.get(
+  '/students/:studentId/parents',
+  validate(uuidStudentIdParam, 'params'),
+  adminController.getStudentParents,
+);
 
 // POST /admin/students/:studentId/parents - Map parent by email
 router.post(
   '/students/:studentId/parents',
+  validate(uuidStudentIdParam, 'params'),
   validate(mapParentSchema, 'body'),
   adminController.mapParentToStudent,
 );
@@ -137,6 +157,7 @@ router.post(
 // DELETE /admin/students/:studentId/parents/:parentId - Remove mapping
 router.delete(
   '/students/:studentId/parents/:parentId',
+  validate(uuidStudentAndParentParams, 'params'),
   adminController.removeParentMapping,
 );
 

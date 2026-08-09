@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
+import { decodeNotificationCursor } from '../utils/cursor';
 
 interface Notification {
   id: string;
@@ -35,16 +36,12 @@ export async function getNotifications(
     .limit(limit + 1);
 
   if (cursor) {
-    try {
-      const decoded = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-      query = query.or(
-        `and(is_read.eq.${decoded.is_read},created_at.lt.${decoded.createdAt}),` +
-        `and(is_read.eq.${decoded.is_read},created_at.eq.${decoded.createdAt},id.lt.${decoded.id}),` +
-        `is_read.gt.${decoded.is_read}`,
-      );
-    } catch {
-      throw new AppError('Invalid cursor', 400, 'INVALID_CURSOR');
-    }
+    const decoded = decodeNotificationCursor(cursor);
+    query = query.or(
+      `and(is_read.eq.${decoded.is_read},created_at.lt.${decoded.createdAt}),` +
+      `and(is_read.eq.${decoded.is_read},created_at.eq.${decoded.createdAt},id.lt.${decoded.id}),` +
+      `is_read.gt.${decoded.is_read}`,
+    );
   }
 
   const { data: notifications, error } = await query;

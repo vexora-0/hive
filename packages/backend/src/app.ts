@@ -34,9 +34,15 @@ app.use(requestId);
 app.use(helmet());
 
 // CORS
+// `credentials: true` alongside `origin: '*'` is rejected outright by every
+// browser, so the permissive default configuration broke any browser client
+// rather than being permissive to it. Credentials are only meaningful with an
+// explicit allow-list; the mobile app authenticates with a bearer token and
+// needs none.
+const allowAnyOrigin = env.CORS_ORIGINS === '*';
 const corsOptions: cors.CorsOptions = {
-  origin: env.CORS_ORIGINS === '*' ? '*' : (env.CORS_ORIGINS as string[]),
-  credentials: true,
+  origin: allowAnyOrigin ? '*' : (env.CORS_ORIGINS as string[]),
+  credentials: !allowAnyOrigin,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type',

@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
 import { roleGuard } from '../middleware/roleGuard';
+import { validate } from '../middleware/validate';
+import { getFeedSchema } from '../validators/feed.validator';
+import { uuidIdParam } from '../validators/params.validator';
 import * as feedController from '../controllers/feed.controller';
 
 const router: import("express").Router = Router();
@@ -12,6 +15,7 @@ router.use(authenticate);
 router.get(
   '/',
   roleGuard('parent'),
+  validate(getFeedSchema, 'query'),
   feedController.getFeed,
 );
 
@@ -19,6 +23,7 @@ router.get(
 router.get(
   '/photos/:id',
   roleGuard('parent'),
+  validate(uuidIdParam, 'params'),
   feedController.getPhotoDetails,
 );
 

@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
+import { decodeCursor } from '../utils/cursor';
 import { getSignedPhotoUrls } from '../utils/supabaseStorage';
 
 interface FeedPhoto {
@@ -110,14 +111,10 @@ export async function getFeed(
     .limit(OVERFETCH);
 
   if (cursor) {
-    try {
-      const decoded = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-      photosQuery = photosQuery.or(
-        `created_at.lt.${decoded.createdAt},and(created_at.eq.${decoded.createdAt},id.lt.${decoded.id})`,
-      );
-    } catch {
-      throw new AppError('Invalid cursor', 400, 'INVALID_CURSOR');
-    }
+    const decoded = decodeCursor(cursor);
+    photosQuery = photosQuery.or(
+      `created_at.lt.${decoded.createdAt},and(created_at.eq.${decoded.createdAt},id.lt.${decoded.id})`,
+    );
   }
 
   const { data: photos, error: photosError } = await photosQuery;

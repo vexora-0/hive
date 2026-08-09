@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
+import { decodeCursor } from '../utils/cursor';
 import { processAndUploadPhoto } from '../utils/imageProcessor';
 import {
   getSignedPhotoUrls,
@@ -460,14 +461,10 @@ export async function getPhotosByClass(
 
   // Cursor-based pagination using (created_at, id)
   if (cursor) {
-    try {
-      const decoded = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-      query = query.or(
-        `created_at.lt.${decoded.createdAt},and(created_at.eq.${decoded.createdAt},id.lt.${decoded.id})`,
-      );
-    } catch {
-      throw new AppError('Invalid cursor', 400, 'INVALID_CURSOR');
-    }
+    const decoded = decodeCursor(cursor);
+    query = query.or(
+      `created_at.lt.${decoded.createdAt},and(created_at.eq.${decoded.createdAt},id.lt.${decoded.id})`,
+    );
   }
 
   const { data: photos, error } = await query;

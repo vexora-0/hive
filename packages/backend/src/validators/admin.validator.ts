@@ -63,7 +63,18 @@ export const createStudentSchema = z.object({
   fullName: z.string().min(1, 'Student name is required').max(200),
   schoolId: z.string().uuid('Invalid school ID'),
   classId: z.string().uuid('Invalid class ID').optional(),
-  dateOfBirth: z.string().optional(),
+  // The column is a Postgres `date`. Unvalidated, "not a date" reached the
+  // driver and came back as a 500 for what is plainly a bad field. The extra
+  // refine catches the shapes the regex admits but the calendar does not,
+  // such as 2026-02-31.
+  dateOfBirth: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'dateOfBirth must be in YYYY-MM-DD format')
+    .refine((value) => {
+      const parsed = new Date(`${value}T00:00:00Z`);
+      return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
+    }, 'dateOfBirth is not a real date')
+    .optional(),
 });
 
 export const mapParentSchema = z.object({
