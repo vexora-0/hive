@@ -50,38 +50,84 @@ worse than one, so this file no longer restates it.
 
 ### Status — 9 August
 
-Every number below was re-run on 9 August rather than copied forward, at commit
-`68721ae`. Other people's work was in flight in the tree at the time, so re-run
-them yourself before relying on them:
+Every number below was re-run on 9 August rather than copied forward, against a
+tree carrying the `afafe1a` changes (uncommitted at the time they were run).
+Other people's work was in flight, so re-run them yourself before relying on
+them:
 
 | Check | Result |
 |---|---|
-| `pnpm typecheck` | Clean, both packages |
-| `pnpm lint` | **0 errors**, 30 warnings — 3 backend (`no-explicit-any` in `admin.service.ts`), 27 mobile (mostly unused imports) |
+| `pnpm typecheck` | Clean, both packages (forced past the Turbo cache) |
+| `pnpm lint` | **0 errors**, 27 warnings — 3 backend (`no-explicit-any` in `admin.service.ts`), 24 mobile (mostly unused imports) |
 | `pnpm build:backend` | Succeeds |
-| `pnpm test` | **178 passed, 0 failed**, 8 files, against `hive-test` |
-| `ls supabase/migrations` | **19 files** at `68721ae` — `00001`–`00018` and `00020`. `00019` was reserved and never used; the count is right, the sequence has a hole |
+| `pnpm test` | **178 tests, 8 files**, against `hive-test`. **Not observed fully green** — see below |
+| `ls supabase/migrations` | **20 files** — `00001`–`00018`, `00020`, `00024`. `00019` and `00021`–`00023` were reserved per plan and never used; the sequence has holes, the count is right |
 
-The suite has **one known flake**: `orders.test.ts > rejects setting a status
-back to pending` fails intermittently in the full parallel run and passes when
-`orders.test.ts` runs alone (26/26). It did not fire in the 9 August run. Treat
-a lone red on that test as unproven, not as proof of a regression.
+**Check for a run in flight before starting the suite** —
+`pgrep -fl "vitest.mjs run"` — and do not start one if there is. `hive-test` is
+shared between CI and every developer.
+
+The one-in-five flake that had been blamed on a bad test was a harness fault,
+fixed in `e4e689e`: `truncateAll()` ran in a global `beforeAll` once per file,
+so two overlapping runs wiped each other's fixtures mid-test. Cleanup is now
+scoped to the schools the running process created. **Repeated runs still
+exhaust the shared GoTrue sign-in quota** — each run creates ~40 auth users,
+and past the quota sign-ins stall rather than fail. Running the suite three
+times inside half an hour on 9 August was enough on its own, with `pgrep`
+checked clear before each: the first run was 177/178 with one 30 s timeout, and by the third
+every one of the 21 tests in `orders.test.ts` timed out and the run took over
+fifteen minutes. **Every failure seen was a timeout, never a failed
+assertion**, and the same files passed in isolation straight afterwards.
+
+A clean **178/178 in 115s was observed earlier the same day**, on a run made
+with nothing else touching the project — so the figure is real, but it is a
+measurement of the suite running alone, not of the suite running whenever you
+happen to want it. A red or very slow run following someone else's is this
+quota, not a regression: pause, then re-run the failing file alone before
+believing it.
 
 The environment works end to end; demo data seeds with photos, tags,
-notifications and orders. G-01, G-02, G-04, G-05, G-07, G-08, G-17 and the
-parent privacy boundary are confirmed at runtime — see
-`docs/IMPLEMENTATION-STATUS.md` §4, and §5 for what is still unproven.
+notifications and orders. `hive-dev` had stopped resolving (NXDOMAIN) at the
+start of 9 August, which is why the app "wasn't running properly"; it was
+restored, and migration `00024` has been applied to it and verified.
+G-01, G-02, G-04, G-05, G-07, G-08, G-17 and the parent privacy boundary are
+confirmed at runtime — see `docs/IMPLEMENTATION-STATUS.md` §4, and §5 for what
+is still unproven.
 
-**9 August brought twelve fix commits** (`f426251..HEAD`, 56 files, +1495/−333)
-across ordering, upload, auth, the admin console and the API error surface.
-`docs/IMPLEMENTATION-STATUS.md` §10 records what each one was. **None of them
-added a test** — the suite stood at 155 across all twelve — so that round is
-guarded by nothing but review and typecheck.
+**9 August brought 25 fix commits** (`f426251..HEAD`) across
+ordering, upload, auth, notifications, the admin console, the API error surface
+and the web build. `docs/IMPLEMENTATION-STATUS.md` §10 records them by area.
+The round's own second review found three regressions it had introduced —
+cursor pagination dropping rows on a millisecond-truncated timestamp, a
+rate-limit bypass via a forged bearer token, and WebP accepted at three format
+gates and refused at the fourth — all fixed. **The only tests the round added
+are the 23 in `tests/cursor.test.ts`**; everything else in it is guarded by
+review and typecheck alone.
+
+**The app was seen rendering for the first time**, in Chrome, via
+`pnpm --filter @hive/mobile exec expo start --web` on `localhost:8081`. Two
+web-only defects had to be fixed first: zustand's `import.meta` making the
+whole bundle a parse error under a classic `<script>` tag, and
+`expo-secure-store` having no web implementation, so the session was never
+persisted and sign-in bounced back to login. Both fixed without changing native
+behaviour. Web is a verification convenience — the product targets iOS and
+Android.
 
 `scripts/verify-security.sh` was run on 1 August — **26 passed, 0 failed, 3
 skipped**. `docs/security.md` §9 records it, including the three skips and why
 they are not interchangeable. It has **not** been re-run since the 9 August
 changes, several of which touch the rate limiter, CORS and the error handler.
+Two of its checks were re-done by hand on 9 August against the running dev
+backend — a signed photo URL returned 200 and the same URL without `?token`
+returned 400; a Bloom teacher asking for Little Stars' roster got 403 and her
+own school's got 200 — which is two checks, not the script.
+
+**This round crossed the ownership map in §6.** The fixes touch
+`order.service.ts`, `photo.service.ts`, the upload middleware and the admin
+services, which belong to Ruthwik and Nagachaitanya, plus the auth store and
+`middleware/auth.ts`, which belong to Nagachaitanya. That was not agreed in
+advance. Both should review the 9 August commits in their own areas before
+building on them.
 
 **Env files are per-machine and gitignored.** On a fresh clone none exists and
 nothing runs; create them from the `.env.example` templates first.
@@ -97,12 +143,27 @@ nothing runs; create them from the `.env.example` templates first.
    `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` exist as repository
    secrets. Until then 178 passing tests still guard nothing on a pull request.
    Lint, typecheck and build are blocking.
-3. **Nothing has been seen on a device.** Bundling proves imports resolve, not
-   that screens render. Plan 04's mobile deep-link checks are still unticked,
-   and the whole 9 August mobile round — auth cold start, sign-out, upload
-   retry, notification badge — has only been typechecked.
-4. **Sentry has never received an error**, and **G-45 custom SMTP** is unowned.
+3. **Nothing has been seen on a device.** This changed by half a step on 9
+   August: the app was driven end to end **in Chrome**, so the screens are no
+   longer merely typechecked. But web is not the target. No iOS or Android
+   build has been launched and no simulator run is recorded, so anything
+   platform-specific — the keychain-backed session, the image picker, deep
+   links, `AppState` transitions — is still unverified where it ships. Plan
+   04's mobile deep-link checks remain unticked.
+4. **The web file picker was never driven end to end.** The tagging gate and
+   the class default were checked in the browser; an actual file upload through
+   the web picker was not completed. The pipeline itself is covered by the API
+   tests.
+5. **`scripts/verify-security.sh` needs re-running**, per the paragraph above.
+   It is the cheapest outstanding item on this list.
+6. **Sentry has never received an error**, and **G-45 custom SMTP** is unowned.
    Both are account signups rather than code changes.
+7. **Redis has no timeout and no health check.** Found on 9 August: with Redis
+   stopped, `POST /orders` hangs — the idempotency middleware talks to Redis
+   before the handler runs, and the request was still open after two minutes.
+   `/health` checks the database but not Redis, so it reports `ok` while
+   ordering is dead. Ruthwik's area (`packages/backend/src/config/redis.ts`,
+   `middleware/idempotency.ts`).
 
 **Two items that were on this list are done.** G-27 upload progress is real:
 `teacherService.uploadPhotoFile` uses `XMLHttpRequest` and reports
