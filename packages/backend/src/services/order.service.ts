@@ -275,7 +275,7 @@ const STATUS_MESSAGES: Record<OrderStatus, string> = {
  * to `getOrders` above so both lists paginate the same way.
  */
 export async function getOrdersForSchool(
-  schoolId: string,
+  schoolId: string | undefined,
   cursor?: string,
   limit: number = 20,
   status?: OrderStatus,
@@ -283,10 +283,17 @@ export async function getOrdersForSchool(
   let query = supabaseAdmin
     .from('orders')
     .select('id, parent_id, school_id, status, shipping_address, notes, total_cents, created_at')
-    .eq('school_id', schoolId)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(limit + 1);
+
+  // No school means a platform admin, who sees every school's queue — the same
+  // rule `updateOrderStatus` below already applies. Previously the controller
+  // rejected this case with a 400, which the admin UI rendered as an empty
+  // fulfilment queue, so orders looked like they did not exist.
+  if (schoolId) {
+    query = query.eq('school_id', schoolId);
+  }
 
   if (status) {
     query = query.eq('status', status);
