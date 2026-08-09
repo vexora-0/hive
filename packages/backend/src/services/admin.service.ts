@@ -581,7 +581,7 @@ export async function mapParentToStudent(
   // Look up parent profile by email
   const { data: parent, error: lookupError } = await supabaseAdmin
     .from('profiles')
-    .select('id, role')
+    .select('id, role, school_id')
     .eq('email', input.email)
     .single();
 
@@ -591,6 +591,27 @@ export async function mapParentToStudent(
       404,
       'PARENT_NOT_FOUND',
     );
+  }
+
+  // The role was already being fetched here and then ignored. Mapping a teacher
+  // or an admin account to a student would hand it that child's photo feed,
+  // which is scoped by parent_student_mappings alone.
+  if (parent.role !== 'parent') {
+    throw new AppError(
+      `"${input.email}" is a ${parent.role} account, not a parent`,
+      400,
+      'NOT_A_PARENT',
+    );
+  }
+
+  const { data: student, error: studentError } = await supabaseAdmin
+    .from('students')
+    .select('school_id')
+    .eq('id', studentId)
+    .single();
+
+  if (studentError || !student) {
+    throw new AppError('Student not found', 404, 'STUDENT_NOT_FOUND');
   }
 
   // Insert mapping (unique constraint prevents duplicates)
@@ -608,6 +629,28 @@ export async function mapParentToStudent(
     }
     logger.error('Failed to map parent', { error: insertError.message });
     throw new AppError('Failed to map parent', 500, 'INSERT_FAILED');
+  }
+
+  // A parent signs up with no school — the signup trigger (migration 00014)
+  // cannot know one — and `createOrder` refuses anyone without a school_id. So
+  // a linked parent could see their child's photos but never order a print.
+  // Being linked to a student is exactly what establishes which school they
+  // belong to. Only filled when absent, so a parent with children at two
+  // schools keeps the school they were first attached to.
+  if (!parent.school_id) {
+    const { error: schoolError } = await supabaseAdmin
+      .from('profiles')
+      .update({ school_id: student.school_id })
+      .eq('id', parent.id)
+      .is('school_id', null);
+
+    if (schoolError) {
+      // The mapping itself succeeded, so this is not fatal to the request.
+      logger.error('Failed to set parent school from mapping', {
+        parentId: parent.id,
+        error: schoolError.message,
+      });
+    }
   }
 
   logger.info('Parent mapped to student', { parentId: parent.id, studentId });
