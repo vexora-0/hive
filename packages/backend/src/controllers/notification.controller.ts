@@ -46,6 +46,22 @@ export async function markAsRead(
   }
 }
 
+export async function markAllAsRead(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user!.id;
+
+    const updated = await notificationService.markAllAsRead(userId);
+
+    res.json(success({ updated }, 'All notifications marked as read'));
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getUnreadCount(
   req: Request,
   res: Response,

@@ -10,10 +10,14 @@ import { logger } from '@/utils/logger';
 import {
   getNotifications,
   getUnreadCount,
+  markAllAsRead,
   markAsRead,
-  type Notification,
   type NotificationsPage,
 } from '../services/notificationService';
+
+type NotificationsCache =
+  | { pages: NotificationsPage[]; pageParams: unknown[] }
+  | undefined;
 
 // ---------------------------------------------------------------------------
 // Query keys
@@ -108,7 +112,7 @@ function useMarkAsReadMutation() {
       // Optimistically mark the notification as read in the list cache.
       queryClient.setQueryData(
         NOTIFICATIONS_KEY,
-        (old: { pages: NotificationsPage[]; pageParams: unknown[] } | undefined) => {
+        (old: NotificationsCache) => {
           if (!old) return old;
 
           return {
@@ -156,6 +160,71 @@ function useMarkAsReadMutation() {
 }
 
 // ---------------------------------------------------------------------------
+// useMarkAllAsRead — optimistic mutation
+// ---------------------------------------------------------------------------
+
+/**
+ * `useMarkAllAsRead` — clears the whole inbox in one request.
+ *
+ * Marking read one row at a time was the only option, and a single 20-photo
+ * upload used to produce 20 notifications, so emptying the list took 20 taps.
+ * The trigger behind that is gone (migration 00024), but the backlog it left
+ * behind is still on people's devices and any busy week produces a long list
+ * on its own.
+ */
+function useMarkAllAsReadMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => markAllAsRead(),
+
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: NOTIFICATIONS_KEY });
+      await queryClient.cancelQueries({ queryKey: UNREAD_COUNT_KEY });
+
+      const previousNotifications = queryClient.getQueryData(NOTIFICATIONS_KEY);
+      const previousUnreadCount = queryClient.getQueryData(UNREAD_COUNT_KEY);
+
+      queryClient.setQueryData(NOTIFICATIONS_KEY, (old: NotificationsCache) => {
+        if (!old) return old;
+
+        return {
+          ...old,
+          pages: old.pages.map((page) => ({
+            ...page,
+            notifications: page.notifications.map((n) =>
+              n.is_read ? n : { ...n, is_read: true },
+            ),
+          })),
+        };
+      });
+
+      // Straight to zero, not a decrement: the server clears everything unread
+      // for this user, including the pages the client has never fetched.
+      queryClient.setQueryData(UNREAD_COUNT_KEY, () => ({ count: 0 }));
+
+      return { previousNotifications, previousUnreadCount };
+    },
+
+    onError: (error, _variables, context) => {
+      logger.error('Failed to mark all notifications as read:', error);
+
+      if (context?.previousNotifications) {
+        queryClient.setQueryData(NOTIFICATIONS_KEY, context.previousNotifications);
+      }
+      if (context?.previousUnreadCount) {
+        queryClient.setQueryData(UNREAD_COUNT_KEY, context.previousUnreadCount);
+      }
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
+      queryClient.invalidateQueries({ queryKey: UNREAD_COUNT_KEY });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Composite hook — public API
 // ---------------------------------------------------------------------------
 
@@ -171,6 +240,7 @@ function useMarkAsReadMutation() {
  *   hasNextPage,
  *   unreadCount,
  *   markAsRead,
+ *   markAllAsRead,
  *   refetch,
  * } = useNotifications();
  * ```
@@ -179,6 +249,7 @@ export function useNotifications() {
   const list = useNotificationsList();
   const unread = useUnreadCount();
   const markMutation = useMarkAsReadMutation();
+  const markAllMutation = useMarkAllAsReadMutation();
 
   return {
     // List
@@ -195,5 +266,7 @@ export function useNotifications() {
 
     // Mark as read
     markAsRead: markMutation.mutate,
+    markAllAsRead: markAllMutation.mutate,
+    isMarkingAllAsRead: markAllMutation.isPending,
   };
 }

@@ -1,9 +1,11 @@
 import React, { useCallback } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { colors, spacing } from '@/theme';
+import { Text } from '@/components/ui/Text';
 import { EmptyState } from '@/components/feedback/EmptyState';
 import { SkeletonShimmer } from '@/components/feedback/SkeletonShimmer';
 import { useNotifications } from '../hooks/useNotifications';
@@ -72,9 +74,16 @@ export function NotificationCenter() {
     refetch,
     isRefetching,
     markAsRead,
+    markAllAsRead,
+    isMarkingAllAsRead,
+    unreadCount,
   } = useNotifications();
 
   // -- Handlers -----------------------------------------------------------
+
+  const handleMarkAllAsRead = useCallback(() => {
+    markAllAsRead();
+  }, [markAllAsRead]);
 
   const handlePress = useCallback(
     (notification: Notification) => {
@@ -156,6 +165,41 @@ export function NotificationCenter() {
 
   return (
     <View style={styles.container}>
+      {/*
+        Sits above the list rather than inside it as a ListHeaderComponent:
+        the point of this control is to clear a backlog, and a backlog is
+        exactly the case where a scrolling header would already be off-screen
+        by the time the user wants it.
+      */}
+      {unreadCount > 0 && (
+        <View style={styles.toolbar}>
+          <Text variant="bodySmall" color={colors.text.secondary}>
+            {unreadCount} unread
+          </Text>
+          <Pressable
+            onPress={handleMarkAllAsRead}
+            disabled={isMarkingAllAsRead}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.markAllButton,
+              (pressed || isMarkingAllAsRead) && styles.markAllButtonPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isMarkingAllAsRead }}
+            accessibilityLabel={`Mark all ${unreadCount} notifications as read`}
+          >
+            <Ionicons
+              name="checkmark-done-outline"
+              size={18}
+              color={colors.primary.blue}
+            />
+            <Text variant="captionBold" color={colors.primary.blue}>
+              Mark all read
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
       <FlashList
         data={notifications}
         renderItem={renderItem}
@@ -190,6 +234,23 @@ const styles = StyleSheet.create({
   listContent: {
     paddingTop: spacing.sm,
     paddingBottom: spacing.xl,
+  },
+  toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+  },
+  markAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  markAllButtonPressed: {
+    opacity: 0.5,
   },
   footer: {
     paddingVertical: spacing.md,

@@ -1,5 +1,5 @@
 import { apiRequest } from '@/lib/api';
-import type { Tables, NotificationType } from '@/types/supabase';
+import type { Tables } from '@/types/supabase';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -14,6 +14,11 @@ export interface NotificationsPage {
 
 export interface UnreadCountResponse {
   count: number;
+}
+
+export interface MarkAllReadResponse {
+  /** How many rows changed from unread to read. */
+  updated: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -52,6 +57,21 @@ export async function markAsRead(notificationId: string): Promise<void> {
   await apiRequest(`/notifications/${notificationId}/read`, {
     method: 'PATCH',
   });
+}
+
+/**
+ * Mark every unread notification as read in one call.
+ *
+ * Resolves to the number of rows the server actually changed, which is not
+ * always what the client believed was unread — the badge polls on a 30s
+ * interval, so it can be stale by a page of notifications.
+ */
+export async function markAllAsRead(): Promise<MarkAllReadResponse> {
+  const res = await apiRequest<{ success: true; data: MarkAllReadResponse }>(
+    '/notifications/read-all',
+    { method: 'PATCH' },
+  );
+  return res.data;
 }
 
 /**
