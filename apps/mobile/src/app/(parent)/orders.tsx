@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, STALE_TIME_MS } from '@/theme';
 import { Text } from '@/components/ui';
 import { ScreenContainer } from '@/components/layout';
-import { SkeletonShimmer, EmptyState } from '@/components/feedback';
+import { SkeletonShimmer, EmptyState, useToast } from '@/components/feedback';
 import { HeaderBar } from '@/components/navigation';
 import { HoneycombFAB } from '@/components/animation';
 import { getPhotoDetails } from '@/features/parent/services/parentService';
@@ -68,6 +68,7 @@ function OrderSkeletonList() {
  */
 export default function OrdersScreen() {
   const { photoId } = useLocalSearchParams<{ photoId?: string }>();
+  const toast = useToast();
   const router = useRouter();
 
   const {
@@ -87,12 +88,26 @@ export default function OrdersScreen() {
   const [orderPhotoId, setOrderPhotoId] = useState<string | null>(null);
 
   // Fetch photo details when photoId is provided (need URI for OrderBottomSheet)
-  const { data: photoForOrder } = useQuery({
+  const {
+    data: photoForOrder,
+    isError: photoForOrderError,
+  } = useQuery({
     queryKey: ['photo-for-order', orderPhotoId],
     queryFn: () => getPhotoDetails(orderPhotoId!),
     enabled: !!orderPhotoId,
     staleTime: STALE_TIME_MS,
   });
+
+  // The sheet only opens once the photo has loaded, so a failed lookup used to
+  // mean the parent tapped "Order Print", landed on this tab, and nothing at
+  // all happened — no sheet, no message.
+  useEffect(() => {
+    if (photoForOrderError && orderPhotoId) {
+      toast.error("Couldn't load that photo. Please try again.");
+      setOrderSheetVisible(false);
+      setOrderPhotoId(null);
+    }
+  }, [photoForOrderError, orderPhotoId, toast]);
 
   // When photoId param arrives (from feed or photo detail), open the order sheet
   useEffect(() => {
@@ -105,7 +120,11 @@ export default function OrdersScreen() {
   const handleOrderSheetClose = useCallback(() => {
     setOrderSheetVisible(false);
     setOrderPhotoId(null);
-    router.setParams({ photoId: undefined as any });
+    // Cleared to an empty string, not undefined: a params merge may drop an
+    // undefined key entirely, leaving photoId at its previous value, so
+    // ordering the same photo a second time in one session would not re-fire
+    // the effect above and the sheet would never reopen.
+    router.setParams({ photoId: '' });
     refetch();
   }, [router, refetch]);
 

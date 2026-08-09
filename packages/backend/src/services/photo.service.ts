@@ -1,4 +1,4 @@
-import fs from 'fs';
+import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
@@ -144,7 +144,10 @@ export async function saveUploadedFile(
       );
     }
 
-    const buffer = fs.readFileSync(tempFilePath);
+    // Async read: this file is up to 25MB and the client uploads three at a
+    // time, so readFileSync stalled the event loop — every other request on the
+    // instance, including /health — for the duration of each one.
+    const buffer = await fs.readFile(tempFilePath);
 
     // Validates magic bytes, converts HEIC, uploads original + thumbnail,
     // and computes the blurhash. Throws on anything that isn't a real image.
@@ -186,7 +189,7 @@ export async function saveUploadedFile(
   } finally {
     // Always remove the multer temp file, on success or failure.
     try {
-      fs.unlinkSync(tempFilePath);
+      await fs.unlink(tempFilePath);
     } catch {
       // Already gone — nothing to do.
     }

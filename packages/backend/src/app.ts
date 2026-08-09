@@ -94,9 +94,24 @@ app.use((req, res, next) => {
 app.get('/health', async (_req, res) => {
   let database: 'ok' | 'error' = 'error';
   try {
+    // The probe carries its own catch before it is raced.
+    //
+    // Promise.race abandons the loser, it does not cancel it. If the query lost
+    // the race and then rejected, nothing was attached to handle it, so it
+    // became an unhandled rejection — and index.ts responds to those by exiting
+    // the process. A slow database could therefore kill the very instance the
+    // health check exists to report on.
+    const probe = supabaseAdmin
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .then(
+        ({ error }) => ({ error: error as unknown as Error | null }),
+        (err: unknown) => ({ error: err instanceof Error ? err : new Error(String(err)) }),
+      );
+
     const { error } = await Promise.race([
-      supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true }),
-      new Promise<{ error: Error }>((resolve) =>
+      probe,
+      new Promise<{ error: Error | null }>((resolve) =>
         setTimeout(() => resolve({ error: new Error('timeout') }), 2000),
       ),
     ]);
