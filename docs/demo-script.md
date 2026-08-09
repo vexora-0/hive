@@ -1,5 +1,36 @@
 # Demo Script
 
+> ## Read this first if you are presenting
+>
+> **Bhargav is not presenting and will not be in the room.** This script has to
+> stand on its own, so it is written for someone who was not there when the
+> code was written.
+>
+> **Do one full dry run before the real thing — do not skip this.** Follow this
+> script start to finish, on the machine you will actually present from, with
+> enough time to fix something if it breaks. Two specific reasons:
+>
+> 1. **Several fixes landed on 9 August and are verified only by having been
+>    clicked through in a browser, not by tests.** Ordering, the order item
+>    counts, the shipping-address guard, order numbers, deep links and the
+>    teacher class picker all changed that day. They worked when checked. They
+>    are not covered by the test suite, so a dry run is the only thing standing
+>    between you and finding out live.
+> 2. **Nothing has ever run on a phone or a simulator.** Every screen has only
+>    ever been seen in a browser. If someone asks to see it on a device, the
+>    honest answer is that it has not been built for one yet.
+>
+> **If something breaks mid-demo**, the fastest recovery is almost always to
+> reload the browser tab. The three checks in "Before you start" — Redis,
+> backend `/health`, and the web server — catch nearly everything else, so run
+> them again rather than debugging live. If the parent feed is empty or the
+> screen is blank, you are probably signed in as the wrong role: sign out and
+> back in.
+>
+> **The single most likely thing to go wrong** is using the OTP login instead of
+> "Use a password instead". It is listed again below because it matters that
+> much.
+
 Target **8–10 minutes**. Rehearse end to end twice and time it.
 
 **This is a browser demo.** The app runs in Chrome through `react-native-web`
@@ -447,6 +478,10 @@ it's the single biggest process lesson from the phase.
 
 ## Day-of checklist
 
+- [ ] **One full dry run of this script completed, start to finish, on the
+      machine you are presenting from.** Not optional. The 9 August fixes are
+      verified only by having been clicked through in a browser, and are not
+      covered by the test suite. Do it early enough that a surprise is fixable
 - [ ] Redis up and `redis-cli ping` answering `PONG` — ordering survives
       without it now, but loses double-submit protection. `/health` reports it
       as `"cache"`
