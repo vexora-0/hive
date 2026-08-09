@@ -67,7 +67,7 @@ export default function DashboardScreen() {
   const router = useRouter();
 
   // ── Class selection ─────────────────────────────────────────────────
-  const { classes, isLoading: classesLoading } = useClasses();
+  const { classes, defaultClassId, isLoading: classesLoading } = useClasses();
   // useClasses is disabled without a school, so the query never runs and the
   // screen sat empty with no explanation.
   const hasSchool = useAuthStore((s) => !!s.profile?.school_id);
@@ -77,12 +77,13 @@ export default function DashboardScreen() {
     setSelectedClassId(cls.id);
   }, []);
 
-  // Auto-select first class when classes load
+  // Preselect the teacher's own class once the list loads — see
+  // `useClasses().defaultClassId` for why it is not simply `classes[0]`.
   React.useEffect(() => {
-    if (classes.length > 0 && !selectedClassId) {
-      setSelectedClassId(classes[0].id);
+    if (defaultClassId && !selectedClassId) {
+      setSelectedClassId(defaultClassId);
     }
-  }, [classes, selectedClassId]);
+  }, [defaultClassId, selectedClassId]);
 
   // ── Photos ──────────────────────────────────────────────────────────
   const {

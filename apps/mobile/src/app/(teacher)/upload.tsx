@@ -38,7 +38,7 @@ export default function UploadScreen() {
   const queryClient = useQueryClient();
 
   // ── Classes ─────────────────────────────────────────────────────────
-  const { classes } = useClasses();
+  const { classes, defaultClassId } = useClasses();
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
 
   const handleClassSelect = useCallback((cls: ClassItem) => {
@@ -47,6 +47,16 @@ export default function UploadScreen() {
     setSelectedStudentIds([]);
     setStudents([]);
   }, []);
+
+  // Preselect the teacher's own class rather than leaving the picker empty or
+  // landing on whichever class sorts first at the school — see
+  // `useClasses().defaultClassId`. Every class stays pickable; this only sets
+  // the starting point.
+  useEffect(() => {
+    if (defaultClassId && !selectedClassId) {
+      setSelectedClassId(defaultClassId);
+    }
+  }, [defaultClassId, selectedClassId]);
 
   // ── Students ────────────────────────────────────────────────────────
   const [students, setStudents] = useState<StudentItem[]>([]);

@@ -23,6 +23,11 @@ export interface ClassItem {
   name: string;
   /** Nullable — classes.grade is optional in the schema. */
   grade: string | null;
+  /**
+   * Profile id of the class's own teacher, when known. Not rendered; callers
+   * use it to decide which class to preselect. Nullable in the schema.
+   */
+  teacherId?: string | null;
 }
 
 export interface ClassSelectorProps {
