@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   MAX_OTP_ATTEMPTS,
   LOCKOUT_DURATION_SEC,
   RESEND_COOLDOWN_SEC,
 } from '@/theme';
 import * as authService from '../services/authService';
+import { useOtpThrottleStore, secondsUntil } from '../stores/otpThrottleStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,14 +48,22 @@ export function useOTP(): UseOTPReturn {
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ── Attempts / lockout ─────────────────────────────────────────────
-  const [otpAttempts, setOtpAttempts] = useState(0);
-  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
-  const [lockoutRemaining, setLockoutRemaining] = useState(0);
+  // ── Attempts / lockout / cooldown ──────────────────────────────────
+  // Held in a module-level store, not in this hook: login and verify-otp each
+  // create their own instance, so per-instance state meant navigating between
+  // them reset both the lockout and the resend cooldown.
+  const attempts = useOtpThrottleStore((s) => s.attempts);
+  const lockoutUntil = useOtpThrottleStore((s) => s.lockoutUntil);
+  const resendCooldownUntil = useOtpThrottleStore((s) => s.resendCooldownUntil);
+  const recordFailure = useOtpThrottleStore((s) => s.recordFailure);
+  const beginResendCooldown = useOtpThrottleStore((s) => s.startResendCooldown);
+  const resetThrottle = useOtpThrottleStore((s) => s.reset);
 
-  // ── Resend cooldown ────────────────────────────────────────────────
-  const [resendCooldownEnd, setResendCooldownEnd] = useState<number | null>(null);
-  const [resendCountdown, setResendCountdown] = useState(0);
+  // Re-derived once a second so the displayed countdowns tick down. The values
+  // themselves come from the deadlines, so they stay right across unmounts.
+  const [, forceTick] = useState(0);
+  const lockoutRemaining = secondsUntil(lockoutUntil);
+  const resendCountdown = secondsUntil(resendCooldownUntil);
 
   // ── Shake trigger ──────────────────────────────────────────────────
   const [shakeKey, setShakeKey] = useState(0);
@@ -62,68 +71,23 @@ export function useOTP(): UseOTPReturn {
     setShakeKey((k) => k + 1);
   }, []);
 
-  // ── Interval refs (cleaned up on unmount) ──────────────────────────
-  const resendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lockoutIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   // ── Derived booleans ───────────────────────────────────────────────
-  const isLockedOut = lockoutUntil !== null && Date.now() < lockoutUntil;
+  const isLockedOut = lockoutRemaining > 0;
   const canResend = !isSending && resendCountdown === 0 && !isLockedOut;
-  const attemptsRemaining = Math.max(MAX_OTP_ATTEMPTS - otpAttempts, 0);
+  const attemptsRemaining = Math.max(MAX_OTP_ATTEMPTS - attempts, 0);
 
-  // ── Resend cooldown timer ──────────────────────────────────────────
-  const startResendCooldown = useCallback(() => {
-    const end = Date.now() + RESEND_COOLDOWN_SEC * 1000;
-    setResendCooldownEnd(end);
-    setResendCountdown(RESEND_COOLDOWN_SEC);
-
-    // Clear any existing interval
-    if (resendIntervalRef.current) {
-      clearInterval(resendIntervalRef.current);
-    }
-
-    resendIntervalRef.current = setInterval(() => {
-      const remaining = Math.max(0, Math.ceil((end - Date.now()) / 1000));
-      setResendCountdown(remaining);
-      if (remaining <= 0 && resendIntervalRef.current) {
-        clearInterval(resendIntervalRef.current);
-        resendIntervalRef.current = null;
-        setResendCooldownEnd(null);
-      }
-    }, 1000);
-  }, []);
-
-  // ── Lockout timer ──────────────────────────────────────────────────
-  const startLockout = useCallback(() => {
-    const until = Date.now() + LOCKOUT_DURATION_SEC * 1000;
-    setLockoutUntil(until);
-    setLockoutRemaining(LOCKOUT_DURATION_SEC);
-
-    if (lockoutIntervalRef.current) {
-      clearInterval(lockoutIntervalRef.current);
-    }
-
-    lockoutIntervalRef.current = setInterval(() => {
-      const remaining = Math.max(0, Math.ceil((until - Date.now()) / 1000));
-      setLockoutRemaining(remaining);
-      if (remaining <= 0) {
-        if (lockoutIntervalRef.current) {
-          clearInterval(lockoutIntervalRef.current);
-          lockoutIntervalRef.current = null;
-        }
-        setLockoutUntil(null);
-        setOtpAttempts(0);
-      }
-    }, 1000);
-  }, []);
-
-  // ── Cleanup on unmount ─────────────────────────────────────────────
+  // ── Countdown ticker ───────────────────────────────────────────────
+  // One interval for both countdowns, running only while one is active.
   useEffect(() => {
-    return () => {
-      if (resendIntervalRef.current) clearInterval(resendIntervalRef.current);
-      if (lockoutIntervalRef.current) clearInterval(lockoutIntervalRef.current);
-    };
-  }, []);
+    if (lockoutUntil === null && resendCooldownUntil === null) return;
+
+    const id = setInterval(() => forceTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [lockoutUntil, resendCooldownUntil]);
+
+  const startResendCooldown = useCallback(() => {
+    beginResendCooldown(RESEND_COOLDOWN_SEC);
+  }, [beginResendCooldown]);
 
   // ── Send OTP ───────────────────────────────────────────────────────
   const sendOTP = useCallback(
@@ -163,15 +127,15 @@ export function useOTP(): UseOTPReturn {
         setIsVerifying(true);
         setError(null);
         await authService.verifyOTP(email, token);
-        // Success — the auth state listener will handle navigation.
+        // Success — clear the throttle so a later sign-in on this device is not
+        // penalised for it, and let the auth state listener handle navigation.
+        resetThrottle();
         return true;
       } catch (err: unknown) {
-        const nextAttempts = otpAttempts + 1;
-        setOtpAttempts(nextAttempts);
+        const nextAttempts = recordFailure(MAX_OTP_ATTEMPTS, LOCKOUT_DURATION_SEC);
         triggerShake();
 
         if (nextAttempts >= MAX_OTP_ATTEMPTS) {
-          startLockout();
           setError(
             `Too many failed attempts. Locked out for ${Math.ceil(LOCKOUT_DURATION_SEC / 60)} minutes.`,
           );
@@ -185,7 +149,7 @@ export function useOTP(): UseOTPReturn {
         setIsVerifying(false);
       }
     },
-    [isLockedOut, lockoutRemaining, otpAttempts, startLockout, triggerShake],
+    [isLockedOut, lockoutRemaining, recordFailure, resetThrottle, triggerShake],
   );
 
   return {

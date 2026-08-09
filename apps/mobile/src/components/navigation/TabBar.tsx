@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '@/theme';
 import { shadowSmall } from '@/theme/shadows';
 import { Text } from '@/components/ui/Text';
+import { useUnreadCount } from '@/features/notifications/hooks/useNotifications';
 
 const TAB_HEIGHT = 64;
 const PILL_HEIGHT = 40;
@@ -25,6 +26,7 @@ function getVisibleRoutes(routes: TabRoute[]): TabRoute[] {
 
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { unreadCount: badgeCount } = useUnreadCount();
   const visibleRoutes = getVisibleRoutes(state.routes);
   const tabCount = visibleRoutes.length;
 
@@ -106,7 +108,21 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             onLongPress={onLongPress}
             style={styles.tab}
           >
-            {options.tabBarIcon?.({ focused: isFocused, color: iconColor, size: 24 })}
+            <View>
+              {options.tabBarIcon?.({ focused: isFocused, color: iconColor, size: 24 })}
+              {/* This tab bar is custom, so react-navigation's own
+                  `tabBarBadge` is never rendered — the unread count was being
+                  polled every 30 seconds and shown nowhere at all, leaving a
+                  parent no way to know a photo had arrived without opening the
+                  tab and looking. */}
+              {badgeCount > 0 && route.name === 'notifications' && (
+                <View style={styles.badge}>
+                  <Text variant="tiny" color={colors.white} style={styles.badgeText}>
+                    {badgeCount > 99 ? '99+' : String(badgeCount)}
+                  </Text>
+                </View>
+              )}
+            </View>
             <Text
               variant="tiny"
               color={isFocused ? colors.primary.amber : colors.text.tertiary}
@@ -143,6 +159,21 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: colors.primary.amberLight + '30',
     borderRadius: PILL_BORDER_RADIUS,
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -10,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    backgroundColor: colors.error.main,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    lineHeight: 18,
   },
   tab: {
     flex: 1,

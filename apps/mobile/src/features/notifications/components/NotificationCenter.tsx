@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
+import { useRouter } from 'expo-router';
 
 import { colors, spacing } from '@/theme';
 import { EmptyState } from '@/components/feedback/EmptyState';
@@ -61,6 +62,7 @@ function LoadingSkeleton() {
  * ```
  */
 export function NotificationCenter() {
+  const router = useRouter();
   const {
     notifications,
     isLoading,
@@ -79,8 +81,24 @@ export function NotificationCenter() {
       if (!notification.is_read) {
         markAsRead(notification.id);
       }
+
+      // Every notification already carries the id of the thing it is about —
+      // `photo_id` from the database triggers, `order_id` from the order
+      // service — and none of it was used, so tapping "New photo of Ava" only
+      // turned the row grey. Photo notifications now open the photo.
+      //
+      // Order notifications have no detail route to open (there is no
+      // orders/[id] screen), so they are deliberately left as read-only
+      // rather than navigated somewhere misleading.
+      const payload = (notification.data ?? {}) as { photo_id?: string };
+      if (payload.photo_id) {
+        router.push({
+          pathname: '/(parent)/photo/[id]',
+          params: { id: payload.photo_id },
+        } as never);
+      }
     },
-    [markAsRead],
+    [markAsRead, router],
   );
 
   const handleDismiss = useCallback(

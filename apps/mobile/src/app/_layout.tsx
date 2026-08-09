@@ -17,6 +17,8 @@ import {
 import { queryClient } from '@/lib/queryClient';
 import { ErrorBoundary, ToastProvider } from '@/components/feedback';
 import { useSession } from '@/features/auth/hooks/useSession';
+import { registerSignOutCleanup } from '@/features/auth/stores/authStore';
+import { useCartStore } from '@/features/orders/stores/cartStore';
 import { initSentry, Sentry } from '@/lib/sentry';
 
 // ---------------------------------------------------------------------------
@@ -50,6 +52,19 @@ function RootLayout() {
   // group a user may enter is decided by <RoleGate> inside each group layout,
   // so that deep links are covered too.
   const { isLoading: authLoading } = useSession();
+
+  // ── Discard per-user state on sign-out ──────────────────────────────
+  // Registered here because this is the one place guaranteed to have mounted
+  // before any sign-out can happen. Without it, signing in as a second parent
+  // on the same device showed the first parent's feed, notifications and
+  // orders from cache on first paint, and inherited their pending print order.
+  useEffect(() => {
+    const unregister = registerSignOutCleanup(() => {
+      queryClient.clear();
+      useCartStore.getState().clearCart();
+    });
+    return unregister;
+  }, []);
 
   // ── Hide splash when ready ─────────────────────────────────────────
   const isReady = (fontsLoaded || !!fontError) && !authLoading;

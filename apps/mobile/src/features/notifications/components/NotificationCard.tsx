@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   runOnJS,
@@ -104,6 +104,19 @@ export function NotificationCard({
   const handleDismiss = useCallback(() => {
     onDismiss?.(notification);
   }, [notification, onDismiss]);
+
+  // Reset the swipe animation whenever this component is showing a different
+  // notification.
+  //
+  // Dismissing only marks the row read — it never leaves the list — so after
+  // the invalidation the same row re-rendered into a component whose opacity
+  // was still 0: an invisible gap. FlashList recycles cells across items too,
+  // so an untouched notification could inherit a cell left at translateX 400
+  // and render blank. Neither state was recoverable without killing the app.
+  useEffect(() => {
+    translateX.value = 0;
+    opacity.value = 1;
+  }, [notification.id, translateX, opacity]);
 
   // -- Pan gesture for swipe-to-dismiss ---------------------------------
   const panGesture = Gesture.Pan()

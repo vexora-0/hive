@@ -67,7 +67,7 @@ function useNotificationsList() {
  * `useUnreadCount` — returns the number of unread notifications and
  * re-fetches automatically every 30 seconds.
  */
-function useUnreadCount() {
+export function useUnreadCount() {
   const { data, isLoading } = useQuery({
     queryKey: UNREAD_COUNT_KEY,
     queryFn: () => getUnreadCount(),

@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/utils/logger';
 import type { Tables, UserRole } from '@/types/supabase';
 
 // ---------------------------------------------------------------------------
@@ -94,7 +95,23 @@ export async function fetchUserProfile(
     .eq('id', userId)
     .single();
 
-  if (error || !data) {
+  // "No row" and "the request failed" are different answers and must not share
+  // a return value. Collapsing both to null meant a transient network failure
+  // looked exactly like a brand-new user, so a signed-in parent was dropped
+  // into the four-slide marketing carousel — and, if the retry there failed
+  // too, bounced to a login screen they were already past, which is a loop.
+  //
+  // PGRST116 is PostgREST's "zero rows for .single()". Only that is null;
+  // everything else throws and the caller decides.
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null;
+    }
+    logger.error('Failed to fetch user profile', error);
+    throw error;
+  }
+
+  if (!data) {
     return null;
   }
 

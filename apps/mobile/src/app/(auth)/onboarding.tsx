@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { colors, spacing, layout } from '@/theme';
 import { Text, Button } from '@/components/ui';
 import { SafeArea } from '@/components/layout';
+import { EmptyState } from '@/components/feedback';
 import { OnboardingSlide } from '@/features/onboarding/components/OnboardingSlide';
 import { slides, type OnboardingSlideData } from '@/features/onboarding/data/slides';
 import { useOnboardingStore } from '@/features/onboarding/stores/onboardingStore';
@@ -37,6 +38,7 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const flatListRef = useRef<FlatList<OnboardingSlideData>>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [lookupFailed, setLookupFailed] = useState(false);
   const completeOnboarding = useOnboardingStore((s) => s.completeOnboarding);
   const { user, setProfile, setRole } = useAuthStore();
 
@@ -46,11 +48,20 @@ export default function OnboardingScreen() {
   const navigateAfterOnboarding = useCallback(async () => {
     completeOnboarding();
     if (user?.id) {
-      const result = await fetchUserProfile(user.id);
-      if (result) {
-        setProfile(result.profile);
-        setRole(result.role);
-        router.replace(getRoleRoute(result.role) as never);
+      try {
+        const result = await fetchUserProfile(user.id);
+        if (result) {
+          setProfile(result.profile);
+          setRole(result.role);
+          router.replace(getRoleRoute(result.role) as never);
+          return;
+        }
+      } catch {
+        // The lookup failed rather than finding nothing. Falling through to
+        // login would send a signed-in user back to a screen they are past,
+        // whose own effect retries the same failing call — the loop this
+        // screen used to sit in the middle of. Say so and let them retry.
+        setLookupFailed(true);
         return;
       }
     }
@@ -99,6 +110,29 @@ export default function OnboardingScreen() {
   );
 
   // ── UI ────────────────────────────────────────────────────────────────
+
+  // The account exists but we could not load it. Retrying is the only sensible
+  // action, and it has to be offered — the previous behaviour was to bounce to
+  // login, which retried the same call and bounced back.
+  if (lookupFailed) {
+    return (
+      <SafeArea style={styles.root}>
+        <View style={styles.lookupError}>
+          <EmptyState
+            title="Couldn't load your account"
+            message="Check your connection and try again."
+            action={{
+              label: 'Try again',
+              onPress: () => {
+                setLookupFailed(false);
+                navigateAfterOnboarding();
+              },
+            }}
+          />
+        </View>
+      </SafeArea>
+    );
+  }
 
   return (
     <SafeArea style={styles.root}>
@@ -171,6 +205,11 @@ export default function OnboardingScreen() {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
+  lookupError: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   root: {
     flex: 1,
     backgroundColor: colors.background.cream,

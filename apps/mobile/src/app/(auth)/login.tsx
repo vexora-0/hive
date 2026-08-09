@@ -14,6 +14,7 @@ import {
   signInWithPassword,
 } from '@/features/auth/services/authService';
 import { getRoleRoute } from '@/types/navigation';
+import { logger } from '@/utils/logger';
 
 type SignInRole = 'teacher' | 'parent' | 'admin';
 
@@ -70,13 +71,20 @@ export default function LoginScreen() {
       router.replace(getRoleRoute(role) as never);
       return;
     }
-    fetchUserProfile(user.id).then((result) => {
-      if (result) {
-        setProfile(result.profile);
-        setRole(result.role);
-        router.replace(getRoleRoute(result.role) as never);
-      }
-    });
+    fetchUserProfile(user.id)
+      .then((result) => {
+        if (result) {
+          setProfile(result.profile);
+          setRole(result.role);
+          router.replace(getRoleRoute(result.role) as never);
+        }
+      })
+      .catch((err) => {
+        // Previously this rejected silently: the user stayed signed in, sitting
+        // on a login form, with no error and no way to tell why. Entering their
+        // email again just re-ran the same failing lookup.
+        logger.error('Could not load profile for a signed-in user', err);
+      });
   }, [user?.id, role, setProfile, setRole, router]);
 
   // Switching role resets the opt-in, so a teacher does not silently inherit
