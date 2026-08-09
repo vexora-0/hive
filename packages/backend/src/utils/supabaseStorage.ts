@@ -62,10 +62,31 @@ export async function getSignedPhotoUrls(
   return result;
 }
 
-/** True if the object exists in the bucket. Used to confirm an upload landed. */
+/**
+ * True if the object exists in the bucket. Used to confirm an upload landed.
+ *
+ * Lists the containing folder rather than downloading the object. The previous
+ * implementation called `.download()` — pulling the entire image into backend
+ * memory and discarding it — to answer a boolean, on every `/confirm`. A
+ * twenty-photo session moved up to half a gigabyte of egress for no reason,
+ * serialised behind the confirm response.
+ */
 export async function fileExistsInStorage(storagePath: string): Promise<boolean> {
-  const { error } = await supabaseAdmin.storage.from(PHOTOS_BUCKET).download(storagePath);
-  return !error;
+  const lastSlash = storagePath.lastIndexOf('/');
+  const folder = lastSlash === -1 ? '' : storagePath.slice(0, lastSlash);
+  const name = lastSlash === -1 ? storagePath : storagePath.slice(lastSlash + 1);
+
+  const { data, error } = await supabaseAdmin.storage
+    .from(PHOTOS_BUCKET)
+    .list(folder, { limit: 1, search: name });
+
+  if (error) {
+    logger.warn('Failed to check storage object', { storagePath, error: error.message });
+    return false;
+  }
+
+  // `search` is a substring match, so confirm the name matches exactly.
+  return (data ?? []).some((entry) => entry.name === name);
 }
 
 /** Remove objects from the bucket. Used to clean up after a failed upload. */

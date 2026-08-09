@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import { encode } from 'blurhash';
 import { logger } from '../config/logger';
-import { uploadPhotoObject } from './supabaseStorage';
+import { uploadPhotoObject, deletePhotoObjects } from './supabaseStorage';
 
 const THUMBNAIL_WIDTH = 400;
 const THUMBNAIL_QUALITY = 80;
@@ -109,13 +109,26 @@ export async function processAndUploadPhoto(
   await uploadPhotoObject(finalPath, originalBuffer, mimeType);
 
   // 4. Thumbnail. `withoutEnlargement` avoids upscaling an already-small image.
-  const thumbnailBuffer = await sharp(originalBuffer)
-    .resize(THUMBNAIL_WIDTH, null, { fit: 'inside', withoutEnlargement: true })
-    .jpeg({ quality: THUMBNAIL_QUALITY })
-    .toBuffer();
-
+  //
+  // Wrapped so that a failure after the original has landed does not leave the
+  // object behind. The caller's cleanup only covers the database-update path,
+  // so a thumbnail failure — a truncated file, a CMYK JPEG, an image past
+  // libvips' pixel ceiling, a transient storage error — used to orphan a
+  // full-resolution original in the bucket that nothing referenced and nothing
+  // would ever remove. With retries re-running the whole step, one bad photo
+  // could leave several.
   const thumbnailPath = finalPath.replace(/(\.[^.]+)$/, '_thumb.jpg');
-  await uploadPhotoObject(thumbnailPath, thumbnailBuffer, 'image/jpeg');
+  try {
+    const thumbnailBuffer = await sharp(originalBuffer)
+      .resize(THUMBNAIL_WIDTH, null, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: THUMBNAIL_QUALITY })
+      .toBuffer();
+
+    await uploadPhotoObject(thumbnailPath, thumbnailBuffer, 'image/jpeg');
+  } catch (err) {
+    await deletePhotoObjects([finalPath]);
+    throw err;
+  }
 
   // 5. Blurhash. Non-fatal — a missing placeholder degrades the loading
   //    experience but should not fail an otherwise successful upload.

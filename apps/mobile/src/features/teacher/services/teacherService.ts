@@ -1,8 +1,15 @@
 import Constants from 'expo-constants';
-import { apiRequest } from '@/lib/api';
+import { apiRequest, ApiError } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/utils/logger';
 import type { StudentItem } from '@/components/forms/StudentTagger';
+
+/**
+ * Deadline for a single file transfer. Generous enough for a 25MB photo on a
+ * slow mobile connection, short enough that a dead connection surfaces as an
+ * error the teacher can act on rather than an indefinite spinner.
+ */
+const UPLOAD_TIMEOUT_MS = 120_000;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -12,7 +19,8 @@ export interface UploadUrlRequest {
   classId: string;
   filename: string;
   contentType: string;
-  fileSize: number;
+  /** Optional: the picker does not always report a size. */
+  fileSize?: number;
 }
 
 export interface UploadUrlResponse {
@@ -86,6 +94,13 @@ export async function uploadPhotoFile(
       };
     }
 
+    // Without a deadline a stalled connection — a captive portal, a carrier
+    // handoff — leaves this promise unsettled until the OS gives up on the
+    // socket, which is minutes. The tile sits on "Uploading" the whole time
+    // with its remove button hidden and the upload button disabled, so the
+    // screen has no exit but navigating away and losing the batch.
+    xhr.timeout = UPLOAD_TIMEOUT_MS;
+
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         onProgress?.(1);
@@ -93,13 +108,19 @@ export async function uploadPhotoFile(
         return;
       }
       let message = 'File upload failed';
+      let body: unknown;
       try {
-        message = JSON.parse(xhr.responseText)?.message ?? message;
+        body = JSON.parse(xhr.responseText);
+        message = (body as { message?: string })?.message ?? message;
       } catch {
         // Non-JSON body — a proxy error page, say. Keep the generic message.
       }
       logger.error('Photo file upload failed', { status: xhr.status, message, photoId });
-      reject(new Error(message));
+      // An ApiError, not a bare Error: `isRetryable` reads the status to decide
+      // whether another attempt could possibly help. Rejecting with a plain
+      // Error made every 4xx here look like a network blip, so an unsupported
+      // file type was re-sent in full three times.
+      reject(new ApiError(xhr.status, message, body));
     };
 
     // Covers connection failure and, separately, the user aborting. Neither
@@ -107,6 +128,10 @@ export async function uploadPhotoFile(
     xhr.onerror = () => {
       logger.error('Photo file upload errored', { photoId });
       reject(new Error('Network request failed'));
+    };
+    xhr.ontimeout = () => {
+      logger.error('Photo file upload timed out', { photoId });
+      reject(new Error('The upload timed out. Check your connection and try again.'));
     };
     xhr.onabort = () => reject(new Error('Upload cancelled'));
 

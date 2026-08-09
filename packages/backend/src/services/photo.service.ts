@@ -197,6 +197,16 @@ export async function confirmUpload(
 ): Promise<void> {
   const photo = await assertPhotoAccess(photoId, user);
 
+  // Confirming an already-confirmed photo is a no-op, not an error. The client
+  // retries this step, so a confirm whose response was lost to a dropped
+  // connection would otherwise leave the photo permanently un-completable: the
+  // work is done, but every retry answers 400 and the tile stays red.
+  // `tagStudents` upserts for the same reason.
+  if (photo.status === 'ready') {
+    logger.info('Upload already confirmed, nothing to do', { photoId });
+    return;
+  }
+
   if (photo.status !== 'processing') {
     throw new AppError(
       `Photo is already in '${photo.status}' state`,

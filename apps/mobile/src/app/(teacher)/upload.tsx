@@ -175,7 +175,19 @@ export default function UploadScreen() {
 
   // ── Computed state ──────────────────────────────────────────────────
   const hasImages = images.length > 0;
-  const canUpload = hasImages && !!selectedClassId && !isUploading && !isComplete;
+  // Photos still to send — idle ones and any that failed and will be retried.
+  const pendingCount = images.filter(
+    (img) => img.state === 'idle' || img.state === 'error',
+  ).length;
+  // At least one tagged student is required, not optional: the parent feed is
+  // built by joining photo_student_tags, and nothing in the app can tag a
+  // photo once it has been uploaded.
+  const canUpload =
+    hasImages &&
+    !!selectedClassId &&
+    selectedStudentIds.length > 0 &&
+    !isUploading &&
+    !isComplete;
 
   return (
     <ScreenContainer scroll keyboard edges={['top', 'left', 'right']}>
@@ -248,14 +260,32 @@ export default function UploadScreen() {
               >
                 {selectedStudentIds.length > 0
                   ? `${selectedStudentIds.length} Student${selectedStudentIds.length !== 1 ? 's' : ''} Tagged`
-                  : 'Tag Students (Optional)'}
+                  : 'Tag Students'}
               </Button>
+            )}
+
+            {/* The feed joins photo_student_tags, so an untagged photo reaches
+                nobody — and there is no way to tag it after upload. It was
+                labelled "Optional", which made silently invisible photos the
+                easiest outcome to produce. */}
+            {selectedClassId && selectedStudentIds.length === 0 && (
+              <Text
+                variant="bodySmall"
+                color={colors.text.secondary}
+                style={styles.tagHint}
+              >
+                Tag at least one child — photos are only shown to the families
+                of the children in them.
+              </Text>
             )}
           </View>
         )}
 
-        {/* Step 4: Upload Button */}
-        {canUpload && (
+        {/* Step 4: Upload Button.
+            Rendered whenever there is something to upload and disabled with a
+            reason, rather than disappearing — a control that vanishes when its
+            preconditions are unmet leaves the teacher with nothing to read. */}
+        {hasImages && !isUploading && !isComplete && (
           <View style={styles.section}>
             <Text variant="h4" style={styles.stepLabel}>
               3. Upload
@@ -264,11 +294,12 @@ export default function UploadScreen() {
               variant="primary"
               size="lg"
               onPress={handleStartUpload}
+              disabled={!canUpload}
               leftIcon={
                 <Ionicons name="cloud-upload-outline" size={22} color={colors.white} />
               }
             >
-              {`Upload ${images.length} Photo${images.length !== 1 ? 's' : ''}`}
+              {`Upload ${pendingCount} Photo${pendingCount !== 1 ? 's' : ''}`}
             </Button>
           </View>
         )}
@@ -361,6 +392,9 @@ const styles = StyleSheet.create({
   },
   tagButton: {
     alignSelf: 'flex-start',
+  },
+  tagHint: {
+    marginTop: spacing.sm,
   },
   progressSection: {
     marginBottom: spacing.lg,

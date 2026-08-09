@@ -36,8 +36,8 @@ export interface UploadImage {
   filename: string;
   /** MIME type. */
   contentType: string;
-  /** File size in bytes. */
-  fileSize: number;
+  /** File size in bytes, when the picker reported one. */
+  fileSize?: number;
   /** Current upload pipeline state. */
   state: ImageUploadState;
   /** Upload progress 0-1. */
@@ -116,6 +116,45 @@ function filenameFromUri(uri: string): string {
   return parts[parts.length - 1] ?? `photo_${Date.now()}.jpg`;
 }
 
+/** What the server's `requestUploadSchema` will accept. */
+const SUPPORTED_CONTENT_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/heic',
+  'image/heif',
+  'image/webp',
+] as const;
+
+const EXTENSION_CONTENT_TYPES: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  webp: 'image/webp',
+};
+
+/**
+ * Pick a content type the server will accept.
+ *
+ * `mimeType` is optional on ImagePickerAsset and is missing often enough on
+ * Android to matter. The old fallback assumed `image/jpeg` for anything
+ * unknown, which was a coin flip: a PNG announced as JPEG still uploads (the
+ * server sniffs the real format from magic bytes), but a genuinely unsupported
+ * type was smuggled past the client only to be rejected server-side after the
+ * whole file had been transferred.
+ *
+ * So: trust the reported type when it is one we support, otherwise derive it
+ * from the file extension, and only then fall back to JPEG.
+ */
+function normaliseContentType(mimeType: string | null | undefined, uri: string): string {
+  if (mimeType && (SUPPORTED_CONTENT_TYPES as readonly string[]).includes(mimeType)) {
+    return mimeType;
+  }
+  const extension = uri.split('.').pop()?.toLowerCase().split('?')[0] ?? '';
+  return EXTENSION_CONTENT_TYPES[extension] ?? 'image/jpeg';
+}
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -173,8 +212,12 @@ export function useUpload(): UseUploadReturn {
           id: uuidv4(),
           uri: asset.uri,
           filename: asset.fileName ?? filenameFromUri(asset.uri),
-          contentType: asset.mimeType ?? 'image/jpeg',
-          fileSize: asset.fileSize ?? 0,
+          contentType: normaliseContentType(asset.mimeType, asset.uri),
+          // Absent rather than 0 when the picker does not report one. Both
+          // fields are optional on ImagePickerAsset and Android
+          // ContentProviders routinely omit them; sending 0 failed the
+          // server's positive-integer check on every photo.
+          fileSize: asset.fileSize && asset.fileSize > 0 ? asset.fileSize : undefined,
           state: 'idle' as const,
           progress: 0,
         }));
@@ -200,19 +243,34 @@ export function useUpload(): UseUploadReturn {
       const { id, uri, filename, contentType, fileSize } = image;
 
       try {
-        // Step 1: Request photo slot
-        updateImage(id, { state: 'requesting-url', progress: 0.1 });
-        const { photoId, s3Key } = await retryWithBackoff(
-          () =>
-            requestUploadUrl({
-              classId,
-              filename,
-              contentType,
-              fileSize,
-            }),
-          RETRY_OPTIONS,
-        );
-        updateImage(id, { photoId, s3Key, progress: 0.3 });
+        // Step 1: Request a photo slot — but only if this attempt does not
+        // already have one.
+        //
+        // A retry used to call this unconditionally and shadow `photoId` with
+        // the new value, so a photo that failed at the tag or confirm step —
+        // its file already uploaded, its original and thumbnail already in the
+        // bucket — got a second row and a second pair of objects on every tap
+        // of Retry, while the first row stayed in 'processing' forever. The
+        // remaining steps are all safe to repeat: the file overwrites, the tags
+        // upsert, and confirm is a no-op once the photo is ready.
+        let photoId = image.photoId;
+        if (!photoId) {
+          updateImage(id, { state: 'requesting-url', progress: 0.1 });
+          const slot = await retryWithBackoff(
+            () =>
+              requestUploadUrl({
+                classId,
+                filename,
+                contentType,
+                fileSize,
+              }),
+            RETRY_OPTIONS,
+          );
+          photoId = slot.photoId;
+          updateImage(id, { photoId: slot.photoId, s3Key: slot.s3Key, progress: 0.3 });
+        } else {
+          updateImage(id, { progress: 0.3 });
+        }
 
         // Step 3: Upload file to backend (saves + confirms in one step)
         //
@@ -286,14 +344,35 @@ export function useUpload(): UseUploadReturn {
 
   const startUpload = useCallback(
     async (classId: string, studentIds: string[]) => {
+      // Anything not already uploaded. Previously this took only 'idle', so
+      // after a partial failure the button was live but every remaining photo
+      // was in 'error' and pressing it returned here silently — and, because
+      // the flag was set before the early return, left isUploadingRef stuck
+      // true. Retrying the failures is the whole point of pressing it again.
+      const pending = images.filter(
+        (img) => img.state === 'idle' || img.state === 'error',
+      );
+      if (pending.length === 0) return;
+
       isUploadingRef.current = true;
       setShowConfetti(false);
 
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      // Grab current idle images
-      const idleImages = images.filter((img) => img.state === 'idle');
-      if (idleImages.length === 0) return;
+      // Clear the previous failure so the tiles show progress rather than a
+      // stale error while they are being retried.
+      for (const img of pending) {
+        if (img.state === 'error') {
+          updateImage(img.id, { state: 'idle', progress: 0, error: undefined });
+        }
+      }
+
+      const idleImages = pending.map((img) => ({
+        ...img,
+        state: 'idle' as const,
+        progress: 0,
+        error: undefined,
+      }));
 
       // Process in small batches rather than all at once.
       //
@@ -321,7 +400,7 @@ export function useUpload(): UseUploadReturn {
         return current;
       });
     },
-    [images, processImage],
+    [images, processImage, updateImage],
   );
 
   // ── Retry a single image ────────────────────────────────────────────

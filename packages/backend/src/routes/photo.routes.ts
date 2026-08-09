@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
 import { roleGuard } from '../middleware/roleGuard';
 import { validate } from '../middleware/validate';
+import { writeRateLimiter } from '../middleware/rateLimiter';
 import {
   requestUploadSchema,
   getPhotosSchema,
@@ -23,6 +24,7 @@ router.use(authenticate);
 router.post(
   '/upload-url',
   roleGuard('teacher', 'admin'),
+  writeRateLimiter,
   validate(requestUploadSchema, 'body'),
   photoController.requestUpload,
 );
@@ -31,6 +33,8 @@ router.post(
 router.post(
   '/:id/file',
   roleGuard('teacher', 'admin'),
+  validate(uuidIdParam, 'params'),
+  writeRateLimiter,
   photoUpload.single('file'),
   photoController.uploadFile,
 );
@@ -39,6 +43,7 @@ router.post(
 router.post(
   '/:id/confirm',
   roleGuard('teacher', 'admin'),
+  validate(uuidIdParam, 'params'),
   photoController.confirmUpload,
 );
 
@@ -46,6 +51,7 @@ router.post(
 router.post(
   '/:id/tag',
   roleGuard('teacher', 'admin'),
+  validate(uuidIdParam, 'params'),
   validate(tagStudentsBodySchema, 'body'),
   photoController.tagStudents,
 );
