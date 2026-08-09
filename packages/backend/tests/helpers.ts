@@ -2,7 +2,12 @@ import { randomUUID } from 'crypto';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { createClient } from '@supabase/supabase-js';
-import { supabaseTest, TEST_PASSWORD } from './setup';
+import {
+  supabaseTest,
+  TEST_PASSWORD,
+  createdSchoolIds,
+  cleanupCreatedRows,
+} from './setup';
 
 const PHOTOS_BUCKET = 'photos';
 
@@ -64,7 +69,22 @@ export async function createTestSchool(name = 'Test Preschool'): Promise<string>
   const id = randomUUID();
   const { error } = await supabaseTest.from('schools').insert({ id, name });
   if (error) throw new Error(`createTestSchool: ${error.message}`);
+  // Registered before anything hangs off it: this id is the handle the scoped
+  // cleanup uses to find every class, student, photo and order underneath.
+  // Nothing truncates any more, so a school that is never registered is a row
+  // that never goes away.
+  createdSchoolIds.push(id);
   return id;
+}
+
+/**
+ * Hand the cleanup a school this suite created through the API rather than
+ * through `createTestSchool` — `POST /api/v1/admin/schools` is exercised by
+ * admin.test.ts, and its schools used to be swept up by the global truncate.
+ * Without this they would now outlive the run.
+ */
+export function registerCreatedSchool(id: string): void {
+  if (id) createdSchoolIds.push(id);
 }
 
 export async function createTestClass(schoolId: string, name = 'Test Class'): Promise<string> {
@@ -160,10 +180,23 @@ export async function setPhotoReady(photoId: string): Promise<void> {
 }
 
 /**
- * Remove every artefact this run created — auth users and storage objects.
- * Domain rows cascade from the users; storage does not, so it is removed here.
+ * Remove every artefact this run created — domain rows, auth users and storage
+ * objects.
+ *
+ * The domain rows used to be somebody else's problem: a global `truncateAll()`
+ * ran at the start of every file and emptied the database, so this only had to
+ * deal with auth users and storage. That truncate is gone — it was deleting a
+ * *concurrently running* suite's fixtures out from under it (see
+ * `cleanupCreatedRows` in setup.ts) — so the rows are cleaned up here, scoped
+ * to the schools this process created.
+ *
+ * Rows first, users second: `photos.uploaded_by` is ON DELETE RESTRICT since
+ * 00018, so deleting a teacher before their photos fails silently in the
+ * `.catch()` below and leaks the profile.
  */
 export async function cleanupUsers(): Promise<void> {
+  await cleanupCreatedRows();
+
   for (const id of createdUserIds) {
     await supabaseTest.auth.admin.deleteUser(id).catch(() => undefined);
   }

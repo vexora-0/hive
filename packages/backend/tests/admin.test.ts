@@ -9,6 +9,7 @@ import {
   createTestClass,
   createTestStudent,
   cleanupUsers,
+  registerCreatedSchool,
   bearer,
   type TestUser,
 } from './helpers';
@@ -176,6 +177,8 @@ describe('admin console', () => {
       .set(bearer(admin.token))
       .send({ name, address: '2 Test Road' });
 
+    registerCreatedSchool(res.body?.data?.id);
+
     expect(res.status).toBe(201);
     expect(res.body.data.name).toBe(name);
   }, 30_000);
@@ -209,6 +212,7 @@ describe('admin console', () => {
       .post('/api/v1/admin/schools')
       .set(bearer(admin.token))
       .send({ name: 'Partial School', address: 'Keep this address' });
+    registerCreatedSchool(created.body?.data?.id);
     expect(created.status).toBe(201);
 
     const res = await request(app)
