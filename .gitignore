@@ -18,3 +18,6 @@ System Architecture & Technical Design.md
 # Written by `supabase start`. start-secrets holds generated local keys.
 supabase/.branches/
 supabase/.temp/
+
+# Redis persistence, if a local redis-server is run from a package dir
+*.rdb
