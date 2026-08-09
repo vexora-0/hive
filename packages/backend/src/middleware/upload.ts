@@ -2,6 +2,8 @@ import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
 
+import { AppError } from './errorHandler';
+
 const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
 
 const photoStorage = multer.diskStorage({
@@ -25,7 +27,16 @@ export const photoUpload = multer({
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error(`Unsupported file type: ${file.mimetype}`));
+      // A plain Error here reaches errorHandler with neither a status nor a
+      // code and is reported as a 500. An AppError carries both, so the client
+      // gets the 400 this actually is, with a message naming the bad type.
+      cb(
+        new AppError(
+          `Unsupported file type: ${file.mimetype}. Allowed: ${allowed.join(', ')}`,
+          400,
+          'UNSUPPORTED_FILE_TYPE',
+        ),
+      );
     }
   },
 });

@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { MulterError } from 'multer';
 import { ZodError } from 'zod';
 import { logger } from '../config/logger';
 import { Sentry, isSentryEnabled } from '../config/sentry';
@@ -97,6 +98,28 @@ export function errorHandler(
         status === 413 ? 'Request body is too large' : 'Malformed request body',
       code: status === 413 ? 'PAYLOAD_TOO_LARGE' : 'INVALID_JSON',
     });
+    return;
+  }
+
+  // Multer upload errors. These must be caught *before* the Supabase branch
+  // below: a MulterError carries a string `code` (LIMIT_FILE_SIZE and friends)
+  // and no status, so it matched the "has a string code, must be Postgres"
+  // test and every oversized or wrong-field upload came back as a 500
+  // DATABASE_ERROR — plus a Sentry event for what is plainly client error.
+  if (err instanceof MulterError) {
+    const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    const message =
+      err.code === 'LIMIT_FILE_SIZE'
+        ? 'The image is larger than the 25MB limit'
+        : `Upload rejected: ${err.message}`;
+
+    logger.warn('Upload rejected', {
+      requestId: req.requestId,
+      code: err.code,
+      field: err.field,
+    });
+
+    res.status(status).json({ success: false, message, code: err.code });
     return;
   }
 
