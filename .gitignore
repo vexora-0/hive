@@ -21,3 +21,4 @@ supabase/.temp/
 
 # Redis persistence, if a local redis-server is run from a package dir
 *.rdb
+ENV_handover.md
