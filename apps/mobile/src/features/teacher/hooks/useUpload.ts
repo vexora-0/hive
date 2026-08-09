@@ -250,9 +250,16 @@ export function useUpload(): UseUploadReturn {
         // the new value, so a photo that failed at the tag or confirm step —
         // its file already uploaded, its original and thumbnail already in the
         // bucket — got a second row and a second pair of objects on every tap
-        // of Retry, while the first row stayed in 'processing' forever. The
-        // remaining steps are all safe to repeat: the file overwrites, the tags
-        // upsert, and confirm is a no-op once the photo is ready.
+        // of Retry, while the first row stayed in 'processing' forever.
+        //
+        // The remaining steps are all safe to repeat. The tags upsert, and both
+        // `/file` and `/confirm` return success without doing anything once the
+        // photo is 'ready' and its object is in the bucket. That last part is
+        // what makes Retry able to recover the worst case: confirm succeeding
+        // on the server while its response is lost, which leaves a ready photo
+        // behind an errored tile. `/file` used to answer 400 INVALID_STATE
+        // there — a status this hook deliberately does not retry — so the tile
+        // stayed red permanently.
         let photoId = image.photoId;
         if (!photoId) {
           updateImage(id, { state: 'requesting-url', progress: 0.1 });

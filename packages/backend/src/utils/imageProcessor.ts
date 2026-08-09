@@ -10,8 +10,22 @@ const BLURHASH_SIZE = 32;
 const BLURHASH_COMPONENT_X = 4;
 const BLURHASH_COMPONENT_Y = 3;
 
-// sharp reports HEIC/HEIF containers as 'heif'.
-const SUPPORTED_FORMATS = new Set(['jpeg', 'png', 'heif']);
+/**
+ * Formats sharp is allowed to decode here.
+ *
+ * This set is the last of four allow-lists a photo passes — the mobile picker,
+ * `requestUploadSchema`, `middleware/upload.ts`, then here — and it is the only
+ * one applied *after* the bytes have been transferred. When the other three
+ * gained `image/webp` and this one did not, a WebP was accepted at every gate,
+ * uploaded in full, and only then rejected with 400 INVALID_IMAGE: precisely
+ * the wasted-transfer failure the earlier gates exist to prevent.
+ *
+ * sharp reports HEIC/HEIF containers as 'heif' and WebP as 'webp'. WebP
+ * decoding is unconditional in libvips (unlike HEIF, which depends on codec
+ * plugins — see the HEIC note below), so it needs no conversion branch:
+ * Android and iOS both render WebP natively.
+ */
+const SUPPORTED_FORMATS = new Set(['jpeg', 'png', 'heif', 'webp']);
 
 export interface ProcessedPhoto {
   /** Final storage path of the original — differs from the input when HEIC was converted. */
