@@ -25,7 +25,10 @@ export const createOrderSchema = z.object({
     .string()
     .min(1, 'shippingAddress is required')
     .max(500, 'shippingAddress too long'),
-  notes: z.string().max(1000, 'notes too long').optional(),
+  // `.nullish()`, not `.optional()`: the mobile client sends `notes: null` when
+  // the optional field is left blank, and a bare `.optional()` rejects null —
+  // which made every order placed without a note fail validation.
+  notes: z.string().max(1000, 'notes too long').nullish(),
 });
 
 export const getOrdersSchema = z.object({

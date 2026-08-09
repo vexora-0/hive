@@ -33,7 +33,9 @@ export async function createOrder(
       schoolId,
       data.items,
       data.shippingAddress,
-      data.notes,
+      // The schema accepts null (what the mobile client sends for a blank
+      // optional field) but the service takes an optional string.
+      data.notes ?? undefined,
       idempotencyKey,
     );
 
@@ -111,15 +113,10 @@ export async function getSchoolOrders(
   try {
     const query = req.query as unknown as GetSchoolOrdersInput;
     const { cursor, limit, status } = query;
-    const schoolId = req.user!.schoolId ?? query.schoolId;
-
-    if (!schoolId) {
-      throw new AppError(
-        'schoolId query parameter is required for an admin without a school',
-        400,
-        'VALIDATION_ERROR',
-      );
-    }
+    // An admin with no school of their own is a platform admin: absent an
+    // explicit ?schoolId filter they get every school's orders, rather than the
+    // 400 that used to surface in the UI as an empty queue.
+    const schoolId = req.user!.schoolId ?? query.schoolId ?? undefined;
 
     const result = await orderService.getOrdersForSchool(
       schoolId,

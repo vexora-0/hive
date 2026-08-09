@@ -60,10 +60,13 @@ export const orderService = {
     notes: string | null,
     idempotencyKey: string,
   ): Promise<CreateOrderResponse> => {
+    // `notes` is optional server-side, so omit the key entirely when it is
+    // blank rather than sending an explicit null — the validator accepts a
+    // string or nothing at all.
     const body: CreateOrderPayload = {
       items,
       shippingAddress: shippingAddress ?? '',
-      notes,
+      ...(notes ? { notes } : {}),
     };
 
     const res = await apiRequest<{ success: true; data: CreateOrderResponse }>('/orders', {

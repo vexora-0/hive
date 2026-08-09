@@ -83,6 +83,7 @@ export function OrderBottomSheet({
   // in the shipping-address box — and nothing in the profile holds an address
   // to pre-fill it with instead.
   const [shippingAddress, setShippingAddress] = useState('');
+  const [addressTouched, setAddressTouched] = useState(false);
   const [notes, setNotes] = useState('');
   const [orderSuccess, setOrderSuccess] = useState(false);
 
@@ -132,11 +133,20 @@ export function OrderBottomSheet({
   }, []);
 
   // ── Place order ───────────────────────────────────────────────────
+  // The server requires a non-empty shipping address. Checking it here turns
+  // what was an opaque 400 ("Validation failed") into a field-level error.
+  const hasAddress = shippingAddress.trim().length > 0;
+
   const handlePlaceOrder = useCallback(async () => {
     if (!selectedType) return;
 
+    if (!shippingAddress.trim()) {
+      setAddressTouched(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+
     const idempotencyKey = uuidv4();
-    const unitPrice = PRODUCT_PRICES_CENTS[selectedType];
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
@@ -328,6 +338,7 @@ export function OrderBottomSheet({
           placeholder="Enter your shipping address"
           value={shippingAddress}
           onChangeText={setShippingAddress}
+          error={addressTouched && !hasAddress ? 'Shipping address is required' : undefined}
           multiline
           containerStyle={styles.input}
         />
@@ -377,6 +388,7 @@ export function OrderBottomSheet({
           size="lg"
           onPress={handlePlaceOrder}
           loading={createOrder.isPending}
+          disabled={!hasAddress}
           style={styles.ctaButton}
         >
           Place Order
