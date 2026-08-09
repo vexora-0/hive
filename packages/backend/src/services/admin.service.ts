@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
-import { decodeCursor } from '../utils/cursor';
+import { decodeCursor, encodeCursor } from '../utils/cursor';
 import type {
   CreateSchoolInput,
   UpdateSchoolInput,
@@ -142,15 +142,9 @@ export async function getUsers(
   const hasNext = (users?.length ?? 0) > limit;
   const results = (users?.slice(0, limit) ?? []) as UserProfile[];
 
+  const last = results[results.length - 1];
   const nextCursor =
-    hasNext && results.length > 0
-      ? Buffer.from(
-          JSON.stringify({
-            createdAt: results[results.length - 1].created_at,
-            id: results[results.length - 1].id,
-          }),
-        ).toString('base64url')
-      : null;
+    hasNext && results.length > 0 ? encodeCursor(last.created_at, last.id) : null;
 
   return { users: results, nextCursor };
 }
@@ -292,15 +286,9 @@ export async function getSchools(
     classes: (school.classes ?? []).map((c: any) => ({ id: c.id, name: c.name, grade: c.grade })),
   }));
 
+  const last = enrichedResults[enrichedResults.length - 1];
   const nextCursor =
-    hasNext && enrichedResults.length > 0
-      ? Buffer.from(
-          JSON.stringify({
-            createdAt: enrichedResults[enrichedResults.length - 1].created_at,
-            id: enrichedResults[enrichedResults.length - 1].id,
-          }),
-        ).toString('base64url')
-      : null;
+    hasNext && enrichedResults.length > 0 ? encodeCursor(last.created_at, last.id) : null;
 
   return { schools: enrichedResults, nextCursor };
 }

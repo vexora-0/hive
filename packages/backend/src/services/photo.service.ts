@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
-import { decodeCursor } from '../utils/cursor';
+import { decodeCursor, encodeCursor } from '../utils/cursor';
 import { processAndUploadPhoto } from '../utils/imageProcessor';
 import {
   getSignedPhotoUrls,
@@ -20,10 +20,24 @@ import type { RequestUploadInput } from '../validators/photo.validator';
  */
 const STALE_PROCESSING_MS = 30 * 60 * 1000;
 
+/**
+ * Must cover every type `requestUploadSchema` accepts.
+ *
+ * The extension chosen here becomes the storage object's name, and the `.jpg`
+ * fallback is a silent lie about the bytes: `image/heif` and `image/webp` were
+ * both accepted by the validator while missing from this map, so a WebP was
+ * stored as `<uuid>.jpg`. Anything reading the extension rather than the
+ * recorded mime_type — a signed-URL consumer, a bucket listing, a support
+ * download — then had the wrong format. The HEIC branch in the image processor
+ * also renames on `\.hei[cf]$`, which never matched a `.jpg` path, so a
+ * converted HEIF kept an extension that was already wrong before conversion.
+ */
 const CONTENT_TYPE_TO_EXT: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/heic': 'heic',
+  'image/heif': 'heif',
+  'image/webp': 'webp',
 };
 
 interface UploadResult {
@@ -127,6 +141,8 @@ export async function requestUpload(
  * notify_parents_on_photo trigger fires on the transition to 'ready' and loops
  * over photo_student_tags, so tags must already exist or no parent is ever
  * notified. See G-07.
+ *
+ * Re-uploading an already-ready photo is a no-op, not an error — see below.
  */
 export async function saveUploadedFile(
   photoId: string,
@@ -136,7 +152,28 @@ export async function saveUploadedFile(
   try {
     const photo = await assertPhotoAccess(photoId, user);
 
-    if (photo.status !== 'processing') {
+    // A 'ready' photo whose object is in the bucket has nothing left to do.
+    //
+    // The client's Retry reuses the photo id and replays every step from the
+    // beginning, which is safe only because each one is idempotent: the storage
+    // object upserts, the tags upsert, and confirmUpload returns early on
+    // 'ready'. This step was the exception, and it broke the case it most
+    // needed to cover — confirm succeeding server-side but its response lost to
+    // a dropped connection. The photo is ready, the tile is red, and Retry
+    // POSTed the file into a 400 INVALID_STATE that is (correctly) not retried,
+    // so the tile stayed red with no way back.
+    //
+    // The existence check matters: 'ready' with a missing object is a different
+    // situation — the object was removed out from under the row — and that one
+    // should fall through and re-process rather than report success.
+    if (photo.status === 'ready' && (await fileExistsInStorage(photo.s3_key))) {
+      logger.info('File already uploaded and photo is ready, nothing to do', {
+        photoId,
+      });
+      return;
+    }
+
+    if (photo.status !== 'processing' && photo.status !== 'ready') {
       throw new AppError(
         `Photo is already in '${photo.status}' state`,
         400,
@@ -535,14 +572,9 @@ export async function getPhotosByClass(
       : null,
   }));
 
-  const nextCursor = hasNext && results.length > 0
-    ? Buffer.from(
-        JSON.stringify({
-          createdAt: results[results.length - 1].created_at,
-          id: results[results.length - 1].id,
-        }),
-      ).toString('base64url')
-    : null;
+  const last = results[results.length - 1];
+  const nextCursor =
+    hasNext && results.length > 0 ? encodeCursor(last.created_at, last.id) : null;
 
   return { photos: photosWithUrls, nextCursor };
 }

@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
-import { decodeCursor } from '../utils/cursor';
+import { decodeCursor, encodeCursor } from '../utils/cursor';
 import { getSignedPhotoUrls } from '../utils/supabaseStorage';
 
 interface FeedPhoto {
@@ -197,15 +197,9 @@ export async function getFeed(
   });
 
   // 5. Build next cursor
+  const last = results[results.length - 1];
   const nextCursor =
-    hasNext && results.length > 0
-      ? Buffer.from(
-          JSON.stringify({
-            createdAt: results[results.length - 1].created_at,
-            id: results[results.length - 1].id,
-          }),
-        ).toString('base64url')
-      : null;
+    hasNext && results.length > 0 ? encodeCursor(last.created_at, last.id) : null;
 
   return { photos: feedPhotos, nextCursor };
 }

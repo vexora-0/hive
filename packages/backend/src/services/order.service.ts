@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
-import { decodeCursor } from '../utils/cursor';
+import { decodeCursor, encodeCursor } from '../utils/cursor';
 import { createNotification } from './notification.service';
 import { PRODUCT_PRICES_CENTS } from '../constants/products';
 import { getSignedPhotoUrls } from '../utils/supabaseStorage';
@@ -220,15 +220,9 @@ export async function getOrders(
   const hasNext = (orders?.length ?? 0) > limit;
   const results = (orders?.slice(0, limit) ?? []) as Order[];
 
+  const last = results[results.length - 1];
   const nextCursor =
-    hasNext && results.length > 0
-      ? Buffer.from(
-          JSON.stringify({
-            createdAt: results[results.length - 1].created_at,
-            id: results[results.length - 1].id,
-          }),
-        ).toString('base64url')
-      : null;
+    hasNext && results.length > 0 ? encodeCursor(last.created_at, last.id) : null;
 
   return { orders: results, nextCursor };
 }
@@ -339,15 +333,9 @@ export async function getOrdersForSchool(
   const hasNext = (orders?.length ?? 0) > limit;
   const results = (orders?.slice(0, limit) ?? []) as Order[];
 
+  const last = results[results.length - 1];
   const nextCursor =
-    hasNext && results.length > 0
-      ? Buffer.from(
-          JSON.stringify({
-            createdAt: results[results.length - 1].created_at,
-            id: results[results.length - 1].id,
-          }),
-        ).toString('base64url')
-      : null;
+    hasNext && results.length > 0 ? encodeCursor(last.created_at, last.id) : null;
 
   return { orders: results, nextCursor };
 }
