@@ -130,7 +130,10 @@ export async function createNotification(
     type,
     title,
     body,
-    data: data ?? null,
+    // `{}`, not null: the column is `jsonb NOT NULL DEFAULT '{}'`, so an
+    // explicit null is a constraint violation. Every current caller passes
+    // something, which is the only reason this has not fired.
+    data: data ?? {},
     is_read: false,
   };
 

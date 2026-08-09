@@ -12,6 +12,14 @@ import {
 } from '../utils/supabaseStorage';
 import type { RequestUploadInput } from '../validators/photo.validator';
 
+/**
+ * How long a photo may sit in 'processing' before it is treated as abandoned.
+ *
+ * Comfortably longer than the client's own upload deadline (two minutes) plus
+ * its retries, so this can only ever match a row nothing is still working on.
+ */
+const STALE_PROCESSING_MS = 30 * 60 * 1000;
+
 const CONTENT_TYPE_TO_EXT: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -319,12 +327,26 @@ export async function archivePhoto(
 ): Promise<void> {
   const photo = await assertPhotoAccess(photoId, user);
 
-  // 'processing' is excluded because an upload may still be in flight against
-  // this row; saveUploadedFile would then fail on a photo the teacher thinks
-  // they removed. 'archived' is excluded because it is already done.
-  if (photo.status !== 'ready' && photo.status !== 'failed') {
+  // 'processing' is normally excluded because an upload may still be in flight
+  // against this row; saveUploadedFile would then fail on a photo the teacher
+  // thinks they removed. 'archived' is excluded because it is already done.
+  //
+  // But a 'processing' row is also what every abandoned upload leaves behind —
+  // the app killed mid-transfer, the network dropped before /confirm — and
+  // there is no sweeper. Those rows still list in the teacher's grid, with no
+  // object behind them, so they render as blank tiles that could never be
+  // removed. Once no upload could plausibly still be running, archiving one is
+  // safe and is the only way to clear it.
+  const isStaleProcessing =
+    photo.status === 'processing' &&
+    Date.now() - new Date(photo.updated_at ?? photo.created_at).getTime() >
+      STALE_PROCESSING_MS;
+
+  if (photo.status !== 'ready' && photo.status !== 'failed' && !isStaleProcessing) {
     throw new AppError(
-      `Cannot archive a photo in '${photo.status}' state`,
+      photo.status === 'processing'
+        ? 'This photo is still uploading. Try again in a few minutes.'
+        : `Cannot archive a photo in '${photo.status}' state`,
       400,
       'INVALID_STATE',
     );
@@ -405,10 +427,19 @@ export async function untagStudent(
 async function assertPhotoAccess(
   photoId: string,
   user: { id: string; role: string; schoolId: string | null },
-): Promise<{ s3_key: string; status: string; mime_type: string; school_id: string }> {
+): Promise<{
+  s3_key: string;
+  status: string;
+  mime_type: string;
+  school_id: string;
+  created_at: string;
+  updated_at: string | null;
+}> {
   const { data: photo, error } = await supabaseAdmin
     .from('photos')
-    .select('s3_key, status, mime_type, school_id, uploaded_by')
+    // created_at/updated_at are read by archivePhoto to tell a genuinely stuck
+    // 'processing' row from one whose upload may still be running.
+    .select('s3_key, status, mime_type, school_id, uploaded_by, created_at, updated_at')
     .eq('id', photoId)
     .single();
 

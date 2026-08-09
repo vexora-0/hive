@@ -84,6 +84,32 @@ export async function createOrder(
     );
   }
 
+  // Only a photo that is actually available may be ordered. Tag ownership was
+  // the sole check, so an archived photo — one a teacher had deliberately
+  // removed — or one still processing could be bought from a stale feed. Both
+  // are permanent once ordered: order_items.photo_id is ON DELETE RESTRICT.
+  const { data: orderablePhotos, error: photoStatusError } = await supabaseAdmin
+    .from('photos')
+    .select('id')
+    .in('id', photoIds)
+    .eq('status', 'ready');
+
+  if (photoStatusError) {
+    logger.error('Failed to verify photo availability', {
+      error: photoStatusError.message,
+    });
+    throw new AppError('Failed to create order', 500, 'QUERY_FAILED');
+  }
+
+  const readyPhotoIds = new Set(orderablePhotos?.map((p) => p.id) ?? []);
+  if (photoIds.some((id) => !readyPhotoIds.has(id))) {
+    throw new AppError(
+      'One of these photos is no longer available to order',
+      409,
+      'PHOTO_UNAVAILABLE',
+    );
+  }
+
   // 2. Calculate server-side prices
   const orderId = uuidv4();
   let subtotal = 0;

@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+// `email` used to be accepted here and on updateSchoolSchema. The schools table
+// has no such column (migration 00002), so the service dropped it and answered
+// "200 School updated" with the field unchanged — an API that claims to accept
+// something and silently discards it. Nothing in the app ever sent it.
 export const createSchoolSchema = z.object({
   name: z
     .string()
@@ -10,7 +14,6 @@ export const createSchoolSchema = z.object({
     .string()
     .regex(/^\+?[\d\s\-()]{7,20}$/, 'Invalid phone number format')
     .optional(),
-  email: z.string().email('Invalid email').optional(),
   logoUrl: z.string().url('Invalid logo URL').optional(),
 });
 
@@ -21,7 +24,6 @@ export const updateSchoolSchema = z.object({
     .string()
     .regex(/^\+?[\d\s\-()]{7,20}$/, 'Invalid phone number format')
     .optional(),
-  email: z.string().email('Invalid email').optional(),
   logoUrl: z.string().url('Invalid logo URL').optional(),
 });
 
