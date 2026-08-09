@@ -92,6 +92,11 @@ export function OrderBottomSheet({
     setSelectedType(null);
     setQuantity(1);
     setNotes('');
+    // Cleared with the rest of the per-attempt state: the address itself is
+    // kept on purpose (a parent orders to the same address twice), but a
+    // "touched" flag left over from a previous sheet would show the required
+    // error on the confirm step of a fresh order the parent has not typed in.
+    setAddressTouched(false);
     setOrderSuccess(false);
     createOrder.reset();
     onClose();
@@ -338,6 +343,14 @@ export function OrderBottomSheet({
           placeholder="Enter your shipping address"
           value={shippingAddress}
           onChangeText={setShippingAddress}
+          // The only thing that used to set `addressTouched` was the submit
+          // handler — and "Place Order" is disabled while the address is
+          // empty, so the handler could never run in the one case the message
+          // exists for. The error was unreachable: a parent who left the field
+          // blank got a greyed-out button and no stated reason. Marking it
+          // touched on blur is what makes the explanation appear, and blur
+          // means it never fires at a parent who has not reached the field.
+          onBlur={() => setAddressTouched(true)}
           error={addressTouched && !hasAddress ? 'Shipping address is required' : undefined}
           multiline
           containerStyle={styles.input}

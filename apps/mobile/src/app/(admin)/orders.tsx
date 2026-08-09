@@ -14,6 +14,7 @@ import { HeaderBar } from '@/components/navigation/HeaderBar';
 import { Text } from '@/components/ui/Text';
 import { EmptyState, SkeletonShimmer } from '@/components/feedback';
 import { formatCents } from '@/features/orders/constants/products';
+import { formatOrderNumber } from '@/features/orders/utils/orderNumber';
 import { useAdminOrders } from '@/features/admin/hooks/useAdminOrders';
 import {
   OrderStatusSheet,
@@ -66,10 +67,10 @@ function OrderRow({
       onPress={() => onPress(order)}
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
       accessibilityRole="button"
-      accessibilityLabel={`Order ${order.id.slice(0, 8)}, ${STATUS_LABELS[order.status]}`}
+      accessibilityLabel={`Order ${formatOrderNumber(order.id)}, ${STATUS_LABELS[order.status]}`}
     >
       <View style={styles.rowMain}>
-        <Text variant="bodyBold">#{order.id.slice(0, 8).toUpperCase()}</Text>
+        <Text variant="bodyBold">#{formatOrderNumber(order.id)}</Text>
         <Text variant="caption" color={colors.text.secondary}>
           {formatDate(order.created_at)}
         </Text>

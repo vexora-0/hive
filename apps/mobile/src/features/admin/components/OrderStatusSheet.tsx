@@ -6,6 +6,7 @@ import { colors, spacing, layout } from '@/theme';
 import { Text } from '@/components/ui';
 import { Modal, ConfirmDialog } from '@/components/feedback';
 import { formatCents } from '@/features/orders/constants/products';
+import { formatOrderNumber } from '@/features/orders/utils/orderNumber';
 import type { OrderStatus } from '@/types/supabase';
 import type { AdminOrder } from '../services/adminService';
 
@@ -112,7 +113,7 @@ export function OrderStatusSheet({
           <View style={styles.content}>
             {order && (
               <>
-                <Text variant="h3">Order #{order.id.slice(0, 8).toUpperCase()}</Text>
+                <Text variant="h3">Order #{formatOrderNumber(order.id)}</Text>
                 <Text
                   variant="bodySmall"
                   color={colors.text.secondary}

@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 
 import { formatCents } from '../constants/products';
+import { formatOrderNumber } from '../utils/orderNumber';
 import { colors, spacing, layout } from '@/theme';
 import { Text, Button } from '@/components/ui';
 import { HiveImage } from '@/components/media';
@@ -261,7 +262,7 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
             <View style={styles.header}>
               <Text variant="h3">Order Details</Text>
               <Text variant="caption" color={colors.text.secondary}>
-                #{order.id.slice(0, 8).toUpperCase()}
+                #{formatOrderNumber(order.id)}
               </Text>
             </View>
 

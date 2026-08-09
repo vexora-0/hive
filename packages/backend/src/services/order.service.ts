@@ -224,7 +224,7 @@ export async function getOrders(
   const nextCursor =
     hasNext && results.length > 0 ? encodeCursor(last.created_at, last.id) : null;
 
-  return { orders: results, nextCursor };
+  return { orders: await withItems(results), nextCursor };
 }
 
 export async function getOrderById(
@@ -337,7 +337,7 @@ export async function getOrdersForSchool(
   const nextCursor =
     hasNext && results.length > 0 ? encodeCursor(last.created_at, last.id) : null;
 
-  return { orders: results, nextCursor };
+  return { orders: await withItems(results), nextCursor };
 }
 
 /**
@@ -478,6 +478,52 @@ export async function cancelOrder(orderId: string, parentId: string): Promise<Or
   logger.info('Order cancelled by parent', { orderId, parentId });
 
   return { ...order, status: 'cancelled' } as Order;
+}
+
+/**
+ * Attach each order's items to it, for a whole page of orders at once.
+ *
+ * Both list endpoints selected the `orders` columns and nothing else, so every
+ * order came back with `items` undefined. `OrderHistoryCard` renders
+ * `order.items?.length ?? 0`, which meant every card in the order history read
+ * "0 items" — including orders that really hold two.
+ *
+ * One query for the page, keyed on the ids just returned, rather than one per
+ * order: a 20-order page would otherwise be 21 round trips to Postgres.
+ *
+ * Thumbnails are deliberately *not* signed here. The list only needs a count
+ * and `getSignedPhotoUrls` is a network call per object — `getOrderById` still
+ * signs them for the detail sheet, which is the only screen that shows images.
+ */
+async function withItems(orders: Order[]): Promise<Order[]> {
+  if (orders.length === 0) return orders;
+
+  const { data: items, error } = await supabaseAdmin
+    .from('order_items')
+    .select('id, order_id, photo_id, product_type, quantity, unit_price_cents')
+    .in(
+      'order_id',
+      orders.map((order) => order.id),
+    );
+
+  if (error) {
+    // The list is still worth showing without item counts — status, total and
+    // date all come from the rows we already have.
+    logger.error('Failed to load items for order list', { error: error.message });
+    return orders.map((order) => ({ ...order, items: [] }));
+  }
+
+  const itemsByOrderId = new Map<string, OrderItem[]>();
+  for (const item of (items ?? []) as OrderItem[]) {
+    const existing = itemsByOrderId.get(item.order_id);
+    if (existing) existing.push(item);
+    else itemsByOrderId.set(item.order_id, [item]);
+  }
+
+  return orders.map((order) => ({
+    ...order,
+    items: itemsByOrderId.get(order.id) ?? [],
+  }));
 }
 
 /**

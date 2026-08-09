@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { formatCents } from '../constants/products';
+import { formatOrderNumber } from '../utils/orderNumber';
 import { colors, spacing, layout } from '@/theme';
 import { Text, Card, Badge, type BadgeVariant } from '@/components/ui';
 import type { OrderStatus } from '@/types/supabase';
@@ -83,9 +84,6 @@ function formatDate(dateString: string): string {
   });
 }
 
-function truncateId(id: string): string {
-  return id.slice(0, 8).toUpperCase();
-}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -106,7 +104,7 @@ export function OrderHistoryCard({ order, onPress }: OrderHistoryCardProps) {
       {/* Top row: order ID + status */}
       <View style={styles.topRow}>
         <Text variant="captionBold" color={colors.text.secondary}>
-          #{truncateId(order.id)}
+          #{formatOrderNumber(order.id)}
         </Text>
         <View
           style={[
