@@ -329,11 +329,32 @@ succeeded, or failed as the wrong kind of failure.
 | `pnpm test` | **178 passed, 0 failed**, 8 files, against `hive-test` |
 | `ls supabase/migrations` | 19 files at `68721ae` — `00001`–`00018` and `00020`. `00019` was reserved and never used, so the sequence has a hole the count does not show. Work in flight on other branches adds to this |
 
-**Known flake.** `orders.test.ts > rejects setting a status back to pending`
-fails intermittently in the full parallel run and passes when `orders.test.ts`
-is run alone (26/26, confirmed 9 Aug). It did not fire in the 9 Aug full run,
-which is luck rather than evidence. Recorded here rather than left for the next
-person to rediscover as a regression.
+**The known flake was the harness truncating a shared database, and is fixed.**
+It was never confined to `orders.test.ts > rejects setting a status back to
+pending`. Six consecutive full runs on 9 Aug failed three times, in three
+different files, three different ways: `auth.test.ts > T-2b` expected 401 and
+got 404; `photos.test.ts` and `authorization.test.ts` failed on
+`photos_school_id_fkey` / `students_school_id_fkey` because a school created
+seconds earlier had vanished; and `POST /api/v1/orders` blocked for 181s and
+379s against a 30s timeout.
+
+It was **not** file parallelism — `vitest.config.mts` already sets
+`fileParallelism: false`, and tracing every truncate confirmed files run
+strictly sequentially with no truncate ever overlapping another file's tests.
+The cause was `tests/setup.ts` truncating **every domain table** in a global
+`beforeAll`, once per file. `hive-test` is shared — CI runs the same suite on
+every push against the same project a developer uses — so a second run's
+`beforeAll` deleted the first run's fixtures mid-test, and the two runs'
+`DELETE`s contended for the locks every foreign-key check needs. The decisive
+evidence: `errors.test.ts`, which creates no school at all, watched `schools` go
+from 0 rows to 2 during its own run. Replaying a concurrent `truncateAll()`
+against a single file reproduces the identical `photos_school_id_fkey` failures
+on demand.
+
+The global truncate is gone. Each run now deletes only the rows it created
+(`cleanupCreatedRows` in `tests/setup.ts`), so concurrent runs no longer destroy
+each other. Six consecutive full runs green afterwards, at unchanged wall-clock
+(~106s).
 
 ### Ordering
 
