@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
@@ -49,9 +50,49 @@ const SecureStoreAdapter = {
   },
 };
 
+/**
+ * Web session storage.
+ *
+ * `expo-secure-store` has no web implementation at all — its web module is
+ * literally `export default {}`, so every call is a TypeError. The adapter
+ * above swallows those, which is right on a device but on web means the
+ * session is never written and never read back. auth-js re-reads the session
+ * from storage to build the `Authorization` header, so with nothing there it
+ * falls back to the anon key: sign-in returns 200, every subsequent PostgREST
+ * request is anonymous, row level security hides the caller's own `profiles`
+ * row, and the app bounces back to the login screen it just came from.
+ *
+ * `localStorage` is what supabase-js uses on web by default. Native is
+ * untouched — it still goes through the keychain.
+ */
+const LocalStorageAdapter = {
+  getItem: async (key: string): Promise<string | null> => {
+    try {
+      return globalThis.localStorage?.getItem(key) ?? null;
+    } catch (err) {
+      logger.error('Could not read the stored session', err);
+      return null;
+    }
+  },
+  setItem: async (key: string, value: string): Promise<void> => {
+    try {
+      globalThis.localStorage?.setItem(key, value);
+    } catch (err) {
+      logger.error('Could not persist the session', err);
+    }
+  },
+  removeItem: async (key: string): Promise<void> => {
+    try {
+      globalThis.localStorage?.removeItem(key);
+    } catch (err) {
+      logger.error('Could not clear the stored session', err);
+    }
+  },
+};
+
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: SecureStoreAdapter,
+    storage: Platform.OS === 'web' ? LocalStorageAdapter : SecureStoreAdapter,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
