@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, STALE_TIME_MS } from '@/theme';
 import { Text, Button } from '@/components/ui';
 import { PhotoViewer } from '@/components/media';
+import { EmptyState } from '@/components/feedback';
 import { getPhotoDetails } from '@/features/parent/services/parentService';
 
 // ---------------------------------------------------------------------------
@@ -34,7 +35,7 @@ export default function PhotoDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const { data: photo, isLoading } = useQuery({
+  const { data: photo, isLoading, isError } = useQuery({
     queryKey: ['photo', id],
     queryFn: () => getPhotoDetails(id!),
     enabled: !!id,
@@ -53,10 +54,27 @@ export default function PhotoDetailScreen() {
   };
 
   // ---- Loading state ------------------------------------------------
-  if (isLoading || !photo) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary.amber} />
+      </View>
+    );
+  }
+
+  // ---- Error / not found --------------------------------------------
+  // Previously this screen fell back to the spinner above whenever `photo` was
+  // absent, so a failed or refused request span forever with no way back. The
+  // API answers 404 rather than 403 for a photo the parent may not see, so a
+  // missing photo and a refused one are deliberately shown the same way.
+  if (isError || !photo) {
+    return (
+      <View style={styles.loadingContainer}>
+        <EmptyState
+          title="Photo unavailable"
+          message="We couldn't load this photo. It may have been removed."
+          action={{ label: 'Go back', onPress: handleClose }}
+        />
       </View>
     );
   }

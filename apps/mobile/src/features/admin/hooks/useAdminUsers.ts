@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query';
 
 import { STALE_TIME_MS } from '@/theme';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useToast } from '@/components/feedback';
 import { apiErrorMessage } from '@/utils/errorMessage';
 import type { UserRole } from '@/types/supabase';
@@ -46,19 +47,25 @@ export function useAdminUsers() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | undefined>(undefined);
 
+  // The text box drives `search` so typing stays responsive, but the query key
+  // uses the debounced value — otherwise every keystroke fired its own
+  // /admin/users request.
+  const debouncedSearch = useDebounce(search, 300);
+
   // ── Infinite query ──────────────────────────────────────────────────
   const {
     data,
     isLoading,
+    isError,
     isRefetching,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
     refetch,
   } = useInfiniteQuery({
-    queryKey: [...USERS_KEY, search, roleFilter],
+    queryKey: [...USERS_KEY, debouncedSearch, roleFilter],
     queryFn: ({ pageParam }) =>
-      getUsers(search || undefined, roleFilter, pageParam as string | undefined),
+      getUsers(debouncedSearch || undefined, roleFilter, pageParam as string | undefined),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     staleTime: STALE_TIME_MS,
@@ -112,6 +119,7 @@ export function useAdminUsers() {
   return {
     users,
     isLoading,
+    isError,
     isRefetching,
     fetchNextPage,
     hasNextPage: hasNextPage ?? false,

@@ -27,7 +27,7 @@ const DASHBOARD_KEY = ['admin', 'dashboard'] as const;
  * ```
  */
 export function useAdminDashboard() {
-  const { data, isLoading, isRefetching, refetch, error } = useQuery({
+  const { data, isLoading, isRefetching, refetch, error, isError } = useQuery({
     queryKey: DASHBOARD_KEY,
     queryFn: getDashboardStats,
     staleTime: STALE_TIME_MS,
@@ -39,5 +39,6 @@ export function useAdminDashboard() {
     isRefetching,
     refetch,
     error,
+    isError,
   };
 }

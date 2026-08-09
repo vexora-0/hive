@@ -92,6 +92,7 @@ export function useTeacherPhotos(classId: string) {
     fetchNextPage: query.fetchNextPage,
     hasNextPage: query.hasNextPage,
     isLoading: query.isLoading,
+    isError: query.isError,
     isFetchingNextPage: query.isFetchingNextPage,
     refetch: query.refetch,
     error: query.error,

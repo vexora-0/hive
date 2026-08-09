@@ -20,7 +20,7 @@ import { StudentCard } from '@/features/admin/components/StudentCard';
 import { AssignTeacherSheet } from '@/features/admin/components/AssignTeacherSheet';
 import { AddStudentSheet } from '@/features/admin/components/AddStudentSheet';
 import { ParentListSheet } from '@/features/admin/components/ParentListSheet';
-import { ConfirmDialog } from '@/components/feedback';
+import { ConfirmDialog, EmptyState } from '@/components/feedback';
 import type { CreateStudentData } from '@/features/admin/services/adminService';
 
 // ---------------------------------------------------------------------------
@@ -35,6 +35,7 @@ export default function ClassDetailScreen() {
     classDetail,
     teachers,
     isLoading,
+    isError,
     isRefetching,
     refetch,
     assignTeacher,
@@ -118,12 +119,29 @@ export default function ClassDetailScreen() {
   );
 
   // ── Loading state ────────────────────────────────────────────────────
-  if (isLoading || !classDetail) {
+  if (isLoading) {
     return (
       <ScreenContainer edges={['top', 'left', 'right']}>
         <HeaderBar title="Class Detail" showBack onBack={() => router.back()} />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary.amber} />
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  // ── Error state ──────────────────────────────────────────────────────
+  // Without this a failed fetch left the spinner above running forever.
+  if (isError || !classDetail) {
+    return (
+      <ScreenContainer edges={['top', 'left', 'right']}>
+        <HeaderBar title="Class Detail" showBack onBack={() => router.back()} />
+        <View style={styles.centered}>
+          <EmptyState
+            title="Couldn't load this class"
+            message="Check your connection and try again."
+            action={{ label: 'Retry', onPress: () => refetch() }}
+          />
         </View>
       </ScreenContainer>
     );

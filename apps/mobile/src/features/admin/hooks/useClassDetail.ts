@@ -34,6 +34,7 @@ export function useClassDetail(classId: string) {
   const {
     data: classDetail,
     isLoading,
+    isError,
     isRefetching,
     refetch,
   } = useQuery<ClassDetail>({
@@ -106,6 +107,7 @@ export function useClassDetail(classId: string) {
     classDetail,
     teachers,
     isLoading,
+    isError,
     isRefetching,
     refetch,
     assignTeacher,

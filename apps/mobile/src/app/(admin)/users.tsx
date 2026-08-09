@@ -14,6 +14,7 @@ import { ScreenContainer } from '@/components/layout/ScreenContainer';
 import { HeaderBar } from '@/components/navigation/HeaderBar';
 import { TextInput } from '@/components/ui/TextInput';
 import { Text } from '@/components/ui/Text';
+import { EmptyState } from '@/components/feedback';
 import { UserListItem } from '@/features/admin/components/UserListItem';
 import { UserEditSheet } from '@/features/admin/components/UserEditSheet';
 import { useAdminUsers } from '@/features/admin/hooks/useAdminUsers';
@@ -44,6 +45,7 @@ export default function UsersScreen() {
   const {
     users,
     isLoading,
+    isError,
     isRefetching,
     fetchNextPage,
     hasNextPage,
@@ -196,6 +198,30 @@ export default function UsersScreen() {
             />
           }
           contentContainerStyle={styles.listContent}
+          // Without this the first paint and a genuinely empty result were
+          // both just a blank area, with nothing to say which had happened.
+          ListEmptyComponent={
+            isLoading ? (
+              <View style={styles.centered}>
+                <ActivityIndicator size="large" color={colors.primary.amber} />
+              </View>
+            ) : isError ? (
+              <EmptyState
+                title="Couldn't load users"
+                message="Check your connection and try again."
+                action={{ label: 'Retry', onPress: () => refetch() }}
+              />
+            ) : (
+              <EmptyState
+                title={search ? 'No matching users' : 'No users yet'}
+                message={
+                  search
+                    ? `Nothing matched "${search}". Try a different name or email.`
+                    : 'Users will appear here once they sign up.'
+                }
+              />
+            )
+          }
         />
       </View>
 
@@ -250,6 +276,11 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: spacing.xxl,
+  },
+  centered: {
+    paddingVertical: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   separator: {
     height: StyleSheet.hairlineWidth,

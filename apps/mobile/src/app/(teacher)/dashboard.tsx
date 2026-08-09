@@ -90,6 +90,7 @@ export default function DashboardScreen() {
     fetchNextPage,
     hasNextPage,
     isLoading: photosLoading,
+    isError: photosError,
     refetch,
   } = useTeacherPhotos(selectedClassId ?? '');
 
@@ -181,7 +182,15 @@ export default function DashboardScreen() {
             onRefresh={handleRefresh}
             ListHeaderComponent={header}
             ListEmptyComponent={
-              hasSchool ? (
+              // A failed fetch used to fall through to "No photos yet", which
+              // invites the teacher to re-upload photos that are already there.
+              photosError ? (
+                <EmptyState
+                  title="Couldn't load photos"
+                  message="Check your connection and try again."
+                  action={{ label: 'Retry', onPress: handleRefresh }}
+                />
+              ) : hasSchool ? (
                 <EmptyState
                   title="No photos yet"
                   message="Tap the camera button below to upload your first photos for this class."

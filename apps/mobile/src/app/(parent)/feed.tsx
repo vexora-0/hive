@@ -52,6 +52,7 @@ export default function FeedScreen() {
     hasNextPage,
     isFetchingNextPage,
     isLoading: isLoadingFeed,
+    isError: isFeedError,
     refetch,
     isRefetching,
   } = useFeed(selectedChild?.id);
@@ -179,7 +180,16 @@ export default function FeedScreen() {
         onRefresh={refetch}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={
-          children.length === 0 ? (
+          // A failed request must not be dressed up as an empty feed — telling
+          // a parent their child has no photos when the request errored is a
+          // worse lie than showing the error.
+          isFeedError ? (
+            <EmptyState
+              title="Couldn't load photos"
+              message="Check your connection and try again."
+              action={{ label: 'Retry', onPress: () => refetch() }}
+            />
+          ) : children.length === 0 ? (
             <EmptyState
               title="No children linked yet"
               message={

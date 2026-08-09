@@ -5,6 +5,7 @@ import { colors, spacing } from '@/theme';
 import { ScreenContainer } from '@/components/layout/ScreenContainer';
 import { HeaderBar } from '@/components/navigation/HeaderBar';
 import { SkeletonShimmer } from '@/components/feedback/SkeletonShimmer';
+import { EmptyState } from '@/components/feedback';
 import { StatCard } from '@/features/admin/components/StatCard';
 import { useAdminDashboard } from '@/features/admin/hooks/useAdminDashboard';
 
@@ -84,7 +85,7 @@ function DashboardSkeleton() {
  * Features pull-to-refresh and a skeleton loading state on initial load.
  */
 export default function DashboardScreen() {
-  const { stats, isLoading, isRefetching, refetch } = useAdminDashboard();
+  const { stats, isLoading, isError, isRefetching, refetch } = useAdminDashboard();
 
   const onRefresh = useCallback(() => {
     refetch();
@@ -108,6 +109,15 @@ export default function DashboardScreen() {
       >
         {isLoading ? (
           <DashboardSkeleton />
+        ) : isError ? (
+          // Falling through to `?? 0` here printed "Schools 0 / Users 0 /
+          // Revenue £0" on a failed request, which reads as real data rather
+          // than a failure to fetch it.
+          <EmptyState
+            title="Couldn't load statistics"
+            message="Check your connection and try again."
+            action={{ label: 'Retry', onPress: onRefresh }}
+          />
         ) : (
           <View style={styles.grid}>
             {STAT_CARDS.map((card) => (
