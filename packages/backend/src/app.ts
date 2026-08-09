@@ -6,6 +6,7 @@ import { globalRateLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
 import { requestId } from './middleware/requestId';
 import { supabaseAdmin } from './config/supabase';
+import { redis } from './config/redis';
 import { logger } from './config/logger';
 
 // Import route modules
@@ -120,13 +121,30 @@ app.get('/health', async (_req, res) => {
     database = 'error';
   }
 
+  // Redis is reported but deliberately does NOT affect the status code. It
+  // backs only the order idempotency cache, and losing that degrades to
+  // "orders are not deduplicated" rather than to an outage — so an instance
+  // without Redis should stay in rotation. It is surfaced because the previous
+  // response said nothing about it at all, and a Redis failure was therefore
+  // invisible until it showed up as a stalled order.
+  let cache: 'ok' | 'error' = 'error';
+  try {
+    const pong = await Promise.race([
+      redis.ping(),
+      new Promise<string>((resolve) => setTimeout(() => resolve('timeout'), 1000)),
+    ]);
+    if (pong === 'PONG') cache = 'ok';
+  } catch {
+    cache = 'error';
+  }
+
   res.status(database === 'ok' ? 200 : 503).json({
     status: database === 'ok' ? 'ok' : 'degraded',
     service: 'hive-backend',
     version: '1.0.0',
     uptimeSeconds: Math.round(process.uptime()),
     timestamp: new Date().toISOString(),
-    checks: { database },
+    checks: { database, cache },
   });
 });
 
