@@ -352,20 +352,42 @@ fi
 echo
 echo "9. Rate limiting"
 # ---------------------------------------------------------------------------
-# Off by default: 100+ requests against a free-tier instance is slow and
-# pollutes the limiter's window right before a demo.
+# Off by default: it is slow and it consumes the limiter's window, which you do
+# not want immediately before a demo.
+#
+# This check used to hammer /health and expect a 429. It could not pass: /health
+# is deliberately exempt from rate limiting, because it is polled by the
+# platform and a 429 there reads as "instance down" and pulls the instance out
+# of rotation. It also assumed the old global ceiling of 100; the global budget
+# is now 1000 per identity, so 120 requests would prove nothing either way.
+#
+# So it targets the WRITE limiter instead — 100 per identity, the tightest
+# budget in the system and the one protecting the endpoints that cost storage
+# or money. The body is deliberately invalid, so every request is rejected by
+# the validator that runs after the limiter: the counter still increments and
+# no photo rows are created.
 
 if [ "${RUN_RATE_LIMIT_CHECK:-0}" = "1" ]; then
-  echo "     sending 120 requests…"
-  limited=0
-  for _ in $(seq 1 120); do
-    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$BASE_URL/health")"
-    [ "$code" = "429" ] && limited=1 && break
-  done
-  if [ "$limited" = "1" ]; then
-    green "  PASS  rate limiter returned 429"; PASS=$((PASS + 1))
+  if [ -z "${TEACHER_X_TOKEN:-}" ]; then
+    skip "rate limiting" "set TEACHER_X_TOKEN (the write limiter is per authenticated identity)"
   else
-    red   "  FAIL  no 429 after 120 requests"; FAIL=$((FAIL + 1))
+    echo "     sending up to 130 write requests…"
+    limited=0
+    attempts=0
+    for _ in $(seq 1 130); do
+      attempts=$((attempts + 1))
+      code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+        -X POST "$BASE_URL/api/v1/photos/upload-url" \
+        -H "Authorization: Bearer $TEACHER_X_TOKEN" \
+        -H 'Content-Type: application/json' \
+        -d '{}')"
+      [ "$code" = "429" ] && limited=1 && break
+    done
+    if [ "$limited" = "1" ]; then
+      green "  PASS  write rate limiter returned 429 after $attempts requests"; PASS=$((PASS + 1))
+    else
+      red   "  FAIL  no 429 after $attempts write requests"; FAIL=$((FAIL + 1))
+    fi
   fi
 else
   skip "rate limiting" "set RUN_RATE_LIMIT_CHECK=1 (slow; consumes the window)"

@@ -285,6 +285,48 @@ and has nothing to do with the code.
 
 ---
 
+## 8a. Running it in a browser
+
+The app runs in Chrome through `react-native-web`. This is how the screens were
+first ever seen rendering — until 9 August nothing had been observed running at
+all. Web is a verification convenience; the product targets iOS and Android.
+
+```bash
+pnpm install                                        # REQUIRED after pulling — see below
+pnpm --filter @hive/mobile exec expo start --web --clear
+# serves on http://localhost:8081
+```
+
+The backend must be running separately on `:4000`, and `apps/mobile/.env` must
+exist — it is gitignored, so a fresh clone has none.
+
+### If the page is blank
+
+A blank page with the tab title "Hive" and **nothing in the console** is the
+signature failure. Diagnose it by symptom rather than guessing — the three
+causes look different:
+
+| What you see | Cause | Fix |
+|---|---|---|
+| Metro says `Unable to resolve "react-dom"` or `"@lottiefiles/dotlottie-react"` | Three dependencies were added for web on 9 August. Pulling the commit does not install them | `pnpm install` |
+| Metro bundles fine, page blank, **console completely empty**, only `entry.bundle` and `favicon.ico` in the network tab | Stale Metro cache serving modules transformed by the old Babel config. `babel.config.js` gained a web-only `unstable_transformImportMeta` — without it, zustand's `import.meta.env.MODE` makes the whole bundle a **parse** error, so nothing executes and nothing can be logged | Restart with `--clear` |
+| Page renders, sign-in succeeds, then bounces straight back to login | `expo-secure-store` has no web implementation — its web module is `export default {}` — so the session was never persisted and auth-js fell back to the anon key. Fixed on 9 August in `src/lib/supabase.ts` | `git pull`, then `--clear` |
+| Page renders, but every API call fails | Backend not running, or `EXPO_PUBLIC_API_URL` points at a LAN IP that is not this machine. For a browser demo it should be `http://localhost:4000` | Fix `apps/mobile/.env` |
+
+The empty console is the tell for the second row and worth internalising: a
+parse error leaves no runtime to report it, so "no errors" means the bundle
+never ran, not that it ran cleanly.
+
+### Sharing a broken setup with someone else
+
+Send the **Metro output** and the **browser console**, and say which row above
+matches. Do **not** send your `.env` files or paste them into a chat or an AI
+assistant — they hold the Supabase service-role key, which bypasses row level
+security entirely, and the database password. Every code fix is in the
+repository; nothing in `.env` is needed to diagnose a blank page.
+
+---
+
 ## 9. Troubleshooting
 
 | Symptom | Cause |
