@@ -1,38 +1,43 @@
 # Capstone submission — checklist and evidence plan
 
-Maps every rubric criterion to what exists, what is missing, and who does it.
-**100 marks total.**
+Maps every rubric criterion to what exists and what is outstanding.
+**100 marks.** Both institute templates have been read; the drafts in this
+folder follow their exact structure.
+
+| File | Follows |
+|---|---|
+| `REPORT.md` | `Document-format.docx` — 6 chapters, front matter, appendix |
+| `PRESENTATION-15min.md` | `Capstone_Project_15_Min_Demo_Template.pptx` — 10 slides |
+| `VIVA-PREP.md` | Q&A preparation |
 
 ---
 
-## 1. Where the marks are, and where we stand
+## 1. Where the marks are
 
 | Section | Marks | State |
 |---|---|---|
-| Continuous evaluation (supervisor) | 20 | Evidence exists — see §2 |
+| Continuous evaluation (supervisor) | 20 | Evidence exists — §2 |
 | Implementation | 30 | Code complete and verified |
-| Testing, validation & results | 15 | Strong, except performance |
-| **Documentation** | **20** | **Chapters drafted; screenshots outstanding** |
-| **Presentation, demo & viva** | **15** | **Content drafted; rehearsal outstanding** |
-
-The two bolded rows are where remaining effort pays best.
+| Testing, validation & results | 15 | Strong except performance — §4 |
+| **Documentation** | **20** | **Drafted; screenshots + template transfer outstanding** |
+| **Presentation, demo & viva** | **15** | **Drafted; demo video + rehearsal outstanding** |
 
 ---
 
 ## 2. Continuous evaluation — 20 marks
 
-Supervisor-assessed, but it is assessed *from evidence*. This project has an
-unusually strong paper trail; make sure the supervisor has seen it.
+Supervisor-assessed, but assessed *from evidence*. The paper trail here is
+unusually strong; make sure the supervisor has actually seen it.
 
-| Criterion | Marks | Evidence to point at |
+| Criterion | Marks | Point them at |
 |---|---|---|
 | Attendance & regularity | 5 | 367 commits, 1 Feb – 9 Aug, four contributors |
-| Task progress & timelines | 5 | `docs/PROGRESS-REPORT.md` — weekly, W1 onward; `docs/PHASE-2-EXECUTION-PLAN.md` |
+| Task progress & timelines | 5 | `docs/PROGRESS-REPORT.md` — 25 weekly entries |
 | Ownership | 5 | Per-person plan ownership; `## Deviations` sections recording what differed and why |
-| Communication & reporting | 5 | `docs/IMPLEMENTATION-STATUS.md`, `docs/security.md`, `docs/architecture.md`, handover docs |
+| Communication & reporting | 5 | `IMPLEMENTATION-STATUS.md`, `security.md`, `architecture.md` |
 
-**Do:** send the supervisor a one-page summary linking these, rather than
-assuming they will find them.
+⚠️ **Report §5.3 needs your records** — review dates and feedback received. Only
+you have these.
 
 ---
 
@@ -41,13 +46,13 @@ assuming they will find them.
 | Aspect | Marks | Evidence |
 |---|---|---|
 | Feature completeness | 10 | Three roles end to end; 40 endpoints; upload → tag → feed → order → notify |
-| Functional correctness | 10 | §5.5 of the report — order 201 with correct cents, idempotency, atomicity, notifications, privacy scoping |
+| Functional correctness | 10 | Report Table 3.3 — order 201 with correct cents, idempotency, atomicity, notifications, privacy scoping |
 | Code quality | 5 | TypeScript strict, Zod at every boundary, `pnpm lint` 0 errors, CI on every push |
-| Tech stack | 5 | §4.2 — including what was *removed* (BullMQ/S3) and why |
+| Tech stack | 5 | Report §2.2 — including what was *removed* and why |
 
 **Strongest single talking point:** the BullMQ/S3 deletion. Removing ~1,500 lines
-of never-executed infrastructure is a better signal of engineering judgement than
-adding a framework.
+of never-executed infrastructure signals engineering judgement better than
+adding a framework does.
 
 ---
 
@@ -55,22 +60,20 @@ adding a framework.
 
 | Aspect | Marks | State |
 |---|---|---|
-| Test cases & coverage | 5 | **Strong** — 178 tests, 8 files, 178/178 in 115 s |
-| Result analysis | 5 | **Strong** — §5.10, including the sabotage finding |
-| Performance / reliability | 5 | **Weak** — no load figures; k6 never run |
+| Test cases & coverage | 5 | **Strong** — 178 tests, Table 3.2 has 37 documented cases |
+| Result analysis | 5 | **Strong** — §3.3.7, including the sabotage finding |
+| Performance / reliability | 5 | ⚠️ **Weak** — no load figures |
 
-⚠️ **The one soft spot in the whole submission.** Options, best first:
+⚠️ **The one soft spot in the submission.** Options, best first:
 
-1. **Deploy and run k6.** Converts the weakest criterion into a real result.
-   Highest value remaining action in the project.
-2. **Run k6 against a local backend.** Not a production measurement, but it is
-   a measurement — and honest labelling ("local, single instance") is fine.
-3. **Present reliability instead.** 503 on database loss, 429 at request 77,
-   idempotency under retry, cold-start reproducibility. These *are* reliability
-   results; frame them as such.
+1. **Deploy, then run k6.** Converts the weakest criterion into a real result and
+   simultaneously fixes Report §4.2.2 and three limitations.
+2. **Run k6 against a local backend.** Not production, but it *is* a measurement.
+   Label it honestly: "local, single instance, seeded dataset".
+3. **Reframe reliability.** 503 on database loss, 429 at request 77, idempotency
+   under retry, cold-start reproducibility — these *are* reliability results.
 
-Do at least option 2 or 3. Do not leave the section empty and do not invent
-numbers.
+Do at least 2 or 3. Never invent numbers.
 
 ---
 
@@ -78,9 +81,9 @@ numbers.
 
 | Aspect | Marks | State |
 |---|---|---|
-| Implementation & testing chapters | 7 | ✅ `REPORT-implementation-and-testing.md` |
-| Results, screenshots, tables | 7 | ⚠️ Tables done; **screenshots outstanding** — §7 below |
-| Clarity, formatting, references | 6 | ⚠️ Needs the institute template — §8 |
+| Implementation & testing chapters | 7 | ✅ `REPORT.md` chapters 2 and 3 |
+| Results, screenshots, tables | 7 | ⚠️ 11 tables done; **23 screenshots outstanding** — §7 |
+| Clarity, formatting, references | 6 | ⚠️ Transfer to Word + formatting — §8 |
 
 ---
 
@@ -88,90 +91,93 @@ numbers.
 
 | Aspect | Marks | State |
 |---|---|---|
-| Technical explanation | 5 | ✅ `PRESENTATION-15min.md` |
-| Live demo | 5 | ✅ Content ready; **rehearse against a clock** |
+| Technical explanation | 5 | ✅ Slides 1–6, 8–10 drafted |
+| Live demo | 5 | ✅ Choreographed; **rehearse against a clock** |
 | Q&A and confidence | 5 | ✅ `VIVA-PREP.md` |
 
-**Rehearse the demo at least twice with a timer**, and record one run as
-insurance. If it breaks on the day, switch to the recording within 20 seconds
-rather than debugging on stage.
+⚠️ **Report Chapter 4.4 requires a demo video link.** Record the six-minute flow
+from `docs/demo-script.md`. This doubles as insurance if the live demo fails.
 
 ---
 
-## 7. Screenshots to capture — 7 marks ride on this
+## 7. Screenshots — 7 marks ride on this
 
-Capture at the same window size, light mode, with seeded demo data present.
-Crop out the OS chrome. **Redact nothing that matters and fabricate nothing** —
-these are results, and a doctored screenshot is worse than a missing one.
+Same window size, light mode, seeded data present, OS chrome cropped.
+**Fabricate nothing** — these are results, and a doctored screenshot is worse
+than a missing one.
 
-### Application
+### Application — Report figures 2.5–2.8
 
-| # | Screenshot | Shows |
+| Fig. | Screenshot | Shows |
 |---|---|---|
-| 1 | Login screen | Entry point, role selection |
-| 2 | Teacher dashboard | Class-scoped view |
-| 3 | Upload with student tagger open | The tagging gate |
-| 4 | Parent feed — Rajesh | Photos of his children |
-| 5 | **Child switcher expanded** | Two children — the many-to-many model |
-| 6 | Feed after switching child | Different photos — scoping is live |
-| 7 | Photo detail | Signed URL rendering, blurhash placeholder |
-| 8 | Order sheet with product picker | Pricing from the shared catalogue |
-| 9 | Order confirmation | `$9.98` for 2 × $4.99 — correct cents |
-| 10 | Order history with thumbnails | Signed per-item URLs |
-| 11 | Notifications list | "New photo of Diya Kumar" — trigger-generated |
-| 12 | Admin dashboard | Non-zero counts |
+| — | Login screen | Entry point, role selection |
+| — | Teacher dashboard | Class-scoped view |
+| 2.5 | Upload with student tagger open | The tagging gate |
+| 2.6 | Parent feed — Rajesh, child switcher expanded | Two children — the many-to-many model |
+| — | Feed after switching child | Different photos — scoping is live |
+| — | Photo detail | Signed URL rendering, blurhash placeholder |
+| 2.7 | Order sheet + confirmation | **$9.98** for 2 × $4.99 — correct cents |
+| — | Order history with thumbnails | Signed per-item URLs |
+| — | Notifications list | "New photo of Diya Kumar" — trigger-generated |
+| 2.8 | Admin dashboard | Non-zero counts |
 
-### Evidence — these carry the "results" marks
+### Evidence — these carry the results marks
 
-| # | Screenshot | Shows |
+| Fig. | Screenshot | Shows |
 |---|---|---|
-| 13 | **`pnpm test` — 178/178 passing, 115 s** | The headline test result |
-| 14 | **`verify-security.sh` — 26/0/3** | Security verification |
-| 15 | **Sabotage run — 3 targeted tests failing** | The suite detects regressions |
-| 16 | Terminal: cross-school `curl` → **403** | G-08 |
-| 17 | Terminal: signed URL 200, token stripped → **400** | G-02 |
-| 18 | Terminal: order POST → **201**, `total_cents: 998` | G-01 |
-| 19 | Terminal: same idempotency key → same order ID | Idempotency |
-| 20 | `/health` 200, then **503** with database stopped | Degradation detected |
-| 21 | GitHub Actions — green run | CI exists and runs |
-| 22 | ER diagram | Schema |
-| 23 | Architecture diagram | Three tiers |
+| 3.1 | **`pnpm test` — 178/178, 115 s** | Headline test result |
+| 3.2 | **`verify-security.sh` — 26/0/3** | Security verification |
+| 3.3 | **Sabotage run — 3 targeted tests failing** | The suite detects regressions |
+| 3.4 | **Rajesh's feed beside Vikram's** | 2 vs 1, zero overlap |
+| 3.5 | **Signed URL 200 beside stripped-token 400** | Private bucket |
+| — | Cross-school `curl` → **403** | G-08 |
+| — | Order POST → **201**, `total_cents: 998` | G-01 |
+| — | Same idempotency key → same order ID | Idempotency |
+| 4.1 | `/health` 200, then **503** with database stopped | Degradation detected |
+| 5.1 | Commit history — 367 commits | Version control evidence |
+| 5.2 | GitHub Actions — green run | CI exists and runs |
+| 2.1 | Architecture diagram | Three tiers |
+| 2.3 | ER diagram | Schema |
 
-**Two side-by-side comparisons are worth more than any single shot:**
-Rajesh's feed next to Vikram's — 2 photos vs 1, zero overlap. And the signed URL
-200 next to the stripped-token 400.
-
----
-
-## 8. Blocked on missing templates
-
-Three files referenced were **not present on this machine** — only
-`Capstone-Rubrics.docx` was:
-
-- `Document-format.docx` (and its duplicate) — report structure
-- `Capstone_Project_15_Min_Demo_Template.pptx` — slide template
-
-The drafted content is deliberately format-agnostic Markdown so it can be poured
-in without rewriting. But **6 marks ride on "clarity, formatting, references"**,
-which means matching the institute's required structure — chapter numbering,
-front matter, citation style, figure and table captions.
-
-**Re-share those files and the content can be mapped onto them directly.**
+**The two side-by-side comparisons (3.4 and 3.5) are worth more than any single
+shot.** They show the property, not just the feature.
 
 ---
 
-## 9. Priority order for remaining work
+## 8. Transfer to the Word template
 
-1. **Capture the 23 screenshots** (§7) — 7 marks, mechanical, needs a running
-   instance and a couple of hours
-2. **Get the report template** and pour the chapters in — 6 marks
-3. **Produce a performance result** (§4, option 1/2/3) — 5 marks, currently the
-   weakest criterion
-4. **Rehearse the demo twice with a timer**, record one — 5 marks
-5. **Send the supervisor a summary** linking the progress evidence — up to 20
-   marks are assessed on impressions they form from it
+Structure already matches; this is mechanical.
 
-Items 1 and 4 need nothing from anyone else and can start today.
+- [ ] Paste chapter by chapter into `Document-format.docx`
+- [ ] Replace every `«…»` — name, roll number, institution, supervisor, dates,
+      supervisor remarks, video link
+- [ ] Insert figures with captions **beneath**; tables with captions **above**
+- [ ] Update List of Figures and List of Tables after captioning
+- [ ] Generate the Table of Contents from Heading styles
+- [ ] Apply: Times New Roman · 12 pt body, 14 pt headings · 1.5 spacing ·
+      1 inch margins · page numbers bottom-centre
+- [ ] Export to **PDF**
+
+**Chapter 1 note.** The template says problem identification and system design
+come from the Study Project. Reuse your earlier submission where it is stronger
+than the summary in `REPORT.md` §1.1–1.5; **keep §1.6**, which records the two
+design changes made during implementation.
+
+---
+
+## 9. Priority order
+
+1. **Capture the 23 screenshots** — 7 marks, mechanical, needs only a running
+   instance
+2. **Record the demo video** — required by Chapter 4.4, and it is your fallback
+   if the live demo fails
+3. **Transfer to the Word template and format** — 6 marks
+4. **Produce a performance result** (§4) — currently the weakest criterion
+5. **Rehearse the demo twice with a timer**
+6. **Fill §5.3 and the supervisor remarks column** from your own records
+7. **Send the supervisor a summary** linking §2's evidence
+
+Items 1, 2 and 5 need nothing from anyone else.
 
 ---
 
@@ -180,8 +186,9 @@ Items 1 and 4 need nothing from anyone else and can start today.
 - **Invent a performance number.** One unsourced figure discredits every sourced
   one, and a viva will find it.
 - **Claim 29/29 on the security script.** It is 26 passed, 0 failed, **3
-  skipped**.
+  skipped** — and the skips need a deployment.
 - **Say "fully working".** It works locally. Nothing is deployed and nothing has
   run on a physical device.
-- **Hide the limitations.** Volunteering them reads as judgement; being caught
-  concealing them discounts everything else.
+- **Hide the limitations.** Report §6.3 and slide 9 state them deliberately.
+  Volunteering them reads as judgement; being caught concealing one discounts
+  everything else.

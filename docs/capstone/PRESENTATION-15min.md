@@ -1,74 +1,132 @@
 # Hive — 15-minute capstone presentation
 
-**Slide content and timing.** Pour into the institute's
-`Capstone_Project_15_Min_Demo_Template.pptx`; slide numbering here is indicative,
-the *timing and content* are the part that matters.
-
-**Budget: 15 minutes.** Roughly 6 minutes of explanation, 6 of live demo, 3 of
-buffer and questions. The rubric splits this evenly — technical explanation (5),
-live demo (5), Q&A (5) — so do not spend 12 minutes on slides and rush the demo.
-
-> Full command-by-command demo choreography already exists in
-> `docs/demo-script.md`. This file is the *presentation* wrapper around it.
+> **Mapped to `Capstone_Project_15_Min_Demo_Template.pptx`.** Ten slides, in the
+> template's own order and headings. Content below goes on the slide; the
+> *Say* lines are what you speak, not what you print.
+>
+> **`«…»` marks what only you can supply.**
+>
+> **Budget.** Slides 1–6 in 6 minutes, live demo 6 minutes, slides 8–10 in
+> 2 minutes, 1 minute spare. The rubric splits this evenly — technical
+> explanation 5, live demo 5, Q&A 5 — so do not spend twelve minutes on slides
+> and rush the demo.
+>
+> Full demo choreography: `docs/demo-script.md`. Viva answers: `VIVA-PREP.md`.
 
 ---
 
 ## Slide 1 — Title (0:00–0:20)
 
-**Hive — privacy-first photo sharing for preschools**
-Your name · BITS ID · supervisor · date
+**Hive — A Privacy-First Photo Sharing Platform for Preschools**
 
-Say only: *"Hive lets preschool teachers share classroom photos with parents,
-where each parent sees only their own child."* Then move. Do not read the slide.
+Presented by: «Your name — roll number»
+Team members: Srujan · Ruthwik · Bhargav · Nagachaitanya
+Under the guidance of: «Supervisor name»
+BSc Computer Science (Online Mode) — 2025–2026
 
----
-
-## Slide 2 — The problem (0:20–1:20)
-
-A preschool wants to share classroom photos with parents. The naive solution is a
-shared album — and it is unacceptable, because it shows every parent every
-child's face.
-
-**The requirement that defines the product:** a parent must see photos of their
-own children and nothing else. Not "mostly"; not "unless they guess a URL".
-
-Three consequences worth stating out loud, because they justify every design
-choice that follows:
-
-- Access control cannot be a UI concern — the client is not trustworthy
-- Photo URLs cannot be public or guessable
-- The rule is a **join** across families and tags, not a filter you can bolt on
+**Say:** *"Hive lets preschool teachers share classroom photos with parents,
+where each parent sees only their own child."* Then move on. Do not read the
+slide aloud.
 
 ---
 
-## Slide 3 — What was built (1:20–2:20)
+## Slide 2 — Problem Statement (0:20–1:30)
 
-| | |
-|---|---|
-| Mobile | React Native / Expo — teacher, parent and admin experiences |
-| API | 40 endpoints, Express + TypeScript |
-| Database | PostgreSQL, 20 migrations, RLS + triggers |
-| Storage | Private bucket, signed expiring URLs |
-| Scale | 199 source files, ~28,000 lines, 367 commits, 4 contributors, 6 months |
+**Background**
+Preschools want to share daily classroom activity with parents. Photographs are
+the natural medium.
 
-Three roles: **teacher** uploads and tags · **parent** sees a scoped feed and
-orders prints · **admin** manages schools, classes, students, users.
+**Gap in the existing system**
+The obvious implementations all broadcast: a shared album, or a class messaging
+group, shows **every child's face to every parent**. In a setting composed
+entirely of minors, that is a safeguarding failure, not a usability complaint.
+
+**Importance**
+The requirement that defines the product: a parent must see photographs of their
+own children **and nothing else** — not "mostly", and not "unless they guess an
+identifier".
+
+**Say:** the three consequences, because they justify every later design choice —
+access control cannot live in the client; photo URLs cannot be public or
+guessable; and visibility is a *join* across families and tags, not a filter you
+apply afterwards.
 
 ---
 
-## Slide 4 — Architecture, and the one rule (2:20–3:40)
+## Slide 3 — Objectives & Scope (1:30–2:20)
 
-Show the three-tier diagram. Then spend most of this slide on one point, because
-it is the thing an examiner will probe:
+**Objectives**
+1. Teacher, parent and administrator experiences, end to end
+2. Privacy boundary enforced server-side and **demonstrated** under probing
+3. Photographs served only via signed, expiring URLs from a private store
+4. Working print orders — correct money arithmetic, idempotent submission
+5. Automated integration tests against a real database
+6. Remediate the defects found by the project audit
 
-> **The API authenticates as the service role, which bypasses Row Level Security
-> by design.** RLS protects only the queries the mobile app makes *directly*.
-> Every API endpoint must therefore enforce authorization explicitly in the
-> service layer.
+**In scope**
+Three role-based apps · REST API · relational schema with RLS and triggers ·
+private storage · synchronous image processing · trigger-generated notifications ·
+ordering · administration console · test suite · scripted security verification
 
-Three of the audit's most serious findings traced to exactly this: code that
-assumed RLS was covering it. Naming this unprompted demonstrates you understand
-your own system's sharpest edge.
+**Out of scope**
+Payments · push notifications · offline mode · video · multi-language · tablet
+layouts
+
+---
+
+## Slide 4 — Existing System / Literature Review (2:20–3:20)
+
+| Approach | How it shares | Limitation |
+|---|---|---|
+| **Shared album** (Google Photos, iCloud) | One album, all parents | No per-child scoping. Every parent sees every child |
+| **Messaging group** (WhatsApp) | Broadcast to all | Same exposure, plus photos leave institutional control entirely |
+| **Commercial platforms** (ClassDojo, Brightwheel, Tadpoles) | Per-child feeds | Solve the problem, but are closed, subscription-based, and hold the data off-site |
+
+**The gap this project addresses**
+
+The first two are unacceptable on privacy. The third is acceptable but
+proprietary — and none is a *reference implementation* a school could self-host
+or audit.
+
+**Say — this is the slide that earns the "literature review" mark:** *"The
+per-child scoping model is well established commercially. What is not published
+is how you enforce it when your API layer legitimately bypasses row-level
+security — which is the case for any service-role backend. That enforcement
+model is what this project implements and verifies."*
+
+Cite OWASP API Security Top 10 (2023), **API1 Broken Object Level Authorization**
+— the category all four of this project's critical defects fall under. That
+grounds the work in a recognised framework rather than in opinion.
+
+---
+
+## Slide 5 — Proposed System Architecture (3:20–4:40)
+
+**System overview** — three tiers
+
+```
+React Native (Expo)  ──REST + JWT──▶  Express API (TypeScript)  ──▶  PostgreSQL
+   role-scoped screens                authenticate → roleGuard →       20 migrations
+                                      validate → service               RLS + triggers
+                                              │
+                                              └──▶ Private object store
+                                                   signed, expiring URLs
+```
+
+**Module description**
+Authentication & authorization · Photographs (upload, tag, process) · Feed
+(privacy-scoped) · Ordering · Notifications (trigger-generated) · Administration
+
+**Spend most of this slide on one point — an examiner will probe it:**
+
+> **The API authenticates as the service role, which bypasses row-level security
+> by design.** RLS therefore protects only the queries the mobile app makes
+> *directly*. Every endpoint must enforce authorization **explicitly, in the
+> service layer**.
+
+Three of the audit's four critical findings trace to exactly this: code that
+assumed RLS was covering it. Naming your system's sharpest edge unprompted is
+worth more than any diagram.
 
 **Three layers, only two trusted:**
 
@@ -80,175 +138,176 @@ your own system's sharpest edge.
 
 ---
 
-## Slide 5 — My contribution (3:40–4:40)
+## Slide 6 — Tools & Technologies (4:40–5:30)
 
-*Adjust emphasis to your own examiner's expectations; be specific, not modest.*
+| | |
+|---|---|
+| **Language** | TypeScript 5.4 (strict) |
+| **Frameworks** | React Native / Expo SDK 51 · Express 4.19 |
+| **Database** | PostgreSQL 15 via Supabase — RLS, triggers, 20 migrations |
+| **Storage** | Supabase Storage, private bucket, signed URLs |
+| **Tools** | Zod · TanStack Query · Zustand · sharp · Redis · Vitest + Supertest · k6 · Docker · GitHub Actions · pnpm + Turborepo |
 
-Data layer: schema, migrations, validation, seed data. 70 commits.
+**Say — one decision, and make it the deletion:**
 
-Two worth describing, because in each the **diagnosis** was the work:
-
-**The ordering contract.** Three layers disagreed three ways — snake_case vs
-camelCase, three different product vocabularies, and cents vs dollars. A $4.99
-print stored `299.00` and displayed **$299.00**. No order had ever been placed
-successfully. Fixed with one shared catalogue, server-side pricing, and an
-integer-cent migration.
-
-**The seed script.** `seed.sql` had never worked — it inserted into `profiles`,
-whose primary key references `auth.users`, which SQL cannot populate because
-Supabase Auth owns password hashing. Replaced with an idempotent script that
-creates identities through the Admin API and pushes photos through the
-application's own image pipeline.
-
----
-
-## Slide 6 — Engineering decisions (4:40–5:40)
-
-Pick two. These are the strongest:
-
-**What we deleted.** An asynchronous BullMQ + S3 thumbnailing pipeline was
-removed entirely. A repository-wide search for queue `.add(` found only
-`Set.add` — **neither queue was ever enqueued**, and both workers targeted S3
-while files went to local disk. ~1,500 lines of dependency graph deleted in
-favour of a synchronous `sharp` call taking 100–300 ms. *Infrastructure that is
-never exercised is liability, not architecture.*
-
-**404, not 403.** A parent requesting another family's photo gets **404**. A 403
-would confirm the resource exists — a disclosure in itself. 403 is reserved for
-the school boundary, where the caller already legitimately knows the school
-exists.
+*"We removed an asynchronous BullMQ and S3 thumbnailing pipeline. A
+repository-wide search for queue enqueue calls found none — neither queue had
+ever been used, and both workers targeted S3 while files went to local disk. We
+deleted about 1,500 lines in favour of a synchronous `sharp` call taking 100 to
+300 milliseconds. Infrastructure that is never exercised is liability, not
+architecture."*
 
 ---
 
-## Slide 7 — Testing strategy (5:40–6:40)
+## LIVE DEMO — maps to Slide 7, "Implementation / Demo" (5:30–11:30)
 
-**178 tests, 8 files, 178/178 passing in 115 s.**
+Put 3–4 screenshots on the slide as a fallback; run the demo live.
 
-Integration, not unit: Vitest + Supertest drive the **real Express app against a
-real PostgreSQL** — the app boots, middleware runs, Postgres enforces its
-constraints.
+**1 · Teacher uploads and tags (≈90 s)**
+Sign in as Sarita. Upload, tag two children, confirm.
+**Say:** tagging happens *before* confirm — the notification trigger fires on the
+transition to `ready` and iterates the tags existing at that instant. Reverse the
+order and every parent notification silently disappears. That was a real defect.
 
-*Why:* the ordering defect is the argument. Every layer was internally consistent
-and would have passed its own unit tests. Only a real HTTP request through real
-middleware into a real database catches a mismatch **between** layers.
+**2 · Parent feed (≈60 s)**
+Sign in as Rajesh. Two children, so the child switcher is meaningful. His
+children's photographs only.
 
-**Then: the sabotage exercise.** Deleted one line — the ownership check — and
-re-ran. Exactly the 3 targeted tests failed, as intended. **And a similarly-named
-test stayed green** — both its teachers were at different schools, so the school
-check refused first and the ownership check never ran. That test had never tested
-what its name claimed.
-
-> Land this line: *"A passing suite proves nothing until you make it fail on
-> purpose. When we did, it found a test that was lying to us."*
-
----
-
-## Slide 8 — Security verification (6:40–7:20)
-
-```
-scripts/verify-security.sh    passed 26    failed 0    skipped 3
-```
-
-Reproduced **from cold** the next day — stack restarted, database truncated,
-re-seeded — same result. A repeatable procedure, not a lucky reading.
-
-The three skips need HTTPS and a deployed origin. **Say that they are skips, not
-passes.** Claiming 29/29 is the kind of thing a viva finds.
-
----
-
-## LIVE DEMO (7:20–13:00)
-
-Full choreography is in `docs/demo-script.md`. Order, and why:
-
-**1. Teacher uploads and tags (≈90 s).** Sign in as Sarita, upload, tag two
-children, confirm. Note that tagging happens *before* confirm — the notification
-trigger fires on the transition to `ready` and loops over tags that exist at that
-moment. Reverse the order and every parent notification silently disappears.
-
-**2. Parent feed (≈60 s).** Sign in as Rajesh. Two children, so the child
-switcher is meaningful. Photos of his children only.
-
-**3. THE PRIVACY PROOF (≈90 s) — the most important minute.** Do not skip under
-time pressure; cut slide 6 instead.
-
-- Rajesh (Bloom, two children) sees **2** of 6 photos
+**3 · THE PRIVACY PROOF (≈90 s) — the most important ninety seconds**
+Do not skip this under time pressure. Cut slide 6 instead.
+- Rajesh (Bloom, two children) sees **2** of 6 photographs
 - Vikram (Little Stars) sees **1**
 - **Zero overlap.** No parent sees all six
-- Then the `curl`: Sarita asking for Little Stars' roster →
-  **`403 "You do not have access to this school"`**; her own school → 200
+- Then the terminal: Sarita requesting Little Stars' roster →
+  **`403 "You do not have access to this school"`**; her own school → **200**
 
-**4. Signed URL (≈30 s).** Open a photo URL — 200. Strip `?token=` — **400**.
-The bucket is private; only signed access works.
+**4 · Signed URL (≈30 s)**
+Open a photograph URL — **200**. Strip `?token=` — **400**. The bucket is
+private; only signed access works.
 
-**5. Order (≈60 s).** Place an order. **201**, `total_cents: 998` for
-2 × 499. Re-send the same idempotency key → **the same order**, not a duplicate.
+**5 · Order (≈60 s)**
+Place an order → **201**, `total_cents: 998` for 2 × 499. Re-send the same
+idempotency key → **the same order**, not a duplicate.
 
-**6. Admin (≈45 s).** Dashboard with real counts, schools, users.
+**6 · Administration (≈45 s)**
+Dashboard with real counts.
 
 ---
 
-## Slide 9 — Limitations, stated first (13:00–13:50)
+## Slide 8 — Results & Analysis (11:30–12:40)
 
-**Volunteer these before you are asked.** An examiner who extracts a limitation
-you concealed will discount everything else; one you name yourself reads as
-judgement.
+**Output — verified at runtime, not by code review**
+
+| Measurement | Result |
+|---|---|
+| Automated tests | **178 / 178 passing, 115 s** |
+| Security verification | **26 passed · 0 failed · 3 skipped** — reproduced from cold |
+| Privacy: 6 photographs | Rajesh sees **2**, Vikram **1**, **zero overlap** |
+| Order placement | **201**, `total_cents: 998` — integer cents |
+| Idempotency | Same key twice → **the same order** |
+| Atomicity | Invalid item → rejected, **no orphaned order** |
+| Notifications | 16 generated, correct parents, correct child names |
+| Signed URL | 200 signed · **400** with the token stripped |
+| Health under database loss | **503 `degraded`** |
+
+**The sabotage exercise — the result worth the most**
+
+Deleted one line, the ownership check, and re-ran. **Exactly the 3 targeted tests
+failed** — as intended. **And a similarly-named test stayed green:** both its
+teachers were at *different* schools, so the school check refused first and the
+ownership check never executed. It had never tested what its name claimed.
+
+> **Say this verbatim:** *"A passing suite proves nothing until you make it fail
+> on purpose. When we did, it found a test that was lying to us."*
+
+**Performance:** none measured — see slide 9. Say it here rather than let it look
+like an omission.
+
+---
+
+## Slide 9 — Challenges & Limitations (12:40–13:40)
+
+**Technical challenges met**
+
+- **The ordering contract** — field naming, product vocabulary and currency unit
+  each disagreed across three layers. Every layer was internally consistent, so
+  no unit test could have caught it. A **$4.99** print stored `299.00` and
+  displayed as **$299.00**. Fixed with one shared catalogue, server-side pricing,
+  and an integer-cent migration.
+- **A guard that failed open** — the suite truncates every table; the guard meant
+  to stop it running against the demo database compared a variable that was never
+  set. Its own comment called it "deliberately loud and unconditional". It was
+  neither.
+
+**Limitations — volunteer these before you are asked**
 
 | Not done | Why |
 |---|---|
-| **Nothing is deployed** | No hosted URL or APK |
+| **Not deployed** | No hosted URL, no app binary |
 | **No performance figures** | k6 suite written; no target to run it against |
-| **Never seen on a physical device** | Driven end to end in Chrome; iOS/Android unverified |
-| **Sentry has never carried an error** | Needs a DSN — an account signup |
-| **CI test step is advisory** | Repository secrets absent; lint/typecheck/build do block |
+| **Never run on a physical device** | Driven end to end in a browser; iOS/Android unverified |
+| **Error reporting never carried an error** | Needs a DSN — an account signup |
+| **CI test step advisory** | Repository secrets absent; lint, typecheck and build do block |
 
-Then: *"Deployment is the first item of future work, because it is the single
+**Say:** *"Deployment is the first item of future work, because it is the single
 step that unlocks the other four."*
 
----
-
-## Slide 10 — What I would do next (13:50–14:30)
-
-1. **Deploy** — unblocks HTTPS/CORS checks, k6, and device testing at once
-2. **Physical device build** — keychain session, image picker, deep links
-3. **Make the CI test step blocking** — add the three repository secrets
-4. **HEIC and magic-byte rejection** — the paths no seed asset exercises
+An examiner who extracts a concealed limitation discounts everything else. One
+you name yourself reads as judgement.
 
 ---
 
-## Slide 11 — Close (14:30–15:00)
+## Slide 10 — Conclusion & Future Work (13:40–14:40)
 
-*"The privacy boundary is the product, and it holds under direct probing:
-cross-family 404, cross-school 403, same-school 403 — verified over HTTP with
-real tokens and reproduced from cold. What is not proven is anything requiring a
-deployment, and I have been specific about which items those are."*
+**Conclusion**
 
-Stop talking. Take questions.
+The privacy boundary is the product, and it holds under direct probing:
+cross-family **404**, cross-school **403**, same-school photograph mutation
+**403** — verified over HTTP with real tokens and reproduced from a cold start.
+178 integration tests run against a real database, and a sabotage exercise
+confirmed they detect the regressions they target.
+
+**Future work**
+
+1. **Deploy** — unblocks the HTTPS and CORS checks, load tests and device testing
+   at once
+2. **Run the k6 suite** against that deployment
+3. **iOS and Android builds** — keychain sessions, image picker, deep links
+4. **Make the CI test step blocking** (three repository secrets)
+5. **Redis health check and timeout** — a known defect: with Redis stopped, order
+   submission blocks while `/health` still reports healthy
+6. Payments · push notifications · photograph search · retention policy
+
+**Close on:** *"What is not proven is anything requiring a deployment, and I have
+been specific about which items those are."* Then stop and take questions.
 
 ---
 
 # Delivery notes
 
-**Timing discipline.** If you are behind at 7:20, cut slide 6 and shorten slide
-3 — never the privacy proof. The live demo is 5 marks; a slide about design
-choices is part of another 5 you have already earned.
+**Timing discipline.** Behind at 5:30? Cut slide 6 and shorten slide 3 — never
+the privacy proof. The live demo is 5 marks; a slide about tooling is part of
+another 5 you have already earned.
 
-**The five sentences worth rehearsing verbatim:**
+**Five sentences worth rehearsing verbatim**
 
 1. *"The API bypasses RLS by design, so every endpoint enforces authorization
    explicitly in the service layer."*
-2. *"Rajesh sees two photos, Vikram sees one, and there is zero overlap."*
+2. *"Rajesh sees two photographs, Vikram sees one, and there is zero overlap."*
 3. *"A passing suite proves nothing until you make it fail on purpose."*
 4. *"Twenty-six passed, zero failed, three skipped — and the three are skips, not
    passes."*
 5. *"Nothing is deployed, so there are no performance numbers. I would rather
    show none than invent them."*
 
-**Have ready in tabs before you start:** backend running with `/health` green ·
-mobile app signed out · a terminal for the `curl` probes · `verify-security.sh`
-output already on screen · the ER diagram.
+**Open in tabs before you start**
+Backend running with `/health` green · mobile app signed out · a terminal for the
+`curl` probes · `verify-security.sh` output already on screen · the ER diagram ·
+**the recorded demo**.
 
-**If the live demo fails:** do not debug on stage past ~20 seconds. Say *"I have
-a recording of this flow"* and continue. Record a screen capture of the full demo
-beforehand and keep it open in a tab — the mark is for showing the system works,
-not for the network cooperating.
+**If the demo breaks:** do not debug on stage past twenty seconds. Say *"I have a
+recording of this flow"*, switch, and keep talking. The mark is for showing the
+system works, not for the network cooperating.
+
+**Rehearse twice with a timer.** The most common failure in a 15-minute slot is
+reaching the demo at minute twelve.
