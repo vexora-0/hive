@@ -153,6 +153,46 @@ describe('parent feed', () => {
     expect(res.status).toBe(401);
   });
 
+  /**
+   * Both feed routes carried no validator at all: `studentId` went from the
+   * query string straight into `.eq('student_id', …)`, so a malformed value
+   * came back as a 500 from PostgREST rather than the 400 the caller earned.
+   */
+  it('rejects a malformed studentId with 400 rather than 500', async () => {
+    const res = await request(app)
+      .get('/api/v1/feed?studentId=not-a-uuid')
+      .set(bearer(parentA.token));
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects a malformed photo id on the detail route with 400 rather than 500', async () => {
+    const res = await request(app)
+      .get('/api/v1/feed/photos/not-a-uuid')
+      .set(bearer(parentA.token));
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+  });
+
+  /**
+   * Cursors are decoded here too, and the same wrong-shape cursor that used to
+   * become a 500 must be a 400. Valid base64 of valid JSON, missing `id`.
+   */
+  it('rejects a cursor of the wrong shape with 400 rather than 500', async () => {
+    const cursor = Buffer.from(
+      JSON.stringify({ createdAt: '2026-08-09T12:00:00.123456+00:00' }),
+    ).toString('base64url');
+
+    const res = await request(app)
+      .get(`/api/v1/feed?cursor=${encodeURIComponent(cursor)}`)
+      .set(bearer(parentA.token));
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_CURSOR');
+  });
+
   it('rejects a teacher reading the parent feed', async () => {
     const res = await request(app).get('/api/v1/feed').set(bearer(teacherA.token));
     expect(res.status).toBe(403);

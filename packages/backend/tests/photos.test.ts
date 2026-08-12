@@ -66,6 +66,135 @@ describe('photo upload, tagging and ownership', () => {
     expect(res.status).toBe(403);
   });
 
+  /**
+   * The picker does not always report a size — `fileSize` is optional on
+   * ImagePickerAsset and Android ContentProviders routinely omit it — so the
+   * client sent 0 and every upload from those devices failed here with
+   * "fileSize must be positive" before a single byte was transferred.
+   */
+  it('accepts an upload request that reports no fileSize', async () => {
+    const res = await request(app)
+      .post('/api/v1/photos/upload-url')
+      .set(bearer(teacherA.token))
+      .send({ classId: classA, filename: 'nosize.jpg', contentType: 'image/jpeg' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.photoId).toBeTruthy();
+  }, 30_000);
+
+  // The four format allow-lists have to agree. This is the first of them: a
+  // type the validator does not accept must be refused before a photo row and
+  // a storage path exist for it.
+  it('rejects an unsupported contentType before a slot is created', async () => {
+    const res = await request(app)
+      .post('/api/v1/photos/upload-url')
+      .set(bearer(teacherA.token))
+      .send({
+        classId: classA,
+        filename: 'x.gif',
+        contentType: 'image/gif',
+        fileSize: 1000,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+  });
+
+  /**
+   * A MulterError carries a string `code` and no status, so it matched the
+   * "has a string code, therefore Postgres" branch in errorHandler: an upload
+   * the client got wrong came back 500 DATABASE_ERROR, and raised a Sentry
+   * event for what is plainly client error.
+   */
+  it('answers 400, not 500, when the file arrives under the wrong field name', async () => {
+    const photoId = await createTestPhoto({
+      schoolId: schoolA,
+      classId: classA,
+      uploadedBy: teacherA.id,
+    });
+
+    const res = await request(app)
+      .post(`/api/v1/photos/${photoId}/file`)
+      .set(bearer(teacherA.token))
+      .attach('photo', validJpeg(), { filename: 'x.jpg', contentType: 'image/jpeg' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('LIMIT_UNEXPECTED_FILE');
+  }, 30_000);
+
+  /**
+   * The upload middleware's fileFilter rejected with a plain Error, which
+   * reached errorHandler with neither a status nor a code and became a 500 as
+   * well. It carries an AppError now, so the client is told which type was
+   * refused.
+   */
+  it('answers 400 naming the type when the format is not accepted', async () => {
+    const photoId = await createTestPhoto({
+      schoolId: schoolA,
+      classId: classA,
+      uploadedBy: teacherA.id,
+    });
+
+    const res = await request(app)
+      .post(`/api/v1/photos/${photoId}/file`)
+      .set(bearer(teacherA.token))
+      .attach('file', Buffer.from('%PDF-1.4 not an image'), {
+        filename: 'doc.pdf',
+        contentType: 'application/pdf',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('UNSUPPORTED_FILE_TYPE');
+  }, 30_000);
+
+  /**
+   * Retry reuses the photo id and replays every step from the beginning, which
+   * is safe only because each step is idempotent. This one was the exception:
+   * re-sending the file for a photo that is already ready answered 400
+   * INVALID_STATE, which is (correctly) not retried, so a tile that failed
+   * after a successful confirm stayed red with no way back.
+   */
+  it('accepts a re-upload of a photo that is already ready', async () => {
+    const photoId = await createTestPhoto({
+      schoolId: schoolA,
+      classId: classA,
+      uploadedBy: teacherA.id,
+      status: 'ready',
+    });
+
+    const res = await request(app)
+      .post(`/api/v1/photos/${photoId}/file`)
+      .set(bearer(teacherA.token))
+      .attach('file', validJpeg(), { filename: 'x.jpg', contentType: 'image/jpeg' });
+
+    expect(res.status).toBe(200);
+  }, 30_000);
+
+  /**
+   * The same failure mode one step later. A confirm whose response was lost to
+   * a dropped connection left the photo permanently un-completable: the work
+   * had been done, and every retry answered 400.
+   */
+  it('treats confirming an already-confirmed photo as a no-op', async () => {
+    const photoId = await createTestPhoto({
+      schoolId: schoolA,
+      classId: classA,
+      uploadedBy: teacherA.id,
+      status: 'processing',
+    });
+    await tagStudent(photoId, childA, teacherA.id);
+
+    const first = await request(app)
+      .post(`/api/v1/photos/${photoId}/confirm`)
+      .set(bearer(teacherA.token));
+    expect(first.status).toBe(200);
+
+    const second = await request(app)
+      .post(`/api/v1/photos/${photoId}/confirm`)
+      .set(bearer(teacherA.token));
+    expect(second.status).toBe(200);
+  }, 30_000);
+
   // T-20 — magic bytes, not the client-declared MIME
   it('rejects a file that is not really an image', async () => {
     const slot = await request(app)

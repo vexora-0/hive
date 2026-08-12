@@ -14,6 +14,9 @@ import {
   type TestUser,
 } from './helpers';
 
+/** The HTTP verbs the path-parameter table below drives supertest with. */
+type Method = 'get' | 'post' | 'patch' | 'delete';
+
 /**
  * The admin console.
  *
@@ -22,19 +25,25 @@ import {
  * filter that G-16 was about — had no automated coverage.
  */
 describe('admin console', () => {
-  let school: string, otherSchool: string, classId: string;
+  let school: string, otherSchool: string, classId: string, otherClassId: string;
   let admin: TestUser, teacher: TestUser, parent: TestUser;
+  let otherSchoolTeacher: TestUser;
+  let student: string;
 
   beforeAll(async () => {
     school = await createTestSchool('Admin School');
     otherSchool = await createTestSchool('Second School');
     classId = await createTestClass(school);
+    // The cross-school integrity cases all need a class and a teacher that
+    // belong to a *different* school from the one being operated on.
+    otherClassId = await createTestClass(otherSchool);
 
     admin = await createTestUser('admin', school);
     teacher = await createTestUser('teacher', school);
     parent = await createTestUser('parent', school);
+    otherSchoolTeacher = await createTestUser('teacher', otherSchool);
 
-    await createTestStudent(school, classId, 'Admin Child');
+    student = await createTestStudent(school, classId, 'Admin Child');
   }, 60_000);
 
   afterAll(cleanupUsers);
@@ -291,6 +300,174 @@ describe('admin console', () => {
       .send({ email: `nobody.${randomUUID().slice(0, 8)}@hive.test` });
 
     expect(res.status).toBe(404);
+  }, 30_000);
+
+  // ── Silent no-ops ───────────────────────────────────────────────────
+  //
+  // PostgREST does not treat "matched no rows" as an error, so each of these
+  // used to issue its update or delete, read only `error`, and answer 200 with
+  // a success message having changed nothing at all.
+
+  it('404s assigning a teacher to a class that does not exist', async () => {
+    const res = await request(app)
+      .patch(`/api/v1/admin/classes/${randomUUID()}/teacher`)
+      .set(bearer(admin.token))
+      .send({ teacherId: teacher.id });
+
+    expect(res.status).toBe(404);
+  }, 30_000);
+
+  it('404s removing a student from a class they are not in', async () => {
+    const res = await request(app)
+      .delete(`/api/v1/admin/classes/${otherClassId}/students/${student}`)
+      .set(bearer(admin.token));
+
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('STUDENT_NOT_IN_CLASS');
+  }, 30_000);
+
+  /**
+   * The no-op that matters most. Unlinking is a revocation, so "it said it
+   * worked" has to mean it worked — the console showed the parent removed
+   * while they could still see every photo of the child.
+   */
+  it('404s removing a parent mapping that does not exist', async () => {
+    const stranger = await createTestUser('parent', school);
+
+    const res = await request(app)
+      .delete(`/api/v1/admin/students/${student}/parents/${stranger.id}`)
+      .set(bearer(admin.token));
+
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('MAPPING_NOT_FOUND');
+  }, 30_000);
+
+  // ── Cross-school integrity ──────────────────────────────────────────
+
+  /**
+   * A mismatch here is silent but live: the roster is filtered by school_id, so
+   * the child never appears in their own teacher's list and cannot be tagged in
+   * their own class's photos.
+   */
+  it('refuses to create a student in a class at another school', async () => {
+    const res = await request(app)
+      .post('/api/v1/admin/students')
+      .set(bearer(admin.token))
+      .send({ fullName: 'Misfiled Child', schoolId: school, classId: otherClassId });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('SCHOOL_MISMATCH');
+  }, 30_000);
+
+  // The same check on the other route that reaches createStudent — this one
+  // takes the class from the URL and the school from the body.
+  it('refuses to add a student to a class at another school', async () => {
+    const res = await request(app)
+      .post(`/api/v1/admin/classes/${otherClassId}/students`)
+      .set(bearer(admin.token))
+      .send({ fullName: 'Misfiled Child', schoolId: school });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('SCHOOL_MISMATCH');
+  }, 30_000);
+
+  /**
+   * Putting a teacher in front of another school's class hands them the roster,
+   * dates of birth included.
+   */
+  it('refuses to assign a teacher from another school to a class', async () => {
+    const res = await request(app)
+      .patch(`/api/v1/admin/classes/${classId}/teacher`)
+      .set(bearer(admin.token))
+      .send({ teacherId: otherSchoolTeacher.id });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('SCHOOL_MISMATCH');
+  }, 30_000);
+
+  // ── Parent mapping ──────────────────────────────────────────────────
+
+  /**
+   * The role was fetched here and then ignored. The photo feed is scoped by
+   * parent_student_mappings alone, so mapping a teacher's account to a student
+   * handed that account the child's photos through the parent surface.
+   */
+  it('refuses to link a non-parent account as a parent', async () => {
+    const res = await request(app)
+      .post(`/api/v1/admin/students/${student}/parents`)
+      .set(bearer(admin.token))
+      .send({ email: teacher.email });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('NOT_A_PARENT');
+  }, 30_000);
+
+  /**
+   * A parent signs up with no school — the signup trigger cannot know one — and
+   * `createOrder` refuses anyone without a school_id. Nothing else ever set it,
+   * so a real parent could be linked to their child, browse the feed, and still
+   * be unable to buy a print. Only the demo seed, which writes school_id
+   * directly, hid this.
+   */
+  it('back-fills a linked parent\'s school so they can order', async () => {
+    const newcomer = await createTestUser('parent', null);
+    const childId = await createTestStudent(school, classId, 'Newcomer Child');
+
+    const res = await request(app)
+      .post(`/api/v1/admin/students/${childId}/parents`)
+      .set(bearer(admin.token))
+      .send({ email: newcomer.email });
+
+    expect(res.status).toBe(201);
+
+    const { data: profile } = await supabaseTest
+      .from('profiles')
+      .select('school_id')
+      .eq('id', newcomer.id)
+      .single();
+    expect(profile?.school_id).toBe(school);
+  }, 30_000);
+
+  // ── Malformed input reaches Postgres as a 400, not a 500 ────────────
+
+  /**
+   * Nine admin routes passed a path parameter straight into a `.eq()` filter,
+   * so a malformed ID came back as an unhandled driver error — a 500 for a
+   * request the caller plainly got wrong. `params.validator` already exported
+   * schemas for most of these and no route used them.
+   */
+  it.each<[Method, string]>([
+    ['patch', '/api/v1/admin/users/not-a-uuid/role'],
+    ['patch', '/api/v1/admin/users/not-a-uuid/school'],
+    ['patch', '/api/v1/admin/schools/not-a-uuid'],
+    ['get', '/api/v1/admin/classes/not-a-uuid'],
+    ['patch', '/api/v1/admin/classes/not-a-uuid/teacher'],
+    ['post', '/api/v1/admin/classes/not-a-uuid/students'],
+    ['delete', '/api/v1/admin/classes/not-a-uuid/students/also-not-a-uuid'],
+    ['get', '/api/v1/admin/students/not-a-uuid/parents'],
+    ['post', '/api/v1/admin/students/not-a-uuid/parents'],
+    ['delete', '/api/v1/admin/students/not-a-uuid/parents/also-not-a-uuid'],
+    ['patch', '/api/v1/admin/orders/not-a-uuid/status'],
+  ])('rejects a malformed id on %s %s', async (method, path) => {
+    const res = await request(app)[method](path).set(bearer(admin.token)).send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+  }, 30_000);
+
+  it('rejects a cursor of the wrong shape with 400 rather than 500', async () => {
+    // Valid base64, valid JSON, no `id` — the shape that used to interpolate
+    // the string "undefined" into a PostgREST filter.
+    const cursor = Buffer.from(
+      JSON.stringify({ createdAt: '2026-08-09T12:00:00.123456+00:00' }),
+    ).toString('base64url');
+
+    const res = await request(app)
+      .get(`/api/v1/admin/users?cursor=${encodeURIComponent(cursor)}`)
+      .set(bearer(admin.token));
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_CURSOR');
   }, 30_000);
 });
 
