@@ -146,8 +146,13 @@ const EXTENSION_CONTENT_TYPES: Record<string, string> = {
  *
  * So: trust the reported type when it is one we support, otherwise derive it
  * from the file extension, and only then fall back to JPEG.
+ *
+ * Exported for `tests/uploadContentType.test.ts`; the hook is its only caller.
  */
-function normaliseContentType(mimeType: string | null | undefined, uri: string): string {
+export function normaliseContentType(
+  mimeType: string | null | undefined,
+  uri: string,
+): string {
   if (mimeType && (SUPPORTED_CONTENT_TYPES as readonly string[]).includes(mimeType)) {
     return mimeType;
   }
