@@ -90,10 +90,11 @@ so confirming first would notify nobody.
 flowchart TD
     D["(teacher)/dashboard"] --> U["(teacher)/upload"]
     U --> P[Pick images]
-    P --> C[Select class]
+    P --> IOS["iOS picker returns a compatible<br/>representation — HEIC transcoded on device"]
+    IOS --> C[Select class]
     C --> R[Create photo record — status: processing]
     R --> F[Upload file]
-    F --> S["sharp: validate magic bytes, HEIC→JPEG,<br/>thumbnail, blurhash, dimensions"]
+    F --> S["sharp: validate magic bytes, AVIF→JPEG,<br/>thumbnail, blurhash, dimensions.<br/>HEVC HEIC refused with 400"]
     S --> T[Tag the children in the photo]
     T --> X[Confirm — status: ready]
     X --> TR[DB trigger reads tags]

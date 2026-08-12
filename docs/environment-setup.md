@@ -172,9 +172,14 @@ code that was written but never executed.
       403 the plan predicted — Supabase rejects the malformed request before
       authorising it; the security property holds either way)*
 - [x] `curl localhost:4000/uploads/anything` → **404** (route deleted)
-- [ ] Upload a HEIC file → stored as `.jpg` — **not tested**, every seed asset is
-      already a JPEG (`converted:false` on all six)
-- [ ] Rename a `.txt` to `.jpg` and upload → **400** — **not tested**
+- [x] Upload a HEIC file → **tested 24 July, and it does not convert.** A real
+      HEVC HEIC fails the pixel decode ("No decoding plugin installed for this
+      compression format") because `sharp`'s prebuilt libvips has no HEVC codec.
+      The server refuses it with a 400 telling the teacher to re-save as JPEG.
+      An AVIF, which shares the HEIF container, **does** convert. The working
+      path is the device-side transcode in `(teacher)/upload.tsx`
+- [x] Rename a `.txt` to `.jpg` and upload → **400**. Covered by
+      `photos.test.ts` T-20 on every suite run since 1 Aug
 
 > These went through the seed script, which calls the photo service directly.
 > The HTTP path — `POST /photos`, the multipart step, `/tag`, `/confirm` — has
@@ -203,14 +208,25 @@ the token or `req.ip`, so the PII scrubbing added alongside the correlation IDs
 is doing its job. Sentry took its no-op path cleanly (`Sentry disabled (no
 SENTRY_DSN)`) rather than failing the boot.
 
-**Security verification (Plan 04 / Plan 11)** — *run 1 Aug, `NODE_ENV=production`*
-- [x] `scripts/verify-security.sh` — **26 passed, 0 failed, 3 skipped**. See
-      `docs/security.md` §9 for the table and for why each skip is skipped
+**Security verification (Plan 04 / Plan 11)** — *last run 11 Aug, `NODE_ENV=production`*
+- [x] `scripts/verify-security.sh` — **27 passed, 0 failed, 2 skipped** (11 Aug;
+      it was 26/0/3 on 1 Aug). See `docs/security.md` §9 for both runs and for
+      why each remaining skip is skipped
+- [x] `SUPABASE_ANON_KEY` present in `packages/backend/.env` — **required**.
+      `verify:env` needs it to sign in as the demo accounts; the service-role
+      key bypasses RLS and does not mint the user-scoped JWT the API expects,
+      only a real sign-in does. Without it 13 of the 26 checks skip, and a skip
+      is not a pass
 - [x] G-17 same-school upload ownership — **403** on `/confirm`, `/tag`, `/file`
-- [x] Rate limiter returns 429 — at request 77 of the 100-per-15-minute window
+- [x] Rate limiter returns 429 — **at request 98** against the write limiter
+      (100 per identity). The check previously targeted `/health`, which is
+      exempt from rate limiting, so it could not pass; fixed in `701c999`
 - [ ] HTTPS and CORS against a real origin — **skipped, needs a deployment**
-- [ ] A triggered 500 carries no stack — **unreachable anonymously**; every
-      `/api/v1/*` route is behind `authenticate`, which answers 401 on any
+- [ ] A triggered 500 carries no stack — **skipped**. Needs `FORCE_500_PATH`
+      pointed at a route that reliably 500s **and** `NODE_ENV=production`;
+      production mode alone does not un-skip it, because the check is gated on
+      `FORCE_500_PATH` being set. No such route exists for an anonymous probe —
+      every `/api/v1/*` route is behind `authenticate`, which answers 401 on any
       Supabase failure. Covered instead by `errors.test.ts` T-34
 
 To repeat it:

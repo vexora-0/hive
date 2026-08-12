@@ -200,8 +200,8 @@ Dashboard with real counts.
 
 | Measurement | Result |
 |---|---|
-| Automated tests | **178 / 178 passing, 115 s** |
-| Security verification | **26 passed · 0 failed · 3 skipped** — reproduced from cold |
+| Automated tests | **218 / 218 passing** (115 s was timed on the preceding 178-test suite) |
+| Security verification | **27 passed · 0 failed · 2 skipped** — reproduced from cold |
 | Privacy: 6 photographs | Rajesh sees **2**, Vikram **1**, **zero overlap** |
 | Order placement | **201**, `total_cents: 998` — integer cents |
 | Idempotency | Same key twice → **the same order** |
@@ -264,7 +264,7 @@ you name yourself reads as judgement.
 The privacy boundary is the product, and it holds under direct probing:
 cross-family **404**, cross-school **403**, same-school photograph mutation
 **403** — verified over HTTP with real tokens and reproduced from a cold start.
-178 integration tests run against a real database, and a sabotage exercise
+218 integration tests run against a real database, and a sabotage exercise
 confirmed they detect the regressions they target.
 
 **Future work**

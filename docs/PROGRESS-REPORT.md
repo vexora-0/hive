@@ -1010,7 +1010,12 @@ anyone holding or guessing a URL, with no credential required.
 - Photos bucket made private; public read and blanket write policies dropped
 - Signed URL helpers with batch signing
 - Thumbnails, blurhash and dimensions generated synchronously during upload
-- HEIC converted to JPEG; image magic bytes verified
+- Image magic bytes verified; a HEIC→JPEG branch added, which turned out **not**
+  to work for iPhone HEIC — `sharp`'s prebuilt libvips has no HEVC decoder, so
+  the branch converts AVIF and refuses HEVC with an actionable 400. Established
+  by testing a real HEVC HEIC on 24 July. The working fix is on the device: the
+  iOS picker is asked for a compatible representation, so the phone transcodes
+  before upload
 - Uploads moved from local disk to Supabase Storage
 - Unauthenticated `/uploads` static route removed
 - Unreachable BullMQ workers, S3 client and AWS configuration deleted

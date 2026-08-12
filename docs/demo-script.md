@@ -134,10 +134,12 @@ Each has an honest one-line answer if someone asks.
   `(parent)` contributes nothing to the URL, so `(admin)/orders` and
   `(parent)/orders` both claimed `/orders`, `(admin)` sorted first, and a
   parent's cold load was bounced to the feed. `RoleGate` now redirects to the
-  caller's own group's copy of the same screen, carrying the query string. But
-  `/notifications`, `/profile` and `/dashboard` collide the same way and were
-  not each walked through. Navigate with the in-app tabs and there is nothing
-  to go wrong.
+  caller's own group's copy of the same screen, carrying the query string.
+  `/notifications`, `/profile` and `/dashboard` collide the same way and **were
+  each walked through on 11 August**, in Chrome as a signed-in parent:
+  `/notifications` and `/profile` cold-load to the parent's own screen, and
+  `/dashboard`, which has no parent equivalent, falls back to `/feed`. Navigate
+  with the in-app tabs anyway and there is nothing to go wrong.
 
 ---
 
@@ -207,8 +209,15 @@ upload** (see "What not to show" for why):
 > because teachers still got their own notification.
 >
 > On upload, `sharp` validates the file by its magic bytes — not the
-> `Content-Type` header, which a client can lie about — converts HEIC to JPEG,
-> and generates a thumbnail and a blurhash."
+> `Content-Type` header, which a client can lie about — and generates a
+> thumbnail and a blurhash."
+>
+> **If asked about HEIC:** it is converted on the phone, not the server. The
+> iOS picker is asked for a compatible representation, so it hands back JPEG.
+> `sharp`'s prebuilt libvips has no HEVC decoder, so an iPhone HEIC reaching the
+> server is refused with a 400 telling the teacher to re-save as JPEG. Do not
+> say the server converts HEIC — it does not, and it is a thirty-second thing
+> to check.
 
 ---
 
@@ -373,7 +382,7 @@ student. Then open the **fulfilment queue** and advance the order just placed.
 ## 9:00 — Engineering
 
 ```bash
-pnpm test      # 178 tests across 8 files
+pnpm test      # 218 tests across 8 files
 ```
 
 **Do not run this live.** It takes about two and a half minutes at best, and it
@@ -382,7 +391,7 @@ or you have run it a few times already, sign-ins hit the project's quota and
 tests start timing out at 30 seconds. Run it once beforehand and show the
 output.
 
-> "178 tests, against a real Supabase project rather than mocks — they sign
+> "218 tests, against a real Supabase project rather than mocks — they sign
 > users in, write real rows, and put real objects in storage. The known
 > weakness is that the project is shared between CI and four developers, so
 > overlapping runs used to delete each other's fixtures mid-test. That's fixed;
@@ -436,12 +445,13 @@ and WebP accepted at three format gates and refused at the fourth — and those
 were fixed too.
 
 How we know: the parent, teacher and admin flows above were clicked through in
-Chrome; typecheck, lint and build are clean; the API suite is 178 tests. But
+Chrome; typecheck, lint and build are clean; the API suite is 218 tests. But
 **the only tests this round added are the 23 in `tests/cursor.test.ts`**. The
-rest is guarded by review and the typechecker. And `verify-security.sh` has not
-been re-run since, even though the round touched the rate limiter, CORS and the
-error handler — so treat its last result (1 August, 26 passed / 0 failed / 3
-skipped) as stale.
+rest is guarded by review and the typechecker. `verify-security.sh` **was**
+re-run on 11 August, after the round touched the rate limiter, CORS and the
+error handler: **27 passed, 0 failed, 2 skipped**. The two skips need a
+deployment (HTTPS) and `FORCE_500_PATH` with `NODE_ENV=production` (the 500
+response shape).
 
 **"How do you stop a parent seeing another child's photo?"**
 Three layers. A `photo_student_tags` pivot decides visibility; a service-layer

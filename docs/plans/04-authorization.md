@@ -152,7 +152,9 @@ pnpm typecheck && pnpm lint && pnpm build:backend
 **Manual — API.** No longer done by hand: `pnpm --filter @hive/backend verify:env`
 prints the tokens and IDs, and `./scripts/verify-security.sh` runs the whole
 list. **All ticks below were made by that run on 1 August 2026** — 26 passed,
-0 failed, 3 skipped. The output is recorded in `docs/security.md` §9.
+0 failed, 3 skipped. The script was **re-run on 11 August** after the 9 August
+sweep and returned **27 passed, 0 failed, 2 skipped**; every tick below still
+holds. Both runs are recorded in `docs/security.md` §9.
 
 - [x] Parent A requests Parent B's child's photo → **404**
 - [x] Parent A requests their **own** child's photo → 200, and `taggedStudentIds` contains **only their own children** — asserted now, not eyeballed
@@ -308,7 +310,9 @@ otherwise unchanged.
 The API half of this plan has been executed. `verify-security.sh` ran against a
 booted backend with real tokens: **26 passed, 0 failed, 3 skipped**, and
 `packages/backend/tests/authorization.test.ts` now covers the same ground on
-every test run (79 tests, 0 failures). Details in `docs/security.md` §9.
+every test run (79 tests in the suite at that date; it is 218 across 8 files
+now). Re-run on 11 August: **27 passed, 0 failed, 2 skipped**. Details in
+`docs/security.md` §9.
 
 **Step 3 was never actually being tested, by anything.** Its verification line
 said "teacher Y's photo", the manual script used a cross-school pair, and

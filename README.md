@@ -56,10 +56,29 @@ caller's access has been checked.
 | Validation | Zod at every route boundary |
 | Database | PostgreSQL via Supabase · 20 migrations · row level security |
 | Storage | Supabase Storage, private bucket + signed URLs |
-| Images | `sharp` — thumbnails, blurhash, dimensions, HEIC→JPEG |
+| Images | `sharp` — thumbnails, blurhash, dimensions. **HEIC is transcoded on the device, not the server** — see below |
 | Auth | Supabase Auth — email OTP, with password sign-in |
 | Idempotency | Redis, order submission only |
 | Monorepo | pnpm workspaces + Turborepo |
+
+**On HEIC.** The server does *not* convert HEIC to JPEG, and it never has.
+`sharp`'s prebuilt libvips ships libheif with an AV1 codec and **no HEVC
+codec** — and an iPhone HEIC is HEVC-coded. libheif parses the container, so
+`sharp(...).metadata()` succeeds and reports `format: 'heif'`; the failure only
+appears when the pixels are decoded. Tested against a real HEVC HEIC on 24 July
+2026: *"No decoding plugin installed for this compression format"*.
+
+What actually handles it is the **client**: `(teacher)/upload.tsx` asks the iOS
+picker for a compatible representation
+(`UIImagePickerPreferredAssetRepresentationMode.Compatible`), so the phone
+transcodes to JPEG before upload and no HEIC leaves the device. The server keeps
+the conversion branch as a backstop — it converts AVIF, which shares the HEIF
+container — and refuses HEVC cleanly with a message a teacher can act on
+("This photo is in a format the server cannot read (HEIC). Please re-save it as
+JPEG and try again.") rather than leaking raw libvips text. A real server-side
+fix means building `sharp` from source against libheif with `libde265`, which is
+a Dockerfile decision, not an application-code one. See
+`docs/plans/03-storage-and-media.md`, "HEIC conversion does not work".
 
 ---
 
@@ -237,7 +256,8 @@ addresses, which cannot receive an OTP email.
 pnpm test          # Vitest + Supertest against the test Supabase project
 ```
 
-**178 tests across 8 files.** The suite talks to a **real, remote** Supabase
+**218 tests across 8 files** (`3b2f4c4`, 13 August; it was 178 through 9
+August). The suite talks to a **real, remote** Supabase
 project — `hive-test` — over the network: it signs users in to mint real JWTs,
 writes real rows and puts real objects in storage. There is no local database
 and no mocking layer. A full pass takes about 2.5 minutes.
@@ -321,7 +341,7 @@ Checks, re-run rather than copied forward:
 | `pnpm typecheck` | Clean, both packages |
 | `pnpm lint` | 0 errors, 27 warnings (3 backend, 24 mobile — mostly unused imports) |
 | `pnpm build:backend` | Succeeds |
-| `pnpm test` | 178 tests, 8 files. Not observed fully green on 9 August — every failure was a 30 s timeout from the shared test project's sign-in quota, and the affected files passed in isolation. See [Testing](#testing) |
+| `pnpm test` | **218 tests, 8 files** since `3b2f4c4` on 13 August; it was 178 on 9 August, and not observed fully green that day — every failure was a 30 s timeout from the shared test project's sign-in quota, and the affected files passed in isolation. See [Testing](#testing) |
 
 **9 August was a defect round**, not a feature round: 25 commits across
 ordering, upload, auth, notifications, the admin console, the API error surface
@@ -405,15 +425,18 @@ proven, and matter more than the feature gaps below them.
 - **Nothing is deployed.** No hosted URL, no APK, no `eas.json`. The Dockerfile
   and the CI workflow exist; nothing is hosted. This is also what blocks the
   HTTPS and CORS checks in `verify-security.sh` and the k6 load suite.
-- **`scripts/verify-security.sh` has not been re-run since 1 August**, when it
-  reported 26 passed, 0 failed, 3 skipped. The 9 August round changed the rate
-  limiter, the CORS configuration and the error handler — three of the things
-  that script exists to check. Treat that 1 August result as stale, not as
-  current evidence.
+- ~~**`scripts/verify-security.sh` has not been re-run since 1 August.**~~
+  **Re-run on 11 August**, after the round that changed the rate limiter, the
+  CORS configuration and the error handler: **27 passed, 0 failed, 2 skipped**.
+  The rate-limit check had been unable to pass at all — it hammered `/health`,
+  which is deliberately exempt from rate limiting — and now targets the write
+  limiter, where a 429 arrived at request 98. The two remaining skips need a
+  deployment (HTTPS) and `FORCE_500_PATH` plus `NODE_ENV=production` (the 500
+  response shape). `docs/security.md` §9 records both runs.
 - **The CI test step is `continue-on-error: true`.** It exists and it runs, but
   it cannot turn a pull request red until `TEST_SUPABASE_URL`,
   `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` exist as repository
-  secrets. Until then the 178 tests guard nothing on a pull request. Lint,
+  secrets. Until then the 218 tests guard nothing on a pull request. Lint,
   typecheck and build are blocking.
 
 Feature gaps, deliberate or unstarted:

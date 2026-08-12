@@ -71,8 +71,17 @@ platform health check removes the instance from rotation.
 Max 50. Students must be at the photo's school, else **400**.
 
 Uploads are capped at 25 MB and validated by **magic bytes**, not the declared
-content type. HEIC is converted to JPEG. Uploading to another school's class, or
-onto another teacher's photo, returns **403**.
+content type. Uploading to another school's class, or onto another teacher's
+photo, returns **403**.
+
+**HEIC is not converted server-side.** `sharp`'s prebuilt libvips has no HEVC
+decoder, and an iPhone HEIC is HEVC-coded, so the pixel decode fails even though
+the container parses. The mobile client transcodes on the device instead — the
+iOS picker is asked for a compatible representation, so what reaches this
+endpoint is already JPEG. An HEVC HEIC that arrives anyway is refused with
+**400** and the message *"This photo is in a format the server cannot read
+(HEIC). Please re-save it as JPEG and try again."* AVIF, which shares the HEIF
+container and does decode, is converted to JPEG.
 
 `DELETE /photos/:id` sets `status = 'archived'` rather than deleting the row.
 The photo leaves the teacher's grid and every parent's feed — both feed queries

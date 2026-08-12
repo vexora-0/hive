@@ -75,7 +75,7 @@ processing, idempotency, and issuing signed URLs.
 
 ### The consequence
 
-**RLS does not protect the API.** The 505-line policy set in migration `00011`
+**RLS does not protect the API.** The 545-line policy set in migration `00011`
 is real and correct, but it guards Path B only. Every API endpoint must
 re-implement authorization explicitly in its service function.
 
@@ -153,7 +153,7 @@ sequenceDiagram
 
     T->>API: POST /photos/:id/file
     API->>API: sharp — verify magic bytes
-    API->>API: HEIC → JPEG if needed
+    API->>API: AVIF → JPEG; HEVC HEIC refused (400)
     API->>S: upload original
     API->>API: 400px thumbnail + blurhash
     API->>S: upload thumbnail
@@ -167,6 +167,22 @@ sequenceDiagram
     API->>DB: status → 'ready'
     DB-->>DB: trigger notifies tagged children's parents
 ```
+
+### Where HEIC is actually handled
+
+Not on the server. `sharp`'s prebuilt libvips ships libheif with an AV1 codec
+and no HEVC codec, and an iPhone HEIC is HEVC-coded. The container parses — so
+`metadata()` reports `format: 'heif'` — and only the pixel decode fails, which
+is why review never caught it. Verified against a real HEVC HEIC on 24 July
+2026: *"No decoding plugin installed for this compression format"*.
+
+The transcode happens **on the device**. `(teacher)/upload.tsx` asks the iOS
+picker for a compatible representation, so the phone converts to JPEG and no
+HEIC leaves it. The server's conversion branch still runs — it handles AVIF,
+which shares the HEIF container — and an HEVC HEIC that reaches it anyway is
+refused with 400 and a message the teacher can act on, rather than raw libvips
+text. Converting server-side would need libvips built against libheif with
+`libde265`, which is a Dockerfile change, not an application-code one.
 
 ### Why confirm is a separate step
 

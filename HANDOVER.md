@@ -1,7 +1,9 @@
 # Hive — Handover
 
 **State:** the core product loop is verified working against a live database.
-**Last verified:** 24 July 2026.
+**Last verified:** 13 August 2026. The runtime table in §4 is from 18 and 24
+July and still holds; §5 and §7 have been re-checked since, most recently on 13
+August.
 **Not deployed.** Everything below runs locally.
 
 For deeper detail: `CLAUDE.md` (working rules) · `docs/IMPLEMENTATION-STATUS.md`
@@ -42,9 +44,15 @@ Supabase project, migrations and demo data already exist — **do not run
 `"database":"ok"` is the real signal: `/health` round-trips to Supabase, so a 503
 means bad credentials rather than a dead process.
 
-**Redis is not optional for orders.** Without it, order creation hangs
-indefinitely rather than failing — ioredis queues rather than erroring. Two
-minutes of silence, no error. Worth a timeout before this ships.
+**Redis backs order idempotency.** It used to be worse than that: without Redis,
+order creation hung indefinitely rather than failing, because
+`maxRetriesPerRequest: null` — left behind by the removed BullMQ — plus
+ioredis's offline queue meant a command retried forever and never settled, so
+the middleware's existing catch never fired. **Fixed in `1f09cf8`** (9 Aug):
+commands now fail after two retries with the offline queue disabled, and
+`/health` reports `"cache"` alongside `"database"`. Losing Redis now degrades
+deduplication rather than availability — which is why the cache check
+deliberately does **not** change the status code.
 
 ---
 
@@ -118,21 +126,41 @@ A real server-side fix means building `sharp` from source against libheif with
 
 ## 5. Not verified
 
-- **Nothing is deployed.** No Render service, no public URL.
-- ~~**Tests have never run.**~~ **They do — 79 of 79 pass**, including 20 new
-  authorization tests and T-23, whose fixture defect is fixed. The suite has
-  also been shown to *detect*: deleting the G-17 uploader check turns exactly
-  three tests red. Still true is that **CI does not run them** — `ci.yml` has no
-  test step. The suite truncates every table, so `.env.test` must name a
-  throwaway project; the guard in `tests/setup.ts` now lists the real demo
-  project ref, which it did not before.
+- **Nothing is deployed.** No Render service, no public URL, no `eas.json`.
+- ~~**Tests have never run.**~~ **They do — the suite is 218 tests across 8
+  files** (`3b2f4c4`, 13 Aug). It was 79 across 5 files when this line was
+  written on 1 August, and 178 across 8 through 9 August. It includes 20
+  authorization tests and T-23, whose fixture defect is fixed, and has been
+  shown to *detect*: deleting the G-17 uploader check turns exactly three tests
+  red. The suite truncates rows it created, so `.env.test` must name a throwaway
+  project; the guard in `tests/setup.ts` lists the real demo project ref.
+- ~~**CI does not run the tests — `ci.yml` has no test step.**~~ **Wrong since 2
+  August.** `.github/workflows/ci.yml` has run
+  `pnpm --filter @hive/backend test` since `09c3226`. What is still true is that
+  the step carries `continue-on-error: true`, so it cannot turn a pull request
+  red until `TEST_SUPABASE_URL`, `TEST_SUPABASE_SERVICE_KEY` and
+  `TEST_SUPABASE_ANON_KEY` exist as repository secrets. Lint, typecheck and
+  build **do** block.
+- **The newest 40 tests were not proven by mutation.** `3b2f4c4` covers the
+  ordering fixes, idempotency, the upload retry paths, admin integrity and
+  malformed input — but the sandbox refused edits to `src/`, so "these fail on
+  a regression" is reasoning, not measurement. The one indirect proof is that
+  the pre-existing replay test passes, which means Redis is live and the
+  corrected-retry case is not passing vacuously through the middleware's
+  Redis-failure fallback.
 - **The upload progress bar has not been watched on a device.** The transfer now
   reports real bytes through `XMLHttpRequest`, verified by reading the code path,
   not by looking at a phone.
-- **The mobile app has not been driven end to end by hand.** The flows above were
-  verified over the API with real tokens. Someone needs to tap through it.
+- **The mobile app has not been driven end to end on a device.** It **was**
+  driven end to end in Chrome on 9 August via `expo start --web`, so the screens
+  are exercised rather than merely compiled — but web is not the target. No iOS
+  or Android build has been launched, so the keychain-backed session, the image
+  picker, native deep links and `AppState` transitions are unverified where they
+  ship.
 - **k6 load suite** written, never run — needs a deployed target.
-- **CI** written, never triggered.
+- **CI runs on every push** — it was written and never triggered when this was
+  drafted; it has run since. What has never happened is a *deployment*, not a
+  build.
 
 `docs/environment-setup.md` §7 is the manual checklist. It asks for failures to
 be reported, not ticks.
@@ -159,7 +187,9 @@ existed; then `total_amount`, after a migration renamed it to `total_cents`. The
 first time it failed silently and reported zero. The second was caught only
 because an error check had been added alongside the first fix.
 
-**Orders hang without Redis.** Not an error — a silent indefinite wait.
+**Orders hang without Redis.** Not an error — a silent indefinite wait. **Fixed
+in `1f09cf8`**: see §2. With Redis stopped, `POST /orders` now answers rather
+than hanging, and `/health` says so.
 
 All four typecheck cleanly. Static review cannot catch a missing column, a string
 comparison that is always true, or a client that queues forever.
@@ -171,23 +201,25 @@ comparison that is always true, or a client that queues forever.
 | Item | Owner | Notes |
 |---|---|---|
 | **Rotate the Supabase service key** | Ruthwik | It was pasted into a chat log. Settings → API → revoke, reissue, update `.env`. |
-| Create `hive-test` project | Bhargav | Unblocks `pnpm test`; free tier allows two |
+| ~~Create `hive-test` project~~ | — | **Done, 1 Aug** — `sdbiuzuyipneioceqysm`, ap-southeast-1, migrations applied. `pnpm test` no longer threatens the demo data. It is shared between CI and every developer, so check `pgrep -fl "vitest.mjs run"` before starting a run |
 | Deploy to Render | Bhargav | Dockerfile and CI are written. `NODE_ENV=production` is critical — anything else returns internal error messages to clients. |
 | Drive the app by hand | all | §7 checklist in `docs/environment-setup.md` |
-| Order, admin and mobile tests | Srujan, Nagachaitanya | Harness exists; feed and photo tests written |
+| ~~Order and admin tests~~ | — | **Done, 2 Aug** — `orders.test.ts` and `admin.test.ts`. Extended on 13 Aug by `3b2f4c4` |
+| Mobile tests | Srujan, Nagachaitanya | Backend is covered; the mobile app has no test suite |
 | Custom SMTP | Bhargav | Default Supabase SMTP is rate-limited; OTP unreliable for a live demo |
 | ~~One lint error~~ | — | **Done** — fixed in `40a69fc`. `pnpm lint` is 0 errors in both packages and the CI step is now blocking. |
-| Add a test step to CI | Bhargav | `ci.yml` runs lint, typecheck and build but never `pnpm test`. Needs the `hive-test` credentials as repository secrets. |
+| ~~Add a test step to CI~~ | — | **Done, 2 Aug** (`09c3226`). What remains is making it *blocking*: add `TEST_SUPABASE_URL`, `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` as repository secrets, then drop `continue-on-error`. Bhargav. |
 | Decide on server-side HEIC | Bhargav | Build `sharp` from source against libheif + libde265, or accept the device-side transcode as the answer. Adds build time and HEVC licensing to the deploy — a call, not a task. |
 | Order item thumbnails (8b) | Ruthwik | Order items carry only `photoId`; the order API returns no signed URL per item |
+| **Orders from a two-school parent are filed under one school** | Ruthwik | Found 13 Aug while writing the order tests; **not fixed**. A parent with children at two schools has every order filed under whichever school back-filled their profile first, because `createOrder` files under `req.user.schoolId`. `mapParentToStudent` only back-fills `school_id` when it is absent, which is deliberate. Consequence: the second school's admin never sees those orders in their queue, and the first sees an order for a photo that is not theirs. |
 
 ---
 
 ## 8. Two things to know before changing code
 
 **The API bypasses row level security.** Every service uses the service-role key,
-which is exempt by design. The 505-line policy set protects only the queries the
-mobile client makes directly to Supabase. **Every endpoint must enforce
+which is exempt by design. The 545-line policy set in migration `00011` protects
+only the queries the mobile client makes directly to Supabase. **Every endpoint must enforce
 authorization explicitly in its service function** — four originally did not, and
 that was the source of three critical findings.
 

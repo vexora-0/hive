@@ -37,8 +37,8 @@ auth service and object storage. It does **not** provide:
   that resolves it without duplicating siblings' shared photos
 - Any of the 40 endpoints, their validation, or their ownership checks. **The API
   bypasses RLS entirely**, so every authorization decision is code we wrote
-- The image pipeline — magic-byte validation, thumbnailing, blurhash, HEIC
-  conversion
+- The image pipeline — magic-byte validation, thumbnailing, blurhash, and why
+  HEIC is handled on the device rather than the server
 - Server-side order pricing, integer-cent money handling, transactional order
   creation, idempotency
 
@@ -72,7 +72,9 @@ it found a test that was lying to us."*
 The k6 suite — smoke, load, stress, spike — is written and committed, but has
 never run because there is no deployed target. The only timing figure measured is
 the test suite: 178 tests in 115 s including database truncation and ~40 auth
-user creations.
+user creations, measured 9 August. **That figure belongs to the 178-test suite**;
+it is 218 tests now and the larger suite has not been timed, so do not restate
+115 s against it.
 
 Then pivot: *"Deployment is the first item of future work precisely because it
 unlocks the load tests, the HTTPS checks and device testing at the same time."*
@@ -98,10 +100,37 @@ HTTP with real tokens and reproduced from a cold start.
 1. `POST /photos` — metadata row created, `status = 'processing'`
 2. `POST /photos/:id/file` — multipart upload. **The declared MIME type is not
    trusted**; `sharp` reads the header bytes
-3. Pipeline: HEIC → JPEG if needed, original uploaded, 400 px thumbnail
-   generated, blurhash computed, dimensions recorded
+3. Pipeline: original uploaded, 400 px thumbnail generated, blurhash computed,
+   dimensions recorded. **HEIC is transcoded on the device, not here** — see
+   below
 4. `POST /photos/:id/tag` — students tagged, capped at 50
 5. `POST /photos/:id/confirm` — `status → 'ready'`
+
+### "You say you convert HEIC. Show me."
+
+**Do not claim the server converts HEIC.** It does not, and an examiner can
+falsify it in half a minute. The honest answer:
+
+`sharp`'s prebuilt libvips ships libheif with an AV1 codec and **no HEVC
+codec**, and an iPhone HEIC is HEVC-coded. libheif parses the container, so
+`metadata()` succeeds and reports `format: 'heif'` — the failure only surfaces
+when the pixels are decoded. We found that by testing a real HEVC HEIC on 24
+July 2026; the error is *"No decoding plugin installed for this compression
+format"*. Code review could not have caught it, because the metadata call
+succeeds.
+
+So the transcode happens **on the device**: the iOS picker is asked for a
+compatible representation
+(`UIImagePickerPreferredAssetRepresentationMode.Compatible`), and the phone
+hands back JPEG. No HEIC leaves the device. The server keeps the conversion
+branch — it does convert AVIF, which shares the HEIF container — and refuses an
+HEVC HEIC that arrives anyway with a 400 reading *"This photo is in a format the
+server cannot read (HEIC). Please re-save it as JPEG and try again"*, rather
+than leaking `bad seek to 80687`.
+
+Fixing it server-side means building `sharp` from source against libheif with
+`libde265`. That is a Dockerfile and licensing decision, not application code,
+and it is recorded as an open decision rather than done.
 
 **Step 5 must come after step 4.** The notification trigger fires on the
 transition *to* `ready` and loops over the tags that exist at that instant.
@@ -205,9 +234,11 @@ Good options — pick one and tell it as a story with a root cause:
 Nothing is deployed and nothing has run on a physical device. Answer the question
 asked, not the one you wish had been asked.
 
-**"You said 26 security checks passed — so it's secure?"** — 26 passed, 0 failed,
-**3 skipped**. The skips need HTTPS and a deployed origin. And passing 26 checks
-means those 26 properties hold; it is not proof of the absence of vulnerabilities.
+**"You said 27 security checks passed — so it's secure?"** — 27 passed, 0 failed,
+**2 skipped** (11 August; it was 26/0/3 on 1 August). One skip needs HTTPS and a
+deployed origin; the other needs `FORCE_500_PATH` pointed at a route that
+reliably 500s, alongside `NODE_ENV=production`. And passing 27 checks means those
+27 properties hold; it is not proof of the absence of vulnerabilities.
 
 **"Why didn't you use [X]?"** — If you evaluated it, say what you compared and
 why. If you did not, say so. "We didn't evaluate that" is a complete answer;
@@ -224,7 +255,8 @@ the one to check tonight.
 - [ ] Re-run `pnpm test` **once**, alone, and note the result. Repeated runs
       exhaust the shared sign-in quota and produce timeouts that look like
       failures
-- [ ] Re-run `scripts/verify-security.sh`, confirm 26/0/3
+- [ ] Re-run `scripts/verify-security.sh`, confirm 27/0/2. It needs
+      `SUPABASE_ANON_KEY` in the backend env, or 13 checks skip silently
 - [ ] Seed fresh demo data; confirm Rajesh sees 2 photos and Vikram 1
 - [ ] Record a screen capture of the full demo as insurance
 - [ ] Re-read §5.7 of the report — the limitations are what you will be pressed on

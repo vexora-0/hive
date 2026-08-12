@@ -60,7 +60,7 @@ them:
 | `pnpm typecheck` | Clean, both packages (forced past the Turbo cache) |
 | `pnpm lint` | **0 errors**, 27 warnings — 3 backend (`no-explicit-any` in `admin.service.ts`), 24 mobile (mostly unused imports) |
 | `pnpm build:backend` | Succeeds |
-| `pnpm test` | **178 tests, 8 files**, against `hive-test`. **Not observed fully green** — see below |
+| `pnpm test` | **178 tests, 8 files** on 9 Aug, against `hive-test`. **Not observed fully green that day** — see below. **The suite is now 218 across the same 8 files** (`3b2f4c4`, 13 Aug) |
 | `ls supabase/migrations` | **20 files** — `00001`–`00018`, `00020`, `00024`. `00019` and `00021`–`00023` were reserved per plan and never used; the sequence has holes, the count is right |
 
 **Check for a run in flight before starting the suite** —
@@ -100,9 +100,12 @@ and the web build. `docs/IMPLEMENTATION-STATUS.md` §10 records them by area.
 The round's own second review found three regressions it had introduced —
 cursor pagination dropping rows on a millisecond-truncated timestamp, a
 rate-limit bypass via a forged bearer token, and WebP accepted at three format
-gates and refused at the fourth — all fixed. **The only tests the round added
-are the 23 in `tests/cursor.test.ts`**; everything else in it is guarded by
-review and typecheck alone.
+gates and refused at the fourth — all fixed. The round itself added only the 23
+tests in `tests/cursor.test.ts`; **`3b2f4c4` (13 Aug) added 40 more**, covering
+ordering, idempotency, the upload retry paths, admin integrity and malformed
+input, and taking the suite to 218. Those 40 were **not proven by mutation** —
+the sandbox refused edits under `src/`, so "they fail on a regression" is
+reasoning rather than measurement.
 
 **The app was seen rendering for the first time**, in Chrome, via
 `pnpm --filter @hive/mobile exec expo start --web` on `localhost:8081`. Two
@@ -114,13 +117,22 @@ behaviour. Web is a verification convenience — the product targets iOS and
 Android.
 
 `scripts/verify-security.sh` was run on 1 August — **26 passed, 0 failed, 3
-skipped**. `docs/security.md` §9 records it, including the three skips and why
-they are not interchangeable. It has **not** been re-run since the 9 August
-changes, several of which touch the rate limiter, CORS and the error handler.
-Two of its checks were re-done by hand on 9 August against the running dev
-backend — a signed photo URL returned 200 and the same URL without `?token`
-returned 400; a Bloom teacher asking for Little Stars' roster got 403 and her
-own school's got 200 — which is two checks, not the script.
+skipped** — and **re-run in full on 11 August, after the 9 August changes to the
+rate limiter, CORS and the error handler: 27 passed, 0 failed, 2 skipped**
+(`701c999`). `docs/security.md` §9 records both runs and why the remaining skips
+are not interchangeable: HTTPS needs a deployment, and the 500-response-shape
+check needs `FORCE_500_PATH` **and** `NODE_ENV=production`, since it is gated on
+the variable rather than on the mode.
+
+Two things the 11 August run turned up. The rate-limit check had never been able
+to pass: it hammered `/health`, which is deliberately exempt from rate limiting,
+and assumed a global ceiling of 100 where the budget is now 1000 per identity.
+It now targets the write limiter (100 per identity) with a deliberately invalid
+body, and a 429 arrived at request 98. And the script had never run in full at
+all, because `verify:env` needs `SUPABASE_ANON_KEY` — the service-role key
+cannot mint the user-scoped JWT the API expects, only a real sign-in does — and
+that variable was missing from the backend env, so 13 of the 26 checks skipped.
+A skip is not a pass.
 
 **This round crossed the ownership map in §6.** The fixes touch
 `order.service.ts`, `photo.service.ts`, the upload middleware and the admin
@@ -141,7 +153,7 @@ nothing runs; create them from the `.env.example` templates first.
    run — `.github/workflows/ci.yml` has run `pnpm --filter @hive/backend test`
    since 2 August — but it cannot go red until `TEST_SUPABASE_URL`,
    `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` exist as repository
-   secrets. Until then 178 passing tests still guard nothing on a pull request.
+   secrets. Until then 218 passing tests still guard nothing on a pull request.
    Lint, typecheck and build are blocking.
 3. **Nothing has been seen on a device.** This changed by half a step on 9
    August: the app was driven end to end **in Chrome**, so the screens are no
@@ -154,16 +166,22 @@ nothing runs; create them from the `.env.example` templates first.
    the class default were checked in the browser; an actual file upload through
    the web picker was not completed. The pipeline itself is covered by the API
    tests.
-5. **`scripts/verify-security.sh` needs re-running**, per the paragraph above.
-   It is the cheapest outstanding item on this list.
+5. ~~**`scripts/verify-security.sh` needs re-running.**~~ **Done, 11 August** —
+   27 passed, 0 failed, 2 skipped. See the paragraph above.
 6. **Sentry has never received an error**, and **G-45 custom SMTP** is unowned.
    Both are account signups rather than code changes.
-7. **Redis has no timeout and no health check.** Found on 9 August: with Redis
-   stopped, `POST /orders` hangs — the idempotency middleware talks to Redis
-   before the handler runs, and the request was still open after two minutes.
-   `/health` checks the database but not Redis, so it reports `ok` while
-   ordering is dead. Ruthwik's area (`packages/backend/src/config/redis.ts`,
-   `middleware/idempotency.ts`).
+7. ~~**Redis has no timeout and no health check.**~~ **Fixed 9 August in
+   `1f09cf8`.** The fault was `maxRetriesPerRequest: null`, left behind by the
+   removed BullMQ: combined with ioredis's offline queue, a command issued while
+   Redis was unreachable retried forever and never settled, so the idempotency
+   middleware's existing catch never fired and `POST /orders` hung open rather
+   than degrading. `config/redis.ts` now sets `maxRetriesPerRequest: 2`,
+   `enableOfflineQueue: false` and `connectTimeout: 3000`, so commands fail
+   fast; `/health` now reports `"cache"` alongside `"database"`, deliberately
+   **without** changing the status code, because losing the idempotency cache
+   degrades deduplication rather than availability. Verified against the running
+   server with Redis stopped: `/health` returned 200 with `"cache":"error"`, and
+   `POST /orders` answered in 485 ms instead of hanging.
 
 **Two items that were on this list are done.** G-27 upload progress is real:
 `teacherService.uploadPhotoFile` uses `XMLHttpRequest` and reports

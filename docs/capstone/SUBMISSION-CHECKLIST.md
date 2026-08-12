@@ -60,7 +60,7 @@ adding a framework does.
 
 | Aspect | Marks | State |
 |---|---|---|
-| Test cases & coverage | 5 | **Strong** — 178 tests, Table 3.2 has 37 documented cases |
+| Test cases & coverage | 5 | **Strong** — 218 tests, Table 3.2 has 37 documented cases |
 | Result analysis | 5 | **Strong** — §3.3.7, including the sabotage finding |
 | Performance / reliability | 5 | ⚠️ **Weak** — no load figures |
 
@@ -70,8 +70,9 @@ adding a framework does.
    simultaneously fixes Report §4.2.2 and three limitations.
 2. **Run k6 against a local backend.** Not production, but it *is* a measurement.
    Label it honestly: "local, single instance, seeded dataset".
-3. **Reframe reliability.** 503 on database loss, 429 at request 77, idempotency
-   under retry, cold-start reproducibility — these *are* reliability results.
+3. **Reframe reliability.** 503 on database loss, a 429 from the write limiter
+   at request 98 (11 Aug), idempotency under retry, cold-start reproducibility —
+   these *are* reliability results.
 
 Do at least 2 or 3. Never invent numbers.
 
@@ -125,8 +126,8 @@ than a missing one.
 
 | Fig. | Screenshot | Shows |
 |---|---|---|
-| 3.1 | **`pnpm test` — 178/178, 115 s** | Headline test result |
-| 3.2 | **`verify-security.sh` — 26/0/3** | Security verification |
+| 3.1 | **`pnpm test` — 218/218** | Headline test result |
+| 3.2 | **`verify-security.sh` — 27/0/2** | Security verification |
 | 3.3 | **Sabotage run — 3 targeted tests failing** | The suite detects regressions |
 | 3.4 | **Rajesh's feed beside Vikram's** | 2 vs 1, zero overlap |
 | 3.5 | **Signed URL 200 beside stripped-token 400** | Private bucket |
@@ -185,8 +186,9 @@ Items 1, 2 and 5 need nothing from anyone else.
 
 - **Invent a performance number.** One unsourced figure discredits every sourced
   one, and a viva will find it.
-- **Claim 29/29 on the security script.** It is 26 passed, 0 failed, **3
-  skipped** — and the skips need a deployment.
+- **Claim 29/29 on the security script.** It is 27 passed, 0 failed, **2
+  skipped** (11 Aug; 26/0/3 on 1 Aug). One skip needs a deployment (HTTPS); the
+  other needs `FORCE_500_PATH` **and** `NODE_ENV=production`.
 - **Say "fully working".** It works locally. Nothing is deployed and nothing has
   run on a physical device.
 - **Hide the limitations.** Report §6.3 and slide 9 state them deliberately.

@@ -82,7 +82,7 @@ The second is mandatory, and here is why:
 
 > **The backend queries exclusively through `supabaseAdmin`, constructed with `SUPABASE_SERVICE_KEY`. The service-role key bypasses row level security by design.**
 
-The 505-line policy set in migration `00011` is therefore never consulted for an API request. It protects only Layer 3. Every endpoint that accepts a resource ID must re-derive authorization itself — and in four places it did not. That single architectural fact is the root cause of G-04, G-08 and G-17.
+The 545-line policy set in migration `00011` is therefore never consulted for an API request. It protects only Layer 3. Every endpoint that accepts a resource ID must re-derive authorization itself — and in four places it did not. That single architectural fact is the root cause of G-04, G-08 and G-17.
 
 Current ownership checks:
 
@@ -141,11 +141,12 @@ table for weeks after it was fixed.
 
 One ordering makes them work together, and it is easy to break: `getPhotoDetails` runs the parent-ownership check **before** minting the signed URL. A signed URL grants access to the file itself, so generating one for a caller who is then refused would hand out exactly what the check exists to prevent. Anyone reordering that function needs to know this.
 
-**Verified against a running system on 1 August 2026.** `scripts/verify-security.sh`
-ran for the first time: **26 passed, 0 failed, 3 skipped**, and
-`packages/backend/tests/authorization.test.ts` covers the same ground on every
-test run — **79 tests pass, 0 fail**. The full record, including what the run
-does *not* cover, is in §9.
+**Verified against a running system.** `scripts/verify-security.sh` ran for the
+first time on 1 August 2026 — **26 passed, 0 failed, 3 skipped** — and was
+re-run on 11 August after the 9 August correctness sweep: **27 passed, 0
+failed, 2 skipped**. `packages/backend/tests/authorization.test.ts` covers the
+same ground on every test run; the suite is **218 tests across 8 files**. The
+full record of both runs, including what they do *not* cover, is in §9.
 
 One entry in this table was never actually being tested. See §9.
 
@@ -281,7 +282,7 @@ Separately confirmed in the same session:
   returns `[]`, not a dump.
 - **G-10** — `seed:admin` does not echo the password.
 
-### What the run does not cover
+### What the 1 August run did not cover
 
 Three checks skipped, and the reasons are not interchangeable:
 
@@ -303,6 +304,59 @@ Postgres, GoTrue, Storage and all 19 migrations, driven through the real Express
 app. That is enough to prove the authorization logic; it is not evidence about
 how any hosted project is configured. Re-run against the deployed URL when one
 exists — `verify:env` prints the environment, and `STRICT=1` makes skips count.
+
+### The run — 11 August 2026
+
+Re-run after the 9 August correctness sweep, which had touched the rate
+limiter, the CORS configuration and the error handler — three of the things
+this script exists to check. Same procedure as the 1 August run: a backend
+booted `NODE_ENV=production` over the seeded demo dataset.
+
+```
+passed 27   failed 0   skipped 2
+```
+
+One more pass and one fewer skip than 1 August, because the rate-limit check
+(§9) now runs inside the script instead of being confirmed by hand beside it.
+The total attempted is 29 either way. Recorded in `701c999`.
+
+**Why the script had never run in full before.** `verify:env` signs in as the
+seeded demo accounts and prints the tokens the script needs, and it requires
+`SUPABASE_ANON_KEY`. The service-role key cannot stand in for it: it bypasses
+RLS and does not mint the user-scoped JWT the API expects — only a real
+sign-in does. That variable was absent from the backend environment, so
+`verify:env` produced no tokens and **13 of the 26 checks skipped** for want of
+them. The script states plainly that a skip is not a pass, so a run made
+without it verified about half of what its exit status suggested. Supplying the
+variable is the entire fix; `packages/backend/.env.example` carries it.
+
+**The rate-limit check could not pass as written.** It sent 120 requests at
+`/health` and expected a 429. `/health` is deliberately exempt from rate
+limiting — it is polled by the hosting platform, and a 429 there reads as
+"instance down" and pulls the instance out of rotation. It also assumed the old
+global ceiling of 100, where the global budget is now 1000 per identity, so 120
+requests proved nothing either way.
+
+It now targets the **write limiter** — 100 per identity, the tightest budget in
+the system and the one guarding the endpoints that cost storage or money. It
+posts a deliberately invalid body to `POST /api/v1/photos/upload-url`, so the
+validator that runs *after* the limiter rejects every request: the counter still
+increments and no photo rows are created. **A 429 arrived at request 98.**
+
+### The two remaining skips
+
+They need different things, and one does not substitute for the other:
+
+1. **Transport (§8) — HTTPS.** Needs a deployment. The target was `localhost`
+   and nothing is hosted, so HTTPS, HSTS and real CORS behaviour stay
+   unverified until there is a hosted URL. Unchanged from 1 August.
+2. **The 500 response shape (§7).** Needs `FORCE_500_PATH` pointed at a route
+   that reliably 500s **and** `NODE_ENV=production`. Production mode alone will
+   not un-skip it — the check is gated on `FORCE_500_PATH` being set, so with
+   no route to point it at it skips however the backend was booted. The 1
+   August entry above explains why no such route exists for an anonymous probe:
+   every `/api/v1/*` route sits behind `authenticate`, which answers 401 rather
+   than 500. The property itself stays covered by `errors.test.ts` T-34.
 
 ### The check that was not checking anything
 

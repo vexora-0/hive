@@ -66,9 +66,9 @@ identified 46 defects, of which the most serious permitted cross-family access t
 photograph metadata, cross-school access to student rosters including dates of
 birth, and an entirely non-functional ordering flow.
 
-Validation used 178 automated integration tests executing against a real
-PostgreSQL instance, completing in 115 seconds, together with a scripted security
-verification returning 26 passed, 0 failed and 3 skipped, reproduced from a cold
+Validation used 218 automated integration tests executing against a real
+PostgreSQL instance, together with a scripted security
+verification returning 27 passed, 0 failed and 2 skipped, reproduced from a cold
 start. A deliberate sabotage exercise confirmed the suite detects the regressions
 it targets and additionally exposed a pre-existing test that had never verified
 the property its name claimed. Privacy scoping was measured directly: of six
@@ -111,8 +111,8 @@ styles.)*
 | 2.6 | Parent feed with child switcher | «» |
 | 2.7 | Order placement and confirmation | «» |
 | 2.8 | Administrator dashboard | «» |
-| 3.1 | Test suite execution — 178 tests passing | «» |
-| 3.2 | Security verification output — 26/0/3 | «» |
+| 3.1 | Test suite execution — 218 tests passing | «» |
+| 3.2 | Security verification output — 27/0/2 | «» |
 | 3.3 | Sabotage exercise — targeted tests failing | «» |
 | 3.4 | Privacy comparison — two parents, zero overlap | «» |
 | 3.5 | Signed URL 200 versus stripped-token 400 | «» |
@@ -594,19 +594,23 @@ the failure mode here is silent data loss.
 
 **Table 3.1 — Test suite composition**
 
-| File | Cases | Area |
-|---|---|---|
-| `admin.test.ts` | 28 | Administration, search sanitisation, own-profile access |
-| `orders.test.ts` | 26 | Creation, pricing, idempotency, ownership |
-| `photos.test.ts` | 22 | Upload, tagging, ownership, archival |
-| `authorization.test.ts` | 17 | Cross-family, cross-school, role separation |
-| `errors.test.ts` | 12 | Envelope shape, error mapping, production leakage |
-| `auth.test.ts` | 11 | Authentication and role-based access control |
-| `feed.test.ts` | 8 | Feed scoping, de-duplication, pagination |
-| `cursor.test.ts` | 3 | Cursor precision and injection rejection |
-| **Total** | **127 declared → 178 executed** | Difference is parameterised `it.each` blocks |
+| File | Declared | Executed | Area |
+|---|---|---|---|
+| `admin.test.ts` | 37 | 59 | Administration, search sanitisation, own-profile access |
+| `orders.test.ts` | 37 | 37 | Creation, pricing, idempotency, ownership |
+| `photos.test.ts` | 28 | 28 | Upload, tagging, ownership, archival |
+| `errors.test.ts` | 12 | 29 | Envelope shape, error mapping, production leakage |
+| `cursor.test.ts` | 3 | 23 | Cursor precision and injection rejection |
+| `authorization.test.ts` | 17 | 20 | Cross-family, cross-school, role separation |
+| `auth.test.ts` | 11 | 11 | Authentication and role-based access control |
+| `feed.test.ts` | 11 | 11 | Feed scoping, de-duplication, pagination |
+| **Total** | **156 declared** | **218 executed** | Difference is parameterised `it.each` blocks and one table-driven loop |
 
-**Table 3.2 — Test cases and results** *(representative selection; all 178 pass)*
+Composition as of `3b2f4c4`, 13 August 2026, which added 40 tests covering the
+ordering fixes, idempotency, the upload retry paths, admin integrity and
+malformed input. The suite was 178 executed from 9 August until then.
+
+**Table 3.2 — Test cases and results** *(representative selection; all 218 pass)*
 
 | ID | Description | Input | Expected output | Status |
 |---|---|---|---|---|
@@ -654,8 +658,10 @@ the failure mode here is silent data loss.
 
 ### 3.3.1 Automated suite
 
-**178 of 178 passing in 115 seconds**, observed 9 August 2026 against the
-dedicated `hive-test` project. *(Figure 3.1)*
+**218 of 218 passing** against the dedicated `hive-test` project, following
+`3b2f4c4` on 13 August 2026. The last timed run is the preceding 178-test
+suite: **178 of 178 in 115 seconds**, observed 9 August 2026. No wall-clock
+figure has been recorded for the 218-test suite. *(Figure 3.1)*
 
 **Table 3.3 — Runtime functional verification**
 
@@ -740,9 +746,9 @@ suite *and* found a test that was not testing anything.
 | **Deployment** | No hosted URL or application binary | HTTPS and CORS-origin checks skipped |
 | **Load and performance** | k6 suite has no target | **No performance figures exist** (§3.3.6) |
 | **Physical device** | No iOS or Android build launched | Keychain session, image picker, deep links unverified |
-| **HEIC conversion, magic-byte rejection** | All seed assets are JPEG | Conversion and rejection paths unexercised |
+| **Server-side HEIC conversion** | `sharp`'s prebuilt libvips has no HEVC decoder | Cannot work, and does not. Tested 24 July against a real HEVC HEIC. Handled by a device-side transcode instead; the server refuses HEVC with an actionable 400 |
 | **Error reporting** | Sentry requires a DSN | Pipeline unproven end to end |
-| **CI test gate** | Repository secrets absent | 178 tests do not yet block a pull request; lint, typecheck and build do |
+| **CI test gate** | Repository secrets absent | 218 tests do not yet block a pull request; lint, typecheck and build do |
 
 The application **has** been driven end to end in a desktop browser via Expo's
 web target, so the screens are exercised rather than merely compiled. Web is a
@@ -787,7 +793,9 @@ deployed target.
 
 The one timing figure measured is the test suite: **178 tests in 115 seconds**,
 including table truncation, approximately forty authentication-user creations and
-full HTTP round-trips.
+full HTTP round-trips. That measurement predates `3b2f4c4`, which took the suite
+to 218; the larger suite has not been timed, and the 115-second figure should not
+be restated against it.
 
 Presenting invented latency or throughput figures would be worse than presenting
 none. §6.4 lists deployment first precisely because it is the step that unlocks
@@ -812,8 +820,8 @@ discovered late; each follows from one absent step — deployment.
 provider's sign-in quota; each run creates roughly forty users, and beyond the
 quota sign-ins stall rather than fail. Three runs within half an hour produced
 timeouts. **Every failure observed was a timeout, never a failed assertion**, and
-the same files passed in isolation immediately afterwards. The 178/178 figure is
-a measurement of the suite *running alone*.
+the same files passed in isolation immediately afterwards. The 178/178-in-115s
+figure is a measurement of that suite *running alone*.
 
 ---
 
@@ -891,7 +899,7 @@ behaviour, order placement, administration dashboard.»
 | Source files | 199 TypeScript / TSX |
 | Lines of source | ~28,000 |
 | Migrations | 20 |
-| Automated tests | 178 |
+| Automated tests | 218 |
 
 | Contributor | Commits |
 |---|---|
@@ -968,12 +976,14 @@ every resource accessed by identifier checked against the caller.
 1. **The privacy boundary holds under adversarial probing** — cross-family 404,
    cross-school 403, same-school photograph mutation 403, each verified over HTTP
    with real tokens and reproduced from a cold start.
-2. **178 automated integration tests**, executing against a real database rather
-   than mocks, completing in 115 seconds.
+2. **218 automated integration tests**, executing against a real database rather
+   than mocks. The 115-second timing was measured on the 178-test suite that
+   preceded them; the larger suite has not been timed.
 3. **A sabotage exercise that validated the suite and found a defective test** —
    one that had never verified the property its name claimed.
-4. **26 of 26 attempted security checks passed**, 0 failed, 3 skipped for want of
-   a deployment, reproduced cold.
+4. **27 of 27 attempted security checks passed**, 0 failed, 2 skipped —
+   reproduced cold. One skip needs a deployment (HTTPS); the other needs
+   `FORCE_500_PATH` set alongside `NODE_ENV=production`.
 5. **A previously non-functional ordering flow made to work**, with correct
    integer-cent arithmetic and genuine idempotency.
 6. **Approximately 1,500 lines of never-executed infrastructure removed** — the
@@ -991,8 +1001,13 @@ Stated explicitly; each is evidenced in Table 3.6.
 4. **The error-reporting pipeline has never carried an error.**
 5. **The continuous-integration test step is advisory**, pending repository
    secrets; lint, typecheck and build do block.
-6. **Two image paths are unexercised** — HEIC conversion and magic-byte rejection
-   — because every seed asset is already a JPEG.
+6. **Server-side HEIC conversion does not work.** `sharp`'s prebuilt libvips
+   ships libheif without an HEVC decoder, and an iPhone HEIC is HEVC-coded, so
+   the container parses and the pixel decode fails. Established by testing a
+   real HEVC HEIC on 24 July 2026. The mobile client transcodes on the device
+   instead, and the server refuses HEVC with an actionable 400. Magic-byte
+   rejection, previously listed here alongside it, **is** covered — by
+   `photos.test.ts` T-20.
 7. **The health endpoint does not check Redis.** With Redis stopped, order
    submission blocks while `/health` still reports healthy.
 
@@ -1127,7 +1142,7 @@ https://github.com/vexora-0/hive
 |---|---|
 | `apps/mobile/` | React Native application |
 | `packages/backend/` | Express API |
-| `packages/backend/tests/` | 178 integration tests |
+| `packages/backend/tests/` | 218 integration tests |
 | `supabase/migrations/` | 20 migrations |
 | `scripts/verify-security.sh` | Runtime security verification |
 | `docs/` | Architecture, security, database, API, demonstration guide |

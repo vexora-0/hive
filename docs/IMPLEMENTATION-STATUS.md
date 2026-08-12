@@ -132,7 +132,7 @@ file, so it must never be generated for a caller who is about to be refused.
 | **Feed deduplication** | No duplicate photo IDs in a parent's feed |
 | **`pnpm test`** | **Ran for the first time** against the new `hive-test` project. **58 of 59 pass**, 1 fails. The suite executes end to end: harness, truncation, user creation, HTTP requests through Supertest |
 | **Test-database guard, armed** | `DEV_SUPABASE_URL` is now set, so guard 1 in `tests/setup.ts` actually compares. It previously did nothing |
-| **`verify-security.sh`, in full** | **Ran for the first time, 1 Aug.** 26 passed, 0 failed, 3 skipped, against a backend booted `NODE_ENV=production`. Covers G-02, G-04, G-04b, G-05, G-08 and G-17 over HTTP with real tokens. Full record and the three skips in `docs/security.md` §9 |
+| **`verify-security.sh`, in full** | **Ran for the first time, 1 Aug**: 26 passed, 0 failed, 3 skipped, against a backend booted `NODE_ENV=production`. **Re-run 11 Aug** after the 9 Aug sweep: **27 passed, 0 failed, 2 skipped** (`701c999`) — the rate-limit check, which had been unable to pass against the exempt `/health`, now targets the write limiter and got a 429 at request 98. Covers G-02, G-04, G-04b, G-05, G-08 and G-17 over HTTP with real tokens. Both runs and the remaining two skips are in `docs/security.md` §9 |
 | **G-17 upload ownership** | **Confirmed fixed — first time.** A teacher at the same school as the uploader gets **403** on `/confirm`, `/tag` and `/file`. Previously untestable: every probe used teachers at *different* schools, where the school check refuses first and the ownership check never runs |
 | **Plan 08 sabotage exercise** | **Done, and it found something.** With `photo.uploaded_by === user.id` deleted from `assertPhotoAccess`, exactly the 3 new same-school G-17 tests failed. `photos.test.ts`'s similarly-named test stayed **green** — its teachers are at different schools, so it never guarded G-17 at all |
 | **`pnpm test` with the new file** | **79 passed, 0 failed**, 5 files. T-23 now passes; the fixture fix landed in `2928b76` |
@@ -170,9 +170,21 @@ guard does nothing unless the variable exists.
 - **Uploads have only been exercised through the seed script**, which calls the
   photo service directly. The HTTP upload path — `POST /photos`, the multipart
   file step, `/tag`, `/confirm` — has not been driven end to end by a client.
-- **HEIC conversion and magic-byte rejection are still unproven.** Every seed
-  asset is already a JPEG, so `converted:false` on all six. Nothing has tested
-  a `.heic` input or a `.txt` renamed to `.jpg`.
+- ~~**HEIC conversion and magic-byte rejection are still unproven.**~~ **Both
+  resolved, and one of them resolved badly.**
+  - **Magic-byte rejection is tested.** `photos.test.ts` T-20, *"rejects a file
+    that is not really an image"*, attaches `Buffer.from('this is plain text,
+    not a jpeg')` as `image/jpeg` and asserts **400**. It has run on every suite
+    execution since 1 August.
+  - **HEIC conversion does not work, and cannot on the prebuilt `sharp`.**
+    Tested against a real HEVC HEIC on 24 July 2026: *"No decoding plugin
+    installed for this compression format"*. libvips ships libheif with an AV1
+    codec and no HEVC codec, and an iPhone HEIC is HEVC. The container parses,
+    so `metadata()` reports `format: 'heif'` and only the pixel decode fails.
+    The branch converts AVIF and refuses HEVC with an actionable 400; the real
+    fix is the device-side transcode in `(teacher)/upload.tsx`, which asks the
+    iOS picker for a compatible representation. See
+    `docs/plans/03-storage-and-media.md`, "HEIC conversion does not work".
 - ~~No order has been placed.~~ **Done** — see §4. A parent placed a real order
   with correct integer cents and working idempotency.
 - ~~**G-17 upload-ownership checks are unverified.**~~ **Done** — see §4. The
@@ -180,7 +192,8 @@ guard does nothing unless the variable exists.
   using it.
 - ~~**Plan 08's sabotage exercise has not been done.**~~ **Done** — see §4.
 - ~~**`verify-security.sh` has never run against a real instance.**~~ **Done** —
-  26 passed, 0 failed, 3 skipped.
+  26 passed, 0 failed, 3 skipped on 1 Aug, and 27 passed, 0 failed, 2 skipped on
+  11 Aug after the 9 Aug sweep.
 - **No error has reached Sentry.** `initSentry()` has only taken its no-op path.
   Needs a DSN; it is an account signup, not a code change.
 - **Nothing has been verified against a *deployed* instance.** The run above was
@@ -208,6 +221,7 @@ guard does nothing unless the variable exists.
 | **G-45** | unowned | Plan 01 Step 8 — custom SMTP. Supabase's default is rate-limited to a few emails an hour, so **OTP delivery will fail mid-demo**. Dashboard task, no code fix. Lower priority now that teacher/parent can sign in with a password. |
 | ~~**T-23 fails**~~ | Ruthwik · Plan 08 | **Closed and confirmed green.** It was a defect in the test, not the product: `createTestPhoto` wrote a row with no object behind it, and `confirmUpload` calls `fileExistsInStorage` and 404s when the object is absent. `2928b76` made the helper upload a real fixture. `photos.test.ts > notifies tagged children's parents` — the only automated guard on G-07 — now passes, as part of 79 of 79. |
 | **S-15** | Plan 11 | Supabase project ref committed; keys not rotated. |
+| **Two-school parents file every order under one school** | Ruthwik | **Found 13 Aug while writing the order tests; not fixed.** `createOrder` files the order under `req.user.schoolId`, and `mapParentToStudent` back-fills a parent's `school_id` only when it is absent — deliberate, and its own comment says so. So a parent with children at two schools has every order attributed to whichever school linked them first: the second school's admin never sees those orders in their fulfilment queue, and the first sees an order for a photo that is not theirs. The school should come from the ordered photo, not the buyer's profile. |
 | — | Bhargav | ~~Create the first `.env`.~~ **Done 1 Aug** — dev environment runs, 19 migrations applied. |
 | — | Bhargav | ~~Create the `hive-test` Supabase project.~~ **Done** — `sdbiuzuyipneioceqysm`, 19 migrations applied, suite runs. |
 | — | — | ~~Seed data.~~ **Done** — the seed photographs landed in `abe853a` and the dataset is loaded. This was the last infrastructure blocker; everything remaining is ordinary work. |
@@ -221,7 +235,7 @@ guard does nothing unless the variable exists.
 | **CP-1** | App compiles · no "Coming Soon" · no credentials in repo | ✔ **Met.** |
 | **CP-2** | Order placeable · private storage with thumbnails · role guards · IDORs closed | ✔ **Met.** All four verified at runtime — order placed with correct cents and working idempotency, photos private with thumbnails and signed URLs, role guards returning 403, cross-school IDOR closed. |
 | **CP-3** | Demo seed on a fresh DB · test harness runs | ✔ **Met.** Seed loads schools, classes, students, parents, 6 photos with thumbnails and 16 notifications. Harness runs against a separate project. |
-| **CP-4** | 36 tests green · CI on every PR | ✔ **Met. 178 of 178 green**, re-run 9 Aug (8 files). Includes 20 authorization tests and the `orders`/`admin` files Plan 08 specified but nobody wrote. T-23 is fixed. The suite has also been shown to *detect* — see the sabotage exercise in §4. **Two caveats:** the CI test step is `continue-on-error` until `TEST_SUPABASE_*` exist as repository secrets, so the suite still gates nothing on a PR; and only the cursor fix in §10 added tests, so the rest of the 9 Aug work is not covered by it. One known flake — see §10. |
+| **CP-4** | 36 tests green · CI on every PR | ✔ **Met. 218 tests across 8 files** since `3b2f4c4` (13 Aug); 178 of 178 green when re-run 9 Aug. Includes 20 authorization tests and the `orders`/`admin` files Plan 08 specified but nobody wrote. T-23 is fixed. The suite has also been shown to *detect* — see the sabotage exercise in §4. **Two caveats:** the CI test step is `continue-on-error` until `TEST_SUPABASE_*` exist as repository secrets, so the suite still gates nothing on a PR; and the 40 tests `3b2f4c4` added for the 9 Aug work were not proven by mutation, because the sandbox refused edits under `src/`. One known flake — see §10. |
 | **CP-5** | Deployed and reachable · Sentry receiving · docs complete | ✗ Nothing deployed. |
 | **CP-6** | Manual QA green · demo rehearsed · submission pack | ✗ |
 
@@ -249,7 +263,7 @@ than anything else here; check §4 before trusting it.*
 3. **Make the CI test step blocking.** The step exists as of 2 Aug but carries
    `continue-on-error: true`, because it needs `TEST_SUPABASE_URL`,
    `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` as **repository
-   secrets** before it can go red on failure. Until somebody adds them, 178
+   secrets** before it can go red on failure. Until somebody adds them, 218
    passing tests still guard nothing on a pull request.
 4. **Drive the app on a device.** Nothing has been seen rendered.
 5. **Sentry has never received an error.** Needs a DSN. Account signup, not code.
@@ -580,21 +594,46 @@ inherit the state.
 
 The same caveat as §5, and it applies to all of the above:
 
-- **Almost no test was added.** The suite was 155 before and after the first
-  twelve commits. The follow-up round that fixed the regressions those commits
-  introduced added `tests/cursor.test.ts` (23 cases), taking it to 178 — so the
-  keyset-pagination fix is covered and essentially nothing else here is. Every other fix
-  is guarded by review and typecheck only, including the server-side ones that
-  the existing harness could cover cheaply — the ordering fixes, the
-  idempotency-cache change, the cursor validation, the admin no-ops.
+- ~~**Almost no test was added.**~~ **Addressed on 13 August by `3b2f4c4`,
+  which added 40 tests and took the suite from 178 to 218 across the same 8
+  files.** The history: the suite was 155 before and after the first twelve
+  commits; the follow-up round that fixed the regressions those commits
+  introduced added `tests/cursor.test.ts` (23 cases), taking it to 178, so for
+  four days the keyset-pagination fix was covered and essentially nothing else
+  in this section was. `3b2f4c4` closed that, covering the ordering fixes,
+  idempotency, the upload retry paths, admin integrity and malformed input.
+
+  **The honest caveat: those 40 tests were not proven by mutation.** The
+  sandbox refused edits under `src/`, so the sabotage exercise that validated
+  the earlier authorization tests could not be repeated here — "these fail on a
+  regression" is reasoning, not measurement. The one indirect proof is that the
+  pre-existing replay test passes, which means Redis is live and the
+  corrected-retry case is not passing vacuously through the middleware's
+  Redis-failure fallback.
 - **None of the mobile work has been rendered on a device.** The cold-start
   hang, the sign-out fallback, the upload retry path, the notification badge,
   the progress bar and the six error states have been typechecked and read, not
   seen. The auth fixes in particular describe races and lifecycle ordering,
   which are exactly the class of defect that a typecheck cannot observe.
-- **`verify-security.sh` has not been re-run.** The 1 Aug run predates changes
-  to the rate limiter, CORS and the error handler — three of the things it
-  checks.
+- ~~**The route-group collisions beyond `/orders` were not each walked
+  through.**~~ **Done, 11 August, in Chrome as a signed-in parent.**
+  `/notifications` and `/profile` each cold-load to the parent's own screen, and
+  `/dashboard` — which has no parent equivalent — correctly falls back to
+  `/feed`. That is the expected behaviour by construction: `GROUP_ROUTES` in
+  `types/navigation.ts` lists `notifications` and `profile` under `parent` but
+  not `dashboard`, so `getRoleEquivalentRoute` resolves the first two and
+  returns nothing for the third, leaving `RoleGate` to redirect to
+  `getRoleRoute('parent')`. This item is now verified rather than half-open.
+  Native deep links (`hive://…`) are a separate question and remain unchecked —
+  Plan 04's mobile checklist still applies.
+- ~~**`verify-security.sh` has not been re-run.**~~ **Re-run 11 Aug** —
+  27 passed, 0 failed, 2 skipped, so the changes this round made to the rate
+  limiter, CORS and the error handler are covered. Running it also exposed two
+  things about the script itself: its rate-limit check had never been able to
+  pass, because it targeted the rate-limit-exempt `/health`, and the script had
+  never run in full at all, because `verify:env` needs `SUPABASE_ANON_KEY` and
+  that variable was missing from the backend env — 13 of 26 checks were
+  skipping. Both fixed in `701c999`; see `docs/security.md` §9.
 - **The rate-limit rekeying is untested under load.** Keying on a hash of the
   bearer token is a behaviour change to a security control, verified by reading.
 - **Nothing is deployed.** No hosted URL, no APK, no `eas.json` in the tree.
