@@ -8,9 +8,10 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { colors, spacing } from '@/theme';
+import { Ionicons } from '@expo/vector-icons';
+
+import { colors, spacing, withAlpha } from '@/theme';
 import { HiveImage } from './HiveImage';
-import { Text } from '@/components/ui/Text';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -146,10 +147,10 @@ export function PhotoViewer({ uri, blurhash, onClose }: PhotoViewerProps) {
         onPress={handleClose}
         style={styles.closeButton}
         hitSlop={16}
+        accessibilityRole="button"
+        accessibilityLabel="Close photo"
       >
-        <Text variant="h3" color={colors.white}>
-          {'\u00D7'}
-        </Text>
+        <Ionicons name="close" size={22} color={colors.text.onInk} />
       </Pressable>
 
       {/* Zoomable image */}
@@ -174,7 +175,9 @@ export function PhotoViewer({ uri, blurhash, onClose }: PhotoViewerProps) {
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.black,
+    // Ink rather than pure black: the photo is warm, and a true-black ground
+    // makes skin tones read cold.
+    backgroundColor: colors.ink[900],
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -186,7 +189,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: withAlpha(colors.ink[700], 0.75),
     alignItems: 'center',
     justifyContent: 'center',
   },

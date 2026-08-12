@@ -2,77 +2,61 @@ import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
 
-import { colors, fontFamily, layout } from '@/theme';
+import { colors, fontFamily, layout, identityPalette } from '@/theme';
 import { Text } from './Text';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type AvatarSize = 'sm' | 'md' | 'lg';
+export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 export interface AvatarProps {
   /** Remote or local image URI. */
   uri?: string | null;
-  /** Display name used to derive fallback initials (first two letters). */
+  /** Display name used for fallback initials and the fallback colour. */
   name?: string;
   /** Preset size. */
   size?: AvatarSize;
-  /** Optional border color for active / highlight states (e.g. amber ring). */
+  /** Ring colour for active / highlight states. */
   borderColor?: string;
-  /** Border width when `borderColor` is set. Defaults to 2. */
+  /** Ring width when `borderColor` is set. Defaults to 2. */
   borderWidth?: number;
   /** Override container style. */
   style?: StyleProp<ViewStyle>;
 }
 
 // ---------------------------------------------------------------------------
-// Size map
+// Sizes
 // ---------------------------------------------------------------------------
 
 const SIZE_MAP: Record<AvatarSize, number> = {
+  xs: 24,
   sm: 32,
   md: 44,
   lg: 64,
+  xl: 88,
 };
 
 const FONT_SCALE: Record<AvatarSize, number> = {
+  xs: 10,
   sm: 12,
   md: 16,
-  lg: 24,
+  lg: 23,
+  xl: 30,
 };
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Derive up-to-two uppercase initials from a name. */
+/** Up to two uppercase initials from a name. */
 function getInitials(name?: string): string {
   if (!name) return '?';
-  const parts = name.trim().split(/\s+/);
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
   if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-/** Simple deterministic colour from a string — used for the fallback circle. */
-const FALLBACK_COLORS = [
-  colors.primary.amber,
-  colors.primary.blue,
-  colors.primary.mint,
-  colors.primary.lavender,
-  colors.primary.amberDark,
-  colors.primary.blueDark,
-  colors.primary.mintDark,
-  colors.primary.lavenderDark,
-];
-
-function getColorFromName(name?: string): string {
-  if (!name) return FALLBACK_COLORS[0];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return FALLBACK_COLORS[Math.abs(hash) % FALLBACK_COLORS.length];
 }
 
 // ---------------------------------------------------------------------------
@@ -80,13 +64,15 @@ function getColorFromName(name?: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * `<Avatar>` — circular profile image with initial-letter fallback.
+ * `<Avatar>` — a circular portrait with an initials fallback.
  *
- * Uses `expo-image` for performant caching and blurhash support.
+ * The fallback is a tinted wash with the initials in the *deep* form of the
+ * same hue, rather than white on a saturated fill. Saturated circles in five
+ * different colours turn a class list into confetti; a wash keeps the child's
+ * name the thing you read.
  *
  * ```tsx
- * <Avatar uri={user.avatarUrl} name={user.displayName} size="md" />
- * <Avatar name="Jane Doe" size="lg" borderColor={colors.primary.amber} />
+ * <Avatar uri={child.avatarUrl} name={child.fullName} size="md" />
  * ```
  */
 export function Avatar({
@@ -100,7 +86,7 @@ export function Avatar({
   const dimension = SIZE_MAP[size];
   const initialsSize = FONT_SCALE[size];
   const initials = useMemo(() => getInitials(name), [name]);
-  const fallbackBg = useMemo(() => getColorFromName(name), [name]);
+  const identity = useMemo(() => identityPalette(name ?? ''), [name]);
 
   const [imgError, setImgError] = useState(false);
   const showImage = !!uri && !imgError;
@@ -110,9 +96,8 @@ export function Avatar({
     height: dimension,
     borderRadius: layout.avatarRadius,
     overflow: 'hidden',
-    ...(borderColor
-      ? { borderColor, borderWidth: borderWidthProp }
-      : {}),
+    backgroundColor: colors.background.surfaceSecondary,
+    ...(borderColor ? { borderColor, borderWidth: borderWidthProp } : {}),
   };
 
   return (
@@ -122,18 +107,19 @@ export function Avatar({
           source={{ uri }}
           style={styles.image}
           contentFit="cover"
-          transition={200}
+          transition={220}
           onError={() => setImgError(true)}
+          accessibilityLabel={name ? `${name}'s photo` : undefined}
         />
       ) : (
-        <View style={[styles.fallback, { backgroundColor: fallbackBg }]}>
+        <View style={[styles.fallback, { backgroundColor: identity.wash }]}>
           <Text
-            variant="captionBold"
-            color={colors.white}
+            color={identity.ink}
             style={{
-              fontFamily: fontFamily.bodySemiBold,
+              fontFamily: fontFamily.bodyBold,
               fontSize: initialsSize,
-              lineHeight: initialsSize * 1.2,
+              lineHeight: initialsSize * 1.25,
+              letterSpacing: 0.3,
             }}
           >
             {initials}

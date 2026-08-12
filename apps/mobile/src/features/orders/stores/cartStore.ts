@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { PRODUCT_PRICES_CENTS, type ProductType } from '../constants/products';
+import { PRODUCT_PRICES_PAISE, type ProductType } from '../constants/products';
 
 // ---------------------------------------------------------------------------
 // Product Prices
@@ -60,7 +60,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
       photoUri,
       productType,
       quantity: 1,
-      unitPriceCents: PRODUCT_PRICES_CENTS[productType],
+      unitPriceCents: PRODUCT_PRICES_PAISE[productType],
     };
 
     set((state) => ({

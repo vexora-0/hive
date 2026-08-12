@@ -9,7 +9,6 @@ import {
 import LottieView, { type AnimationObject } from 'lottie-react-native';
 
 import { colors } from '@/theme/colors';
-import { spacing } from '@/theme/spacing';
 
 // --------------------------------------------------------------------------
 // Types
@@ -65,7 +64,7 @@ export const LottieWrapper: React.FC<LottieWrapperProps> = ({
         <ActivityIndicator
           style={styles.loader}
           size="small"
-          color={colors.primary.amber}
+          color={colors.text.accent}
         />
       )}
 

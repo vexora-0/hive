@@ -3,13 +3,11 @@ import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing } from '@/theme';
-import { Text } from '@/components/ui';
+import { colors, spacing, radius, layout } from '@/theme';
 import { ScreenContainer } from '@/components/layout';
 import { ClassSelector, type ClassItem } from '@/components/forms/ClassSelector';
-import { PolaroidCard } from '@/components/media';
-import { MasonryGrid } from '@/components/media';
-import { HoneycombFAB } from '@/components/animation';
+import { PhotoMount, MasonryGrid } from '@/components/media';
+import { HoneycombFAB, Reveal } from '@/components/animation';
 import { EmptyState, SkeletonShimmer, ConfirmDialog, useToast } from '@/components/feedback';
 import { HeaderBar } from '@/components/navigation';
 
@@ -29,20 +27,20 @@ function DashboardSkeleton() {
   return (
     <View style={styles.skeletonContainer}>
       {/* Class selector skeleton */}
-      <SkeletonShimmer width="100%" height={44} borderRadius={12} />
+      <SkeletonShimmer width="100%" height={52} borderRadius={radius.sm} />
 
       {/* Grid skeletons */}
       <View style={styles.skeletonGrid}>
         <View style={styles.skeletonColumn}>
-          <SkeletonShimmer width="100%" height={180} borderRadius={8} />
-          <View style={{ height: spacing.sm }} />
-          <SkeletonShimmer width="100%" height={220} borderRadius={8} />
+          <SkeletonShimmer width="100%" height={180} borderRadius={radius.mount} index={0} />
+          <View style={{ height: spacing.ms }} />
+          <SkeletonShimmer width="100%" height={220} borderRadius={radius.mount} index={2} />
         </View>
-        <View style={{ width: spacing.sm }} />
+        <View style={{ width: spacing.ms }} />
         <View style={styles.skeletonColumn}>
-          <SkeletonShimmer width="100%" height={220} borderRadius={8} />
-          <View style={{ height: spacing.sm }} />
-          <SkeletonShimmer width="100%" height={180} borderRadius={8} />
+          <SkeletonShimmer width="100%" height={220} borderRadius={radius.mount} index={1} />
+          <View style={{ height: spacing.ms }} />
+          <SkeletonShimmer width="100%" height={180} borderRadius={radius.mount} index={3} />
         </View>
       </View>
     </View>
@@ -138,15 +136,19 @@ export default function DashboardScreen() {
 
   // ── Render item ─────────────────────────────────────────────────────
   const renderPhoto = useCallback(
-    ({ item }: { item: Photo }) => (
-      <PolaroidCard
-        id={item.id}
-        uri={item.thumbnailUri ?? item.uri}
-        blurhash={item.blurhash}
-        caption={item.caption}
-        onLongPress={() => setPendingRemoval(item)}
-        style={styles.polaroid}
-      />
+    ({ item, index }: { item: Photo; index: number }) => (
+      <Reveal index={index < 6 ? index : 0} style={styles.cell}>
+        <PhotoMount
+          id={item.id}
+          uri={item.thumbnailUri ?? item.uri}
+          blurhash={item.blurhash}
+          caption={item.caption ?? undefined}
+          onLongPress={() => setPendingRemoval(item)}
+          accessibilityLabel={
+            item.caption ?? 'Class photo. Press and hold to remove.'
+          }
+        />
+      </Reveal>
     ),
     [],
   );
@@ -167,9 +169,20 @@ export default function DashboardScreen() {
     </View>
   );
 
+  const selectedClass = classes.find((c) => c.id === selectedClassId);
+
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
-      <HeaderBar title="Dashboard" />
+      <HeaderBar
+        large
+        title="Your class"
+        eyebrow={selectedClass?.name ?? undefined}
+        subtitle={
+          photos.length > 0
+            ? `${photos.length} photo${photos.length === 1 ? '' : 's'} shared`
+            : undefined
+        }
+      />
 
       {isLoading ? (
         <DashboardSkeleton />
@@ -187,20 +200,23 @@ export default function DashboardScreen() {
               // invites the teacher to re-upload photos that are already there.
               photosError ? (
                 <EmptyState
+                  icon="cloud-offline-outline"
                   title="Couldn't load photos"
                   message="Check your connection and try again."
-                  action={{ label: 'Retry', onPress: handleRefresh }}
+                  action={{ label: 'Try again', onPress: handleRefresh }}
                 />
               ) : hasSchool ? (
                 <EmptyState
-                  title="No photos yet"
-                  message="Tap the camera button below to upload your first photos for this class."
-                  action={{ label: 'Upload Photos', onPress: handleFABPress }}
+                  icon="camera-outline"
+                  title="Nothing shared yet"
+                  message="Upload today's photos and tag the children in them. Only their own parents will see them."
+                  action={{ label: 'Upload photos', onPress: handleFABPress }}
                 />
               ) : (
                 <EmptyState
+                  icon="business-outline"
                   title="No school assigned"
-                  message="An administrator needs to assign you to a school before you can upload photos."
+                  message="An administrator needs to add you to a school before you can upload photos."
                 />
               )
             }
@@ -209,13 +225,8 @@ export default function DashboardScreen() {
           {/* Floating action button */}
           <HoneycombFAB
             onPress={handleFABPress}
-            icon={
-              <Ionicons
-                name="camera"
-                size={24}
-                color={colors.white}
-              />
-            }
+            accessibilityLabel="Upload photos"
+            icon={<Ionicons name="camera" size={24} color={colors.ink[900]} />}
           />
 
           <ConfirmDialog
@@ -244,14 +255,13 @@ const styles = StyleSheet.create({
   header: {
     paddingBottom: spacing.md,
   },
-  polaroid: {
-    flex: 1,
-    margin: spacing.xs,
+  cell: {
+    paddingHorizontal: spacing.xs + 2,
   },
   skeletonContainer: {
     flex: 1,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    paddingTop: spacing.sm,
     gap: spacing.md,
   },
   skeletonGrid: {

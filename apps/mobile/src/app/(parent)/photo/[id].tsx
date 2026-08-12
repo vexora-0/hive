@@ -10,7 +10,9 @@ import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, spacing, STALE_TIME_MS } from '@/theme';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+
+import { colors, spacing, radius, withAlpha, STALE_TIME_MS } from '@/theme';
 import { Text, Button } from '@/components/ui';
 import { PhotoViewer } from '@/components/media';
 import { EmptyState } from '@/components/feedback';
@@ -57,7 +59,7 @@ export default function PhotoDetailScreen() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary.amber} />
+        <ActivityIndicator size="large" color={colors.text.accent} />
       </View>
     );
   }
@@ -69,8 +71,9 @@ export default function PhotoDetailScreen() {
   // missing photo and a refused one are deliberately shown the same way.
   if (isError || !photo) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.errorContainer}>
         <EmptyState
+          icon="image-outline"
           title="Photo unavailable"
           message="We couldn't load this photo. It may have been removed."
           action={{ label: 'Go back', onPress: handleClose }}
@@ -110,7 +113,8 @@ export default function PhotoDetailScreen() {
       </Pressable>
 
       {/* Bottom info bar */}
-      <View
+      <Animated.View
+        entering={FadeInDown.duration(320).delay(120)}
         style={[
           styles.bottomBar,
           { paddingBottom: Math.max(insets.bottom, spacing.md) },
@@ -118,47 +122,26 @@ export default function PhotoDetailScreen() {
       >
         <View style={styles.bottomInfo}>
           {photo.caption && (
-            <Text
-              variant="body"
-              color={colors.white}
-              numberOfLines={2}
-              style={styles.caption}
-            >
+            <Text variant="bodyBold" onInk numberOfLines={2} style={styles.caption}>
               {photo.caption}
             </Text>
           )}
 
-          <Text
-            variant="bodySmall"
-            color={colors.gray[400]}
-            style={styles.date}
-          >
+          <Text variant="bodySmall" onInk muted>
             {photo.uploadedBy.name
               ? `${formattedDate} · by ${photo.uploadedBy.name}`
               : formattedDate}
           </Text>
         </View>
 
-        <Pressable
+        <Button
+          variant="primary"
           onPress={handleOrderPrint}
-          style={({ pressed }) => [
-            styles.orderButton,
-            pressed && styles.orderButtonPressed,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Order a print of this photo"
+          leftIcon={<Ionicons name="cart" size={17} color={colors.ink[900]} />}
         >
-          <Ionicons
-            name="cart-outline"
-            size={18}
-            color={colors.white}
-            style={styles.orderIcon}
-          />
-          <Text variant="bodyBold" color={colors.white}>
-            Order Print
-          </Text>
-        </Pressable>
-      </View>
+          Order a print
+        </Button>
+      </Animated.View>
     </View>
   );
 }
@@ -170,11 +153,19 @@ export default function PhotoDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.black,
+    backgroundColor: colors.ink[900],
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: colors.black,
+    backgroundColor: colors.ink[900],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // The error state is paper, not ink: there is no photograph to sit behind,
+  // and an EmptyState on black reads as a crash rather than a message.
+  errorContainer: {
+    flex: 1,
+    backgroundColor: colors.background.cream,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -185,7 +176,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: withAlpha(colors.ink[700], 0.75),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -197,33 +188,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
+    gap: spacing.md,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.lg,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    backgroundColor: withAlpha(colors.ink[900], 0.92),
   },
   bottomInfo: {
     flex: 1,
-    marginRight: spacing.md,
+    paddingBottom: spacing.sm,
   },
   caption: {
     marginBottom: spacing.xs,
-  },
-  date: {
-    marginBottom: spacing.xs,
-  },
-  orderButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary.amber,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: 12,
-    minHeight: 44,
-  },
-  orderButtonPressed: {
-    opacity: 0.85,
-  },
-  orderIcon: {
-    marginRight: spacing.xs,
   },
 });

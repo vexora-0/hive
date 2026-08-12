@@ -18,7 +18,7 @@ import { NotificationCenter } from '@/features/notifications/components/Notifica
 export default function NotificationsScreen() {
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
-      <HeaderBar title="Notifications" />
+      <HeaderBar large title="Notifications" />
       <NotificationCenter />
     </ScreenContainer>
   );

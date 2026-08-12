@@ -10,11 +10,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing } from '@/theme';
+import { colors, spacing, radius, layout, shadows, platformShadow } from '@/theme';
 import { ScreenContainer } from '@/components/layout/ScreenContainer';
 import { HeaderBar } from '@/components/navigation/HeaderBar';
-import { Text } from '@/components/ui/Text';
-import { Button } from '@/components/ui/Button';
+import { Text, Button, Avatar } from '@/components/ui';
 import { useClassDetail } from '@/features/admin/hooks/useClassDetail';
 import { StudentCard } from '@/features/admin/components/StudentCard';
 import { AssignTeacherSheet } from '@/features/admin/components/AssignTeacherSheet';
@@ -122,9 +121,9 @@ export default function ClassDetailScreen() {
   if (isLoading) {
     return (
       <ScreenContainer edges={['top', 'left', 'right']}>
-        <HeaderBar title="Class Detail" showBack onBack={() => router.back()} />
+        <HeaderBar title="Class" showBack onBack={() => router.back()} />
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary.amber} />
+          <ActivityIndicator size="large" color={colors.primary.amberDark} />
         </View>
       </ScreenContainer>
     );
@@ -135,12 +134,13 @@ export default function ClassDetailScreen() {
   if (isError || !classDetail) {
     return (
       <ScreenContainer edges={['top', 'left', 'right']}>
-        <HeaderBar title="Class Detail" showBack onBack={() => router.back()} />
+        <HeaderBar title="Class" showBack onBack={() => router.back()} />
         <View style={styles.centered}>
           <EmptyState
+            icon="cloud-offline-outline"
             title="Couldn't load this class"
             message="Check your connection and try again."
-            action={{ label: 'Retry', onPress: () => refetch() }}
+            action={{ label: 'Try again', onPress: () => refetch() }}
           />
         </View>
       </ScreenContainer>
@@ -175,41 +175,38 @@ export default function ClassDetailScreen() {
 
         {/* Teacher section */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="school-outline" size={18} color={colors.text.secondary} />
-            <Text variant="bodyBold" style={styles.sectionTitle}>Teacher</Text>
-          </View>
+          <Text variant="eyebrow" color={colors.text.tertiary} style={styles.sectionTitle}>
+            Teacher
+          </Text>
 
           {classDetail.teacher ? (
-            <Pressable onPress={() => setShowTeacherSheet(true)} style={styles.teacherCard}>
-              <Ionicons name="person" size={20} color={colors.primary.amberDark} />
+            <Pressable
+              onPress={() => setShowTeacherSheet(true)}
+              style={styles.teacherCard}
+              accessibilityRole="button"
+              accessibilityLabel={`Change the teacher for this class. Currently ${classDetail.teacher.full_name}.`}
+            >
+              <Avatar name={classDetail.teacher.full_name} size="sm" />
               <View style={styles.teacherInfo}>
-                <Text variant="body">{classDetail.teacher.full_name}</Text>
-                <Text variant="bodySmall" color={colors.text.secondary}>
+                <Text variant="bodySmallBold">{classDetail.teacher.full_name}</Text>
+                <Text variant="caption" color={colors.text.tertiary}>
                   {classDetail.teacher.email}
                 </Text>
               </View>
-              <Ionicons name="pencil-outline" size={18} color={colors.text.secondary} />
+              <Ionicons name="pencil-outline" size={17} color={colors.text.tertiary} />
             </Pressable>
           ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              onPress={() => setShowTeacherSheet(true)}
-            >
-              Assign Teacher
+            <Button variant="outline" onPress={() => setShowTeacherSheet(true)}>
+              Assign a teacher
             </Button>
           )}
         </View>
 
         {/* Students section */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="people-outline" size={18} color={colors.text.secondary} />
-            <Text variant="bodyBold" style={styles.sectionTitle}>
-              Students ({students.length})
-            </Text>
-          </View>
+          <Text variant="eyebrow" color={colors.text.tertiary} style={styles.sectionTitle}>
+            {students.length} {students.length === 1 ? 'child' : 'children'}
+          </Text>
         </View>
 
         <FlashList
@@ -224,16 +221,21 @@ export default function ClassDetailScreen() {
           keyExtractor={(item) => item.id}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListEmptyComponent={
-            <Text variant="body" color={colors.text.secondary} center style={styles.empty}>
-              No students in this class yet
-            </Text>
+            <EmptyState
+              compact
+              icon="person-add-outline"
+              title="No children yet"
+              message="Add the children in this class so their parents can be linked to them."
+              action={{ label: 'Add a child', onPress: () => setShowAddStudent(true) }}
+            />
           }
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
               onRefresh={refetch}
-              tintColor={colors.primary.amber}
-              colors={[colors.primary.amber]}
+              tintColor={colors.primary.amberDark}
+              colors={[colors.primary.amberDark]}
+              progressBackgroundColor={colors.background.surface}
             />
           }
           contentContainerStyle={styles.listContent}
@@ -244,9 +246,9 @@ export default function ClassDetailScreen() {
           onPress={() => setShowAddStudent(true)}
           style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
           accessibilityRole="button"
-          accessibilityLabel="Add student"
+          accessibilityLabel="Add a child to this class"
         >
-          <Ionicons name="person-add" size={24} color={colors.white} />
+          <Ionicons name="person-add" size={22} color={colors.ink[900]} />
         </Pressable>
       </View>
 
@@ -306,69 +308,57 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    paddingBottom: spacing.md,
   },
   pill: {
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: colors.primary.amberLight + '20',
+    paddingHorizontal: spacing.ms,
+    paddingVertical: spacing.xs + 1,
+    borderRadius: radius.xs,
+    backgroundColor: colors.primary.amberWash,
   },
   section: {
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    marginBottom: spacing.lg,
   },
   sectionTitle: {
-    flex: 1,
+    marginBottom: spacing.sm,
   },
   teacherCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
+    gap: spacing.ms,
+    padding: spacing.ms,
     backgroundColor: colors.background.surface,
-    borderRadius: 12,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border.light,
   },
   teacherInfo: {
     flex: 1,
+    gap: 1,
   },
   listContent: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xxl + 80,
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    paddingBottom: layout.tabBarClearance + 72,
   },
   separator: {
-    height: spacing.xs,
-  },
-  empty: {
-    paddingVertical: spacing.xl,
+    height: spacing.sm,
   },
   fab: {
     position: 'absolute',
-    right: spacing.lg,
-    bottom: spacing.lg,
+    right: spacing.md,
+    bottom: layout.tabBarClearance,
     width: 56,
     height: 56,
     borderRadius: 28,
     backgroundColor: colors.primary.amber,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    ...platformShadow(shadows.large),
   },
   fabPressed: {
     backgroundColor: colors.primary.amberDark,
-    transform: [{ scale: 0.95 }],
+    transform: [{ scale: 0.94 }],
   },
 });

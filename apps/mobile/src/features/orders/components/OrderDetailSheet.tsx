@@ -6,11 +6,17 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-import { formatCents } from '../constants/products';
+import { formatRupees, PRODUCT_LABELS } from '../constants/products';
+import {
+  ORDER_STATUS,
+  ORDER_PROGRESSION,
+  orderProgressIndex,
+} from '../constants/orderStatus';
 import { formatOrderNumber } from '../utils/orderNumber';
-import { colors, spacing, layout } from '@/theme';
-import { Text, Button } from '@/components/ui';
+import { colors, spacing, radius, shadows, platformShadow } from '@/theme';
+import { Text, Button, Badge } from '@/components/ui';
 import { HiveImage } from '@/components/media';
 import type { OrderStatus, ProductType } from '@/types/supabase';
 
@@ -32,35 +38,26 @@ export interface OrderDetailSheetProps {
 // Status timeline config
 // ---------------------------------------------------------------------------
 
-const STATUS_STEPS: { key: OrderStatus; label: string }[] = [
-  { key: 'pending', label: 'Pending' },
-  { key: 'confirmed', label: 'Confirmed' },
-  { key: 'processing', label: 'Processing' },
-  { key: 'shipped', label: 'Shipped' },
-  { key: 'delivered', label: 'Delivered' },
-];
-
-const STATUS_COLORS: Record<OrderStatus, string> = {
-  pending: colors.primary.amber,
-  confirmed: colors.primary.blue,
-  processing: colors.primary.lavender,
-  shipped: colors.primary.mint,
-  delivered: colors.success.main,
-  cancelled: colors.error.main,
-};
+/**
+ * The happy path and its colours now come from `constants/orderStatus`, which
+ * every screen shares. This file used to keep its own copy, so the same order
+ * could read "Processing" here and "Processing" in a different colour in the
+ * admin console.
+ */
+const STATUS_STEPS = ORDER_PROGRESSION.map((key) => ({
+  key,
+  label: ORDER_STATUS[key].label,
+}));
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-
-
 function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
+  return new Date(dateString).toLocaleDateString('en-IN', {
     weekday: 'short',
-    month: 'short',
     day: 'numeric',
+    month: 'short',
     year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
@@ -68,21 +65,11 @@ function formatDate(dateString: string): string {
 }
 
 function getProductLabel(type: ProductType): string {
-  const labels: Record<ProductType, string> = {
-    print_4x6: '4x6 Print',
-    print_5x7: '5x7 Print',
-    print_8x10: '8x10 Print',
-    digital_download: 'Digital Download',
-    photo_book: 'Photo Book',
-    magnet: 'Magnet',
-    mug: 'Mug',
-  };
-  return labels[type];
+  return PRODUCT_LABELS[type];
 }
 
 function getStatusStepIndex(status: OrderStatus): number {
-  if (status === 'cancelled') return -1;
-  return STATUS_STEPS.findIndex((s) => s.key === status);
+  return orderProgressIndex(status);
 }
 
 // ---------------------------------------------------------------------------
@@ -121,12 +108,13 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
     if (isCancelled) {
       return (
         <View style={styles.section}>
-          <Text variant="bodyBold" style={styles.sectionTitle}>
+          <Text variant="eyebrow" color={colors.text.tertiary} style={styles.sectionTitle}>
             Status
           </Text>
-          <View style={[styles.cancelledBadge]}>
-            <Text variant="bodyBold" color={colors.error.dark}>
-              Order Cancelled
+          <View style={styles.cancelledBadge}>
+            <Ionicons name="close-circle" size={19} color={colors.error.dark} />
+            <Text variant="bodySmall" color={colors.error.dark} style={styles.cancelledText}>
+              {ORDER_STATUS.cancelled.description}
             </Text>
           </View>
         </View>
@@ -135,47 +123,56 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
 
     return (
       <View style={styles.section}>
-        <Text variant="bodyBold" style={styles.sectionTitle}>
-          Order Status
+        <Text variant="eyebrow" color={colors.text.tertiary} style={styles.sectionTitle}>
+          Progress
         </Text>
+
+        {/* What is happening right now, in words, above the rail. A row of
+            dots tells a parent which stage is lit; it does not tell them what
+            that stage means. */}
+        <Text variant="bodyBold" style={styles.timelineHeadline}>
+          {ORDER_STATUS[order.status].description}
+        </Text>
+
         <View style={styles.timeline}>
           {STATUS_STEPS.map((step, index) => {
             const isCompleted = index <= currentStepIndex;
             const isCurrent = index === currentStepIndex;
             const isLast = index === STATUS_STEPS.length - 1;
-            const dotColor = isCompleted
-              ? STATUS_COLORS[step.key]
-              : colors.gray[300];
 
             return (
               <View key={step.key} style={styles.timelineStep}>
                 <View style={styles.timelineDotColumn}>
-                  {/* Dot */}
                   <View
                     style={[
                       styles.timelineDot,
-                      { backgroundColor: dotColor },
+                      {
+                        backgroundColor: isCompleted
+                          ? ORDER_STATUS[step.key].tint
+                          : colors.gray[300],
+                      },
                       isCurrent && styles.timelineDotCurrent,
                     ]}
                   />
-                  {/* Line */}
                   {!isLast && (
                     <View
                       style={[
                         styles.timelineLine,
                         {
-                          backgroundColor: isCompleted && index < currentStepIndex
-                            ? STATUS_COLORS[step.key]
-                            : colors.gray[200],
+                          backgroundColor:
+                            index < currentStepIndex
+                              ? ORDER_STATUS[step.key].tint
+                              : colors.gray[200],
                         },
                       ]}
                     />
                   )}
                 </View>
                 <Text
-                  variant={isCurrent ? 'bodySmallBold' : 'bodySmall'}
+                  variant={isCurrent ? 'captionBold' : 'caption'}
                   color={isCompleted ? colors.text.primary : colors.text.tertiary}
                   style={styles.timelineLabel}
+                  numberOfLines={2}
                 >
                   {step.label}
                 </Text>
@@ -193,36 +190,36 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
 
     return (
       <View style={styles.section}>
-        <Text variant="bodyBold" style={styles.sectionTitle}>
-          Items
+        <Text variant="eyebrow" color={colors.text.tertiary} style={styles.sectionTitle}>
+          {order.items.length === 1 ? 'Item' : `${order.items.length} items`}
         </Text>
         {order.items.map((item) => (
           <View key={item.id} style={styles.itemRow}>
             {item.thumbnailUrl ? (
-              <HiveImage
-                uri={item.thumbnailUrl}
-                style={styles.itemImage}
-                contentFit="cover"
-              />
+              <View style={styles.itemMount}>
+                <HiveImage
+                  uri={item.thumbnailUrl}
+                  style={styles.itemImage}
+                  contentFit="cover"
+                />
+              </View>
             ) : (
               // No signed URL — the photo record or its stored object is
               // missing. Keep the slot so the row does not reflow.
               <View style={styles.itemImagePlaceholder}>
-                <Text variant="caption" color={colors.text.tertiary} center>
-                  Photo
-                </Text>
+                <Ionicons name="image-outline" size={20} color={colors.text.tertiary} />
               </View>
             )}
             <View style={styles.itemDetails}>
               <Text variant="bodySmallBold">
                 {getProductLabel(item.product_type)}
               </Text>
-              <Text variant="caption" color={colors.text.secondary}>
-                Qty: {item.quantity} x {formatCents(item.unit_price_cents)}
+              <Text variant="caption" color={colors.text.tertiary}>
+                {item.quantity} × {formatRupees(item.unit_price_cents)}
               </Text>
             </View>
             <Text variant="bodySmallBold">
-              {formatCents(item.quantity * item.unit_price_cents)}
+              {formatRupees(item.quantity * item.unit_price_cents)}
             </Text>
           </View>
         ))}
@@ -244,13 +241,9 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
           <View style={styles.container}>
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary.amber} />
-            <Text
-              variant="bodySmall"
-              color={colors.text.secondary}
-              style={styles.loadingText}
-            >
-              Loading order details...
+            <ActivityIndicator size="large" color={colors.primary.amberDark} />
+            <Text variant="bodySmall" muted style={styles.loadingText}>
+              Loading your order…
             </Text>
           </View>
         ) : order ? (
@@ -260,15 +253,16 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
           >
             {/* Header */}
             <View style={styles.header}>
-              <Text variant="h3">Order Details</Text>
-              <Text variant="caption" color={colors.text.secondary}>
-                #{formatOrderNumber(order.id)}
-              </Text>
+              <View style={styles.headerText}>
+                <Text variant="h2">Your order</Text>
+                <Text variant="caption" color={colors.text.tertiary} style={styles.headerMeta}>
+                  #{formatOrderNumber(order.id)} · placed {formatDate(order.created_at)}
+                </Text>
+              </View>
+              <Badge variant={ORDER_STATUS[order.status].variant} dot>
+                {ORDER_STATUS[order.status].label}
+              </Badge>
             </View>
-
-            <Text variant="bodySmall" color={colors.text.secondary}>
-              Placed on {formatDate(order.created_at)}
-            </Text>
 
             {/* Status timeline */}
             {renderTimeline()}
@@ -276,14 +270,14 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
             {/* Items */}
             {renderItems()}
 
-            {/* Shipping address */}
+            {/* Delivery address */}
             {order.shipping_address && (
               <View style={styles.section}>
-                <Text variant="bodyBold" style={styles.sectionTitle}>
-                  Shipping Address
+                <Text variant="eyebrow" color={colors.text.tertiary} style={styles.sectionTitle}>
+                  Delivering to
                 </Text>
                 <View style={styles.infoCard}>
-                  <Text variant="bodySmall" color={colors.text.secondary}>
+                  <Text variant="bodySmall" muted>
                     {order.shipping_address}
                   </Text>
                 </View>
@@ -293,11 +287,11 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
             {/* Notes */}
             {order.notes && (
               <View style={styles.section}>
-                <Text variant="bodyBold" style={styles.sectionTitle}>
-                  Notes
+                <Text variant="eyebrow" color={colors.text.tertiary} style={styles.sectionTitle}>
+                  Your note
                 </Text>
                 <View style={styles.infoCard}>
-                  <Text variant="bodySmall" color={colors.text.secondary}>
+                  <Text variant="bodySmall" muted>
                     {order.notes}
                   </Text>
                 </View>
@@ -307,21 +301,20 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
             {/* Total */}
             <View style={styles.totalSection}>
               <View style={styles.totalRow}>
-                <Text variant="bodyBold">Total Amount</Text>
-                <Text variant="h3" color={colors.primary.amberDark}>
-                  {formatCents(order.total_cents)}
-                </Text>
+                <Text variant="bodyBold">Total</Text>
+                <Text variant="priceLarge">{formatRupees(order.total_cents)}</Text>
               </View>
             </View>
 
             {canCancel && (
               <Button
                 variant="outline"
+                fullWidth
                 onPress={() => setConfirmingCancel(true)}
                 loading={cancelOrder.isPending}
                 style={styles.cancelButton}
               >
-                Cancel Order
+                Cancel this order
               </Button>
             )}
           </ScrollView>
@@ -338,9 +331,9 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
         <ConfirmDialog
           visible={confirmingCancel}
           title="Cancel this order?"
-          message="The order will not be printed or delivered. You can place a new one at any time."
-          confirmLabel="Cancel Order"
-          cancelLabel="Keep Order"
+          message="It will not be printed or delivered. You can order again at any time."
+          confirmLabel="Cancel order"
+          cancelLabel="Keep it"
           destructive
           onConfirm={handleConfirmCancel}
           onCancel={() => setConfirmingCancel(false)}
@@ -360,27 +353,28 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: colors.overlay.scrim,
   },
   sheet: {
-    maxHeight: '85%',
+    maxHeight: '88%',
     backgroundColor: colors.background.cream,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    ...platformShadow(shadows.xlarge),
   },
   container: {
     flex: 1,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     maxHeight: '100%',
   },
   handleIndicator: {
     alignSelf: 'center',
-    backgroundColor: colors.gray[300],
+    backgroundColor: colors.border.default,
     width: 40,
     height: 4,
     borderRadius: 2,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
+    marginTop: spacing.ms,
+    marginBottom: spacing.md,
   },
   scrollContent: {
     paddingBottom: spacing.xxl,
@@ -390,8 +384,14 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
+    alignItems: 'flex-start',
+    gap: spacing.ms,
+  },
+  headerText: {
+    flex: 1,
+  },
+  headerMeta: {
+    marginTop: spacing.xs,
   },
 
   // Loading
@@ -414,74 +414,84 @@ const styles = StyleSheet.create({
   },
 
   // Timeline
+  timelineHeadline: {
+    marginBottom: spacing.md,
+  },
+  // Horizontal rail: five stages read left to right in the space three read
+  // vertically, and the shape matches the step rail in the order sheet.
   timeline: {
-    paddingLeft: spacing.xs,
+    flexDirection: 'row',
   },
   timelineStep: {
-    flexDirection: 'row',
+    flex: 1,
     alignItems: 'flex-start',
-    minHeight: 40,
   },
   timelineDotColumn: {
+    flexDirection: 'row',
     alignItems: 'center',
-    width: 20,
+    alignSelf: 'stretch',
+    height: 16,
   },
   timelineDot: {
-    width: 12,
-    height: 12,
+    width: 11,
+    height: 11,
     borderRadius: 6,
   },
   timelineDotCurrent: {
     width: 16,
     height: 16,
     borderRadius: 8,
-    borderWidth: 3,
+    borderWidth: 3.5,
     borderColor: colors.background.cream,
-    // Outer ring effect
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
   },
   timelineLine: {
-    width: 2,
+    height: 2,
     flex: 1,
-    minHeight: 20,
   },
   timelineLabel: {
-    marginLeft: spacing.sm,
-    paddingTop: 0,
+    marginTop: spacing.sm,
+    paddingRight: spacing.xs,
   },
 
   // Cancelled
   cancelledBadge: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
     backgroundColor: colors.error.background,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: layout.cardRadius,
-    alignSelf: 'flex-start',
+    paddingVertical: spacing.ms,
+    borderRadius: radius.sm,
+  },
+  cancelledText: {
+    flex: 1,
   },
 
   // Items
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
+    gap: spacing.ms,
+    paddingVertical: spacing.ms,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
   },
+  itemMount: {
+    padding: 4,
+    borderRadius: radius.mount,
+    backgroundColor: colors.background.surface,
+    ...platformShadow(shadows.small),
+  },
   itemImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
+    width: 52,
+    height: 52,
+    borderRadius: radius.print,
   },
   itemImagePlaceholder: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: colors.gray[100],
+    width: 60,
+    height: 60,
+    borderRadius: radius.mount,
+    backgroundColor: colors.background.surfaceSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -493,25 +503,25 @@ const styles = StyleSheet.create({
   // Info cards
   infoCard: {
     backgroundColor: colors.background.surface,
-    borderRadius: layout.cardRadius,
+    borderRadius: radius.lg,
     padding: spacing.md,
-  },
-
-  cancelButton: {
-    marginTop: spacing.lg,
   },
 
   // Total
   totalSection: {
     marginTop: spacing.lg,
-    backgroundColor: colors.background.surface,
-    borderRadius: layout.cardRadius,
-    padding: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
   },
   totalRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  cancelButton: {
+    marginTop: spacing.lg,
   },
 });
 

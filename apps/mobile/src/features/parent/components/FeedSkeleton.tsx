@@ -1,7 +1,7 @@
 import React from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
 
-import { colors, spacing } from '@/theme';
+import { colors, spacing, radius, shadows, platformShadow } from '@/theme';
 import { SkeletonShimmer } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
@@ -9,89 +9,63 @@ import { SkeletonShimmer } from '@/components/feedback';
 // ---------------------------------------------------------------------------
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const COLUMN_GAP = spacing.sm;
+const COLUMN_GAP = spacing.ms;
 const HORIZONTAL_PADDING = spacing.md * 2;
 const CARD_WIDTH = (SCREEN_WIDTH - HORIZONTAL_PADDING - COLUMN_GAP) / 2;
+const MAT = spacing.sm;
+const CAPTION_BAND = 34;
 
-/** Heights that mimic the PolaroidCard aspect ratio + caption area. */
-const CARD_HEIGHTS = [CARD_WIDTH + 40, CARD_WIDTH + 56, CARD_WIDTH + 32, CARD_WIDTH + 48, CARD_WIDTH + 40, CARD_WIDTH + 52];
+/**
+ * The same three print ratios `<PhotoMount>` seeds from, in the same
+ * proportion, so the skeleton has the real wall's rhythm and the layout does
+ * not jump when the photos land.
+ */
+const IMAGE_HEIGHTS = [1, 0.8, 0.75, 1, 0.75, 0.8].map(
+  (ratio) => (CARD_WIDTH - MAT * 2) / ratio,
+);
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 /**
- * `<FeedSkeleton>` -- a skeleton loading state that mimics the masonry
- * grid of PolaroidCards. Shows 6 shimmer cards in a two-column layout.
+ * `<FeedSkeleton>` — the wall before the photos arrive.
  *
- * ```tsx
- * {isLoading && <FeedSkeleton />}
- * ```
+ * Real mounts with shimmering windows, not grey rectangles: the paper, the
+ * corner radius and the caption band are all already correct, so only the
+ * photograph is missing.
  */
 export function FeedSkeleton() {
+  const columns = [
+    IMAGE_HEIGHTS.filter((_, i) => i % 2 === 0),
+    IMAGE_HEIGHTS.filter((_, i) => i % 2 !== 0),
+  ];
+
   return (
     <View style={styles.container}>
-      {/* Child switcher skeleton */}
-      <View style={styles.switcherRow}>
-        {Array.from({ length: 3 }).map((_, i) => (
-          <View key={`avatar-${i}`} style={styles.avatarContainer}>
-            <SkeletonShimmer
-              width={64}
-              height={64}
-              borderRadius={9999}
-            />
-            <View style={styles.avatarNameSpacer}>
-              <SkeletonShimmer
-                width={48}
-                height={12}
-                borderRadius={4}
-              />
-            </View>
+      <View style={styles.grid}>
+        {columns.map((heights, columnIndex) => (
+          <View key={`column-${columnIndex}`} style={styles.column}>
+            {heights.map((height, i) => (
+              <View key={`${columnIndex}-${i}`} style={styles.mount}>
+                <SkeletonShimmer
+                  width="100%"
+                  height={height}
+                  borderRadius={radius.print}
+                  index={i * 2 + columnIndex}
+                />
+                <View style={styles.captionBand}>
+                  <SkeletonShimmer
+                    width={columnIndex === 0 ? '62%' : '48%'}
+                    height={9}
+                    borderRadius={4}
+                    index={i * 2 + columnIndex}
+                  />
+                </View>
+              </View>
+            ))}
           </View>
         ))}
-      </View>
-
-      {/* Masonry grid skeleton */}
-      <View style={styles.grid}>
-        {/* Left column */}
-        <View style={styles.column}>
-          {CARD_HEIGHTS.filter((_, i) => i % 2 === 0).map((height, i) => (
-            <View key={`left-${i}`} style={[styles.card, { height }]}>
-              <SkeletonShimmer
-                width="100%"
-                height={height - 40}
-                borderRadius={2}
-              />
-              <View style={styles.captionSpacer}>
-                <SkeletonShimmer
-                  width="70%"
-                  height={10}
-                  borderRadius={4}
-                />
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Right column */}
-        <View style={styles.column}>
-          {CARD_HEIGHTS.filter((_, i) => i % 2 !== 0).map((height, i) => (
-            <View key={`right-${i}`} style={[styles.card, { height }]}>
-              <SkeletonShimmer
-                width="100%"
-                height={height - 40}
-                borderRadius={2}
-              />
-              <View style={styles.captionSpacer}>
-                <SkeletonShimmer
-                  width="60%"
-                  height={10}
-                  borderRadius={4}
-                />
-              </View>
-            </View>
-          ))}
-        </View>
       </View>
     </View>
   );
@@ -106,37 +80,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background.cream,
   },
-  switcherRow: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.md,
-  },
-  avatarContainer: {
-    alignItems: 'center',
-  },
-  avatarNameSpacer: {
-    marginTop: spacing.xs,
-  },
   grid: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
     gap: COLUMN_GAP,
   },
   column: {
     flex: 1,
-    gap: spacing.sm,
+    gap: COLUMN_GAP,
   },
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: 4,
-    padding: spacing.sm,
+  mount: {
+    backgroundColor: colors.background.surface,
+    borderRadius: radius.mount,
+    padding: MAT,
     paddingBottom: 0,
+    ...platformShadow(shadows.medium),
   },
-  captionSpacer: {
-    height: 40,
+  captionBand: {
+    height: CAPTION_BAND,
     justifyContent: 'center',
-    alignItems: 'center',
+    paddingTop: spacing.sm,
   },
 });
 

@@ -10,7 +10,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { colors, spacing, layout, fontFamily, fontSize, MIN_TAP_SIZE } from '@/theme';
+import { colors, spacing, radius, layout, fontFamily, MIN_TAP_SIZE } from '@/theme';
 import { Text } from '@/components/ui';
 import { Modal } from '@/components/feedback';
 
@@ -124,7 +124,7 @@ export function ClassSelector({
 
           {isSelected && (
             <View style={styles.checkmark}>
-              <Text variant="body" color={colors.primary.amber}>
+              <Text variant="body" color={colors.text.accent}>
                 {'✓'}
               </Text>
             </View>
@@ -266,14 +266,14 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: colors.overlay.scrim,
   },
   sheet: {
     maxHeight: '65%',
     minHeight: 200,
     backgroundColor: colors.background.cream,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
     paddingBottom: spacing.lg,
   },
   handleBar: {
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.gray[300],
+    backgroundColor: colors.border.default,
     marginTop: spacing.sm,
     marginBottom: spacing.xs,
   },

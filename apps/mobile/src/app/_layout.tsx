@@ -5,15 +5,22 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
-import { Baloo2_700Bold } from '@expo-google-fonts/baloo-2';
 import {
-  Nunito_400Regular,
-  Nunito_600SemiBold,
-  Nunito_700Bold,
-} from '@expo-google-fonts/nunito';
+  Fraunces_600SemiBold,
+  Fraunces_700Bold,
+} from '@expo-google-fonts/fraunces';
+import {
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+} from '@expo-google-fonts/plus-jakarta-sans';
 
+import { colors } from '@/theme';
 import { queryClient } from '@/lib/queryClient';
 import { ErrorBoundary, ToastProvider } from '@/components/feedback';
 import { useSession } from '@/features/auth/hooks/useSession';
@@ -40,11 +47,16 @@ SplashScreen.preventAutoHideAsync();
 
 function RootLayout() {
   // ── Fonts ───────────────────────────────────────────────────────────
+  // Fraunces carries the three display sizes; Plus Jakarta Sans does
+  // everything else. See src/theme/typography.ts for which weight does what.
   const [fontsLoaded, fontError] = useFonts({
-    Baloo2_700Bold,
-    Nunito_400Regular,
-    Nunito_600SemiBold,
-    Nunito_700Bold,
+    Fraunces_600SemiBold,
+    Fraunces_700Bold,
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
   });
 
   // ── Auth ────────────────────────────────────────────────────────────
@@ -87,7 +99,16 @@ function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <ErrorBoundary>
             <ToastProvider>
-              <Stack screenOptions={{ headerShown: false }}>
+              <StatusBar style="dark" />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  // Without this every push flashes the default white before
+                  // the screen paints, which on a cream ground reads as a
+                  // stutter.
+                  contentStyle: { backgroundColor: colors.background.cream },
+                }}
+              >
                 {/* Auth group — shown when not authenticated */}
                 <Stack.Screen
                   name="(auth)"
@@ -135,6 +156,7 @@ function RootLayout() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    backgroundColor: colors.background.cream,
   },
 });
 

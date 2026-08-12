@@ -33,12 +33,12 @@ importers:
 
   apps/mobile:
     dependencies:
-      '@expo-google-fonts/baloo-2':
-        specifier: ^0.3.0
-        version: 0.3.0
-      '@expo-google-fonts/nunito':
-        specifier: ^0.3.0
-        version: 0.3.0
+      '@expo-google-fonts/fraunces':
+        specifier: 0.4.1
+        version: 0.4.1
+      '@expo-google-fonts/plus-jakarta-sans':
+        specifier: 0.4.2
+        version: 0.4.2
       '@expo/metro-runtime':
         specifier: ~6.1.2
         version: 6.1.2(expo@54.0.33)(react-dom@19.1.0(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -1063,11 +1063,11 @@ packages:
     resolution: {integrity: sha512-d9zaMRSTIKDLhctzH12MtXvJKSSUhaHcjV+2Z+GK+EEY7XKpP5yR4x+N3TAcHTcu963nIr+TMcCb4DBCYX1z6Q==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
 
-  '@expo-google-fonts/baloo-2@0.3.0':
-    resolution: {integrity: sha512-3CuZDXpieb3CltghZfwnhjdkMRmlid7lTzygZhYoipWkkKxNCCbidXK66Gmtl8uqM4feMOMlJKJnj7Pd5w6njg==}
+  '@expo-google-fonts/fraunces@0.4.1':
+    resolution: {integrity: sha512-gYc9P92ObyWvz1rWPOeWSvVKyBFIuA8hgOdhvo4DSiPBaWLbFA6v8uLIEIBwW+0oWTlXbBzjeBReHQI2H7UNjQ==}
 
-  '@expo-google-fonts/nunito@0.3.0':
-    resolution: {integrity: sha512-7vfsuOqBm+MWjiNjWOX6t17nQbj1SN+oWwp8EGShexurF7dss2URRJG3hBlG7cxoGdZm+rw2iY+DSMZSUSlFZA==}
+  '@expo-google-fonts/plus-jakarta-sans@0.4.2':
+    resolution: {integrity: sha512-6LYVmVGwjQvH+uzzWlVc9+oMj4lkNQ41aymVDjO+x8aFk8kCye20wOyLomYMZaMezA++Uf1mZRCw3W3Fy/hxEA==}
 
   '@expo/cli@54.0.23':
     resolution: {integrity: sha512-km0h72SFfQCmVycH/JtPFTVy69w6Lx1cHNDmfLfQqgKFYeeHTjx7LVDP4POHCtNxFP2UeRazrygJhlh4zz498g==}
@@ -6513,9 +6513,9 @@ snapshots:
 
   '@eslint/js@8.57.1': {}
 
-  '@expo-google-fonts/baloo-2@0.3.0': {}
+  '@expo-google-fonts/fraunces@0.4.1': {}
 
-  '@expo-google-fonts/nunito@0.3.0': {}
+  '@expo-google-fonts/plus-jakarta-sans@0.4.2': {}
 
   ? '@expo/cli@54.0.23(expo-router@6.0.23(@expo/metro-runtime@6.1.2)(@types/react@19.1.17)(expo-constants@18.0.13)(expo-linking@8.0.11)(expo@54.0.33)(react-dom@19.1.0(react@19.1.0))(react-native-gesture-handler@2.28.0(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native-reanimated@4.1.6(@babel/core@7.29.0)(react-native-worklets@0.5.1(@babel/core@7.29.0)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native-safe-area-context@5.6.2(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native-screens@4.16.0(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native-web@0.21.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(expo@54.0.33(@babel/core@7.29.0)(@expo/metro-runtime@6.1.2)(expo-router@6.0.23)(graphql@15.8.0)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(graphql@15.8.0)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))'
   : dependencies:

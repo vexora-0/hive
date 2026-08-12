@@ -1,11 +1,18 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing, layout, MIN_TAP_SIZE } from '@/theme';
-import { Text, Button, TextInput } from '@/components/ui';
-import { LottieWrapper, HoneycombPattern } from '@/components/animation';
+import {
+  Text,
+  Button,
+  TextInput,
+  SegmentedControl,
+  type SegmentOption,
+} from '@/components/ui';
+import { HoneycombPattern, Reveal } from '@/components/animation';
+import { HiveMark } from '@/components/brand';
 import { ScreenContainer } from '@/components/layout';
 import { useOTP } from '@/features/auth/hooks/useOTP';
 import { useAuthStore } from '@/features/auth/stores/authStore';
@@ -23,8 +30,8 @@ type SignInRole = 'teacher' | 'parent' | 'admin';
 // ---------------------------------------------------------------------------
 
 /**
- * Login screen — choose Teacher, Parent, or Admin, enter email, then:
- *   - Teacher / Parent → OTP flow
+ * Login screen — choose Parent, Teacher, or Admin, enter email, then:
+ *   - Parent / Teacher → OTP flow (or an opt-in password)
  *   - Admin → email + password
  */
 export default function LoginScreen() {
@@ -113,12 +120,12 @@ export default function LoginScreen() {
   const validateEmail = useCallback((value: string): boolean => {
     const trimmed = value.trim();
     if (!trimmed) {
-      setEmailError('Email is required.');
+      setEmailError('Enter the email your school has on file.');
       return false;
     }
     // Simple RFC-ish check
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      setEmailError('Please enter a valid email address.');
+      setEmailError('That does not look like an email address.');
       return false;
     }
     setEmailError(undefined);
@@ -133,7 +140,7 @@ export default function LoginScreen() {
     if (isPasswordMode) {
       // ── Password sign-in ──────────────────────────────────────────
       if (!password.trim()) {
-        setPasswordError('Password is required.');
+        setPasswordError('Enter your password.');
         return;
       }
       setPasswordError(undefined);
@@ -142,10 +149,10 @@ export default function LoginScreen() {
       try {
         setIsSigningIn(true);
         await signInWithPassword(trimmed, password);
-        // useSession hook picks up SIGNED_IN and routes to admin dashboard
+        // useSession hook picks up SIGNED_IN and routes to the role's home
       } catch (err: unknown) {
         const message =
-          err instanceof Error ? err.message : 'Login failed. Please try again.';
+          err instanceof Error ? err.message : 'Sign-in failed. Try again.';
         setAdminError(message);
       } finally {
         setIsSigningIn(false);
@@ -164,152 +171,119 @@ export default function LoginScreen() {
     }
   }, [email, password, signInAs, isPasswordMode, validateEmail, sendOTP, router]);
 
+  // ── Role options ────────────────────────────────────────────────────
+  const roleOptions = useMemo<SegmentOption<SignInRole>[]>(
+    () => [
+      {
+        value: 'parent',
+        label: 'Parent',
+        icon: (color) => <Ionicons name="heart" size={15} color={color} />,
+      },
+      {
+        value: 'teacher',
+        label: 'Teacher',
+        icon: (color) => <Ionicons name="school" size={15} color={color} />,
+      },
+      {
+        value: 'admin',
+        label: 'Admin',
+        icon: (color) => <Ionicons name="shield" size={15} color={color} />,
+      },
+    ],
+    [],
+  );
+
   // ── Render ─────────────────────────────────────────────────────────
   return (
     <ScreenContainer scroll keyboard>
-      {/* Honeycomb decoration */}
-      <View style={styles.honeycombContainer}>
-        <HoneycombPattern rows={4} cols={8} size={28} style={styles.honeycomb} />
+      {/* Ambient comb in the corner. A wide field of it draws a visible
+          vertical seam down the middle of the screen where the tessellation
+          ends, so it is kept to a cluster that runs off two edges. */}
+      <View pointerEvents="none" style={styles.combLayer}>
+        <View style={styles.combInner}>
+          <HoneycombPattern rows={3} cols={4} size={38} />
+        </View>
       </View>
 
       <View style={styles.content}>
-        {/* Lottie animation */}
-        <View style={styles.lottieContainer}>
-          <LottieWrapper
-            source="https://assets.lottiefiles.com/packages/lf20_hu9cd9.json"
-            autoPlay
-            loop
-            style={styles.lottie}
+        <Reveal scale distance={20}>
+          <HiveMark size={54} style={styles.mark} />
+        </Reveal>
+
+        <Reveal index={1}>
+          <Text variant="h1" style={styles.heading}>
+            {isAdmin ? 'Administrator sign-in' : 'Welcome to Hive'}
+          </Text>
+        </Reveal>
+
+        <Reveal index={2}>
+          <Text variant="body" muted style={styles.subtitle}>
+            {isAdmin
+              ? 'Manage schools, classes and people.'
+              : "Your child's week at school, kept private."}
+          </Text>
+        </Reveal>
+
+        <Reveal index={3} style={styles.block}>
+          <Text variant="eyebrow" color={colors.text.tertiary} style={styles.eyebrow}>
+            I am a
+          </Text>
+          <SegmentedControl
+            options={roleOptions}
+            value={signInAs}
+            onChange={setSignInAs}
+            disabled={isLoading}
+            accessibilityLabel="Choose how you are signing in"
           />
-        </View>
+        </Reveal>
 
-        {/* Heading */}
-        <Text variant="h1" center style={styles.heading}>
-          Welcome to Hive
-        </Text>
-
-        {/* Subtitle */}
-        <Text
-          variant="body"
-          color={colors.text.secondary}
-          center
-          style={styles.subtitle}
-        >
-          Sign in with your email
-        </Text>
-
-        {/* Role selector: Teacher, Parent, or Admin */}
-        <Text variant="bodyBold" style={styles.roleLabel}>
-          I am a
-        </Text>
-        <View style={styles.roleRow}>
-          <Pressable
-            onPress={() => setSignInAs('teacher')}
-            style={[
-              styles.roleOption,
-              signInAs === 'teacher' && styles.roleOptionSelected,
-            ]}
-            accessibilityRole="button"
-            accessibilityState={{ selected: signInAs === 'teacher' }}
-            accessibilityLabel="Sign in as Teacher"
-          >
-            <Ionicons
-              name="school-outline"
-              size={22}
-              color={signInAs === 'teacher' ? colors.primary.amberDark : colors.text.secondary}
-            />
-            <Text
-              variant="body"
-              color={signInAs === 'teacher' ? colors.primary.amberDark : colors.text.secondary}
-              style={styles.roleOptionText}
-            >
-              Teacher
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setSignInAs('parent')}
-            style={[
-              styles.roleOption,
-              signInAs === 'parent' && styles.roleOptionSelected,
-            ]}
-            accessibilityRole="button"
-            accessibilityState={{ selected: signInAs === 'parent' }}
-            accessibilityLabel="Sign in as Parent"
-          >
-            <Ionicons
-              name="people-outline"
-              size={22}
-              color={signInAs === 'parent' ? colors.primary.amberDark : colors.text.secondary}
-            />
-            <Text
-              variant="body"
-              color={signInAs === 'parent' ? colors.primary.amberDark : colors.text.secondary}
-              style={styles.roleOptionText}
-            >
-              Parent
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setSignInAs('admin')}
-            style={[
-              styles.roleOption,
-              signInAs === 'admin' && styles.roleOptionSelected,
-            ]}
-            accessibilityRole="button"
-            accessibilityState={{ selected: signInAs === 'admin' }}
-            accessibilityLabel="Sign in as Admin"
-          >
-            <Ionicons
-              name="shield-outline"
-              size={22}
-              color={signInAs === 'admin' ? colors.primary.amberDark : colors.text.secondary}
-            />
-            <Text
-              variant="body"
-              color={signInAs === 'admin' ? colors.primary.amberDark : colors.text.secondary}
-              style={styles.roleOptionText}
-            >
-              Admin
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Email input */}
-        <TextInput
-          label="Email"
-          placeholder="you@example.com"
-          value={email}
-          onChangeText={setEmail}
-          error={emailError}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="email"
-          textContentType="emailAddress"
-          returnKeyType={isPasswordMode ? 'next' : 'go'}
-          onSubmitEditing={isPasswordMode ? undefined : handleSignIn}
-          editable={!isLoading}
-          containerStyle={styles.input}
-        />
-
-        {/* Password input */}
-        {isPasswordMode && (
+        <Reveal index={4} style={styles.block}>
           <TextInput
-            label="Password"
-            placeholder="Enter your password"
-            value={password}
-            onChangeText={setPassword}
-            error={passwordError}
-            secureTextEntry
+            label="Email"
+            placeholder="you@example.com"
+            hint={
+              isPasswordMode
+                ? undefined
+                : "We'll send a 6-digit code to this address."
+            }
+            value={email}
+            onChangeText={setEmail}
+            error={emailError}
+            keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
-            autoComplete="password"
-            textContentType="password"
-            returnKeyType="go"
-            onSubmitEditing={handleSignIn}
+            autoComplete="email"
+            textContentType="emailAddress"
+            returnKeyType={isPasswordMode ? 'next' : 'go'}
+            onSubmitEditing={isPasswordMode ? undefined : handleSignIn}
             editable={!isLoading}
-            containerStyle={styles.input}
+            leftIcon={
+              <Ionicons name="mail-outline" size={18} color={colors.text.tertiary} />
+            }
           />
+        </Reveal>
+
+        {isPasswordMode && (
+          <Reveal style={styles.block}>
+            <TextInput
+              label="Password"
+              placeholder="Your password"
+              value={password}
+              onChangeText={setPassword}
+              error={passwordError}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="password"
+              textContentType="password"
+              returnKeyType="go"
+              onSubmitEditing={handleSignIn}
+              editable={!isLoading}
+              leftIcon={
+                <Ionicons name="lock-closed-outline" size={18} color={colors.text.tertiary} />
+              }
+            />
+          </Reveal>
         )}
 
         {/* Teachers and parents can opt into a password instead of an OTP. */}
@@ -326,30 +300,37 @@ export default function LoginScreen() {
             }
             style={styles.switchMethod}
           >
-            <Text variant="bodySmall" color={colors.text.link}>
+            <Text variant="bodySmallBold" color={colors.text.accent}>
               {usePassword ? 'Use a one-time code instead' : 'Use a password instead'}
             </Text>
           </Pressable>
         )}
 
-        {/* Server error */}
         {serverError && (
-          <Text variant="bodySmall" color={colors.error.main} style={styles.error}>
-            {serverError}
-          </Text>
+          <View style={styles.errorBox}>
+            <Ionicons name="alert-circle" size={17} color={colors.error.dark} />
+            <Text variant="bodySmall" color={colors.error.dark} style={styles.errorText}>
+              {serverError}
+            </Text>
+          </View>
         )}
 
-        {/* Sign-in button */}
-        <Button
-          variant="primary"
-          size="lg"
-          onPress={handleSignIn}
-          loading={isLoading}
-          disabled={isLoading}
-          style={styles.button}
-        >
-          {isPasswordMode ? 'Sign In' : 'Send Code'}
-        </Button>
+        <Reveal index={5} style={styles.block}>
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            onPress={handleSignIn}
+            loading={isLoading}
+            disabled={isLoading}
+          >
+            {isPasswordMode ? 'Sign in' : 'Send code'}
+          </Button>
+        </Reveal>
+
+        <Text variant="caption" color={colors.text.tertiary} center style={styles.footer}>
+          Only addresses your school has registered can sign in.
+        </Text>
       </View>
     </ScreenContainer>
   );
@@ -360,70 +341,45 @@ export default function LoginScreen() {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  honeycombContainer: {
+  /**
+   * A clipping window for the comb. Without it the pattern's negative offsets
+   * widen the scroll view and the whole screen scrolls sideways — which is
+   * exactly what a decoration must never do.
+   */
+  combLayer: {
     position: 'absolute',
-    top: -20,
-    right: -40,
-    opacity: 0.5,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 260,
+    overflow: 'hidden',
   },
-  honeycomb: {
-    // Positioned by parent
+  combInner: {
+    position: 'absolute',
+    top: -46,
+    right: -54,
+    opacity: 0.5,
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: layout.screenPaddingHorizontal,
     paddingTop: spacing.xxl,
-    alignItems: 'center',
   },
-  lottieContainer: {
-    width: 180,
-    height: 180,
+  mark: {
     marginBottom: spacing.lg,
-  },
-  lottie: {
-    width: 180,
-    height: 180,
   },
   heading: {
     marginBottom: spacing.sm,
   },
   subtitle: {
-    marginBottom: spacing.lg,
-    paddingHorizontal: spacing.md,
+    marginBottom: spacing.xl,
+    maxWidth: 300,
   },
-  roleLabel: {
-    alignSelf: 'flex-start',
-    marginBottom: spacing.sm,
-  },
-  roleRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    width: '100%',
-    marginBottom: spacing.lg,
-  },
-  roleOption: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm + 4,
-    paddingHorizontal: spacing.md,
-    borderRadius: layout.inputRadius,
-    borderWidth: 2,
-    borderColor: colors.border.default,
-    backgroundColor: colors.background.surface,
-  },
-  roleOptionSelected: {
-    borderColor: colors.primary.amber,
-    backgroundColor: colors.primary.amberLight + '20',
-  },
-  roleOptionText: {
-    fontFamily: 'Nunito_600SemiBold',
-  },
-  input: {
-    width: '100%',
+  block: {
     marginBottom: spacing.md,
+  },
+  eyebrow: {
+    marginBottom: spacing.sm,
   },
   switchMethod: {
     alignSelf: 'flex-end',
@@ -431,16 +387,22 @@ const styles = StyleSheet.create({
     // Text-only control: without an explicit floor this is ~26px tall, under
     // the 44px minimum every other tappable element in the app honours.
     minHeight: MIN_TAP_SIZE,
-    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
-    marginBottom: spacing.xs,
   },
-  error: {
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    padding: spacing.ms,
     marginBottom: spacing.md,
-    textAlign: 'center',
+    borderRadius: 14,
+    backgroundColor: colors.error.background,
   },
-  button: {
-    width: '100%',
-    borderRadius: layout.buttonRadius,
+  errorText: {
+    flex: 1,
+  },
+  footer: {
+    marginTop: spacing.lg,
+    paddingBottom: spacing.xl,
   },
 });

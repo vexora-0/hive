@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, layout } from '@/theme';
+import { colors, spacing } from '@/theme';
 import { Text } from '@/components/ui';
 import type { ImageUploadState } from '@/features/teacher/hooks/useUpload';
 
@@ -105,7 +105,7 @@ export function UploadProgress({
             <Ionicons
               name="refresh"
               size={14}
-              color={colors.primary.amber}
+              color={colors.text.accent}
             />
           </Pressable>
         )}

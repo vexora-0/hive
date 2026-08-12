@@ -68,7 +68,7 @@ export function SchoolCard({ school, onPress, onAddClass, onClassPress }: School
         accessibilityLabel={onPress ? `Edit ${school.name}` : school.name}
       >
         <View style={styles.iconCircle}>
-          <Ionicons name="school" size={22} color={colors.primary.amber} />
+          <Ionicons name="school" size={22} color={colors.text.accent} />
         </View>
 
         <View style={styles.headerInfo}>
@@ -123,8 +123,8 @@ export function SchoolCard({ school, onPress, onAddClass, onClassPress }: School
         accessibilityRole="button"
         accessibilityLabel="Add class to this school"
       >
-        <Ionicons name="add-circle-outline" size={18} color={colors.primary.amber} />
-        <Text variant="bodySmallBold" color={colors.primary.amber}>
+        <Ionicons name="add-circle-outline" size={18} color={colors.text.accent} />
+        <Text variant="bodySmallBold" color={colors.text.accent}>
           Add class
         </Text>
       </Pressable>
@@ -138,14 +138,14 @@ export function SchoolCard({ school, onPress, onAddClass, onClassPress }: School
             accessibilityRole="button"
             accessibilityLabel={expanded ? 'Collapse class list' : 'Expand class list'}
           >
-            <Text variant="bodySmallBold" color={colors.primary.amber}>
+            <Text variant="bodySmallBold" color={colors.text.accent}>
               {expanded ? 'Hide classes' : `View ${school.classes.length} classes`}
             </Text>
             <Animated.View style={chevronStyle}>
               <Ionicons
                 name="chevron-down"
                 size={18}
-                color={colors.primary.amber}
+                color={colors.text.accent}
               />
             </Animated.View>
           </Pressable>

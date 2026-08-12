@@ -16,7 +16,7 @@ import {
   bearer,
   type TestUser,
 } from './helpers';
-import { PRODUCT_PRICES_CENTS } from '../src/constants/products';
+import { PRODUCT_PRICES_PAISE } from '../src/constants/products';
 
 /**
  * The order lifecycle, end to end.
@@ -140,7 +140,7 @@ describe('orders', () => {
     const res = await placeOrder();
 
     expect(res.status).toBe(201);
-    expect(res.body.data.total_cents).toBe(PRODUCT_PRICES_CENTS.print_4x6 * 2);
+    expect(res.body.data.total_cents).toBe(PRODUCT_PRICES_PAISE.print_4x6 * 2);
     expect(res.body.data.status).toBe('pending');
   }, 30_000);
 
@@ -157,7 +157,7 @@ describe('orders', () => {
       });
 
     expect(res.status).toBe(201);
-    expect(res.body.data.total_cents).toBe(PRODUCT_PRICES_CENTS.print_8x10);
+    expect(res.body.data.total_cents).toBe(PRODUCT_PRICES_PAISE.print_8x10);
   }, 30_000);
 
   it('replays the same response for a repeated idempotency key', async () => {

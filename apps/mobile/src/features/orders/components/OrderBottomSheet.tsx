@@ -1,20 +1,21 @@
 import React, { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { MotiView } from 'moti';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { v4 as uuidv4 } from 'uuid';
 
-import { colors, spacing, layout } from '@/theme';
-import { Text, Button } from '@/components/ui';
-import { TextInput } from '@/components/ui';
+import { colors, spacing, radius, shadows, platformShadow } from '@/theme';
+import { Text, Button, TextInput, Divider } from '@/components/ui';
 import { HiveImage } from '@/components/media';
+import { ConfettiOverlay } from '@/components/animation';
 import type { ProductType } from '@/types/supabase';
 
-import { PRODUCT_PRICES_CENTS, formatCents } from '../constants/products';
+import {
+  PRODUCT_PRICES_PAISE,
+  PRODUCT_LABELS,
+  formatRupees,
+} from '../constants/products';
 import { useCreateOrder } from '../hooks/useOrders';
 import { ProductPicker } from './ProductPicker';
 import { Modal } from '@/components/feedback';
@@ -42,18 +43,21 @@ type Step = 'product' | 'summary' | 'confirm';
 
 
 
+/**
+ * Reads from the shared catalogue. This used to hold a second, hand-written
+ * copy of the seven labels, which meant renaming a product in `products.ts`
+ * changed the picker and not the summary a parent confirmed against.
+ */
 function getProductLabel(type: ProductType): string {
-  const labels: Record<ProductType, string> = {
-    print_4x6: '4x6 Print',
-    print_5x7: '5x7 Print',
-    print_8x10: '8x10 Print',
-    digital_download: 'Digital Download',
-    photo_book: 'Photo Book',
-    magnet: 'Magnet',
-    mug: 'Mug',
-  };
-  return labels[type];
+  return PRODUCT_LABELS[type];
 }
+
+/** The three steps, in order, with the name shown while you are on it. */
+const STEPS: { key: Step; label: string }[] = [
+  { key: 'product', label: 'Choose' },
+  { key: 'summary', label: 'Review' },
+  { key: 'confirm', label: 'Confirm' },
+];
 
 // ---------------------------------------------------------------------------
 // Component
@@ -177,37 +181,64 @@ export function OrderBottomSheet({
   }, [selectedType, photoId, quantity, shippingAddress, notes, createOrder]);
 
   // ── Computed values ────────────────────────────────────────────────
-  const unitPrice = selectedType ? PRODUCT_PRICES_CENTS[selectedType] : 0;
+  const unitPrice = selectedType ? PRODUCT_PRICES_PAISE[selectedType] : 0;
   const totalPrice = unitPrice * quantity;
 
   // ── Render helpers ─────────────────────────────────────────────────
 
-  const renderStepIndicator = () => (
-    <View style={styles.stepIndicator}>
-      {(['product', 'summary', 'confirm'] as Step[]).map((s, index) => (
-        <View
-          key={s}
-          style={[
-            styles.stepDot,
-            step === s && styles.stepDotActive,
-            (['product', 'summary', 'confirm'] as Step[]).indexOf(step) > index &&
-              styles.stepDotCompleted,
-          ]}
-        />
-      ))}
-    </View>
-  );
+  // A named rail rather than three dots: "Review" tells a parent where they
+  // are and what is left, which a row of circles cannot.
+  const renderStepIndicator = () => {
+    const activeIndex = STEPS.findIndex((s) => s.key === step);
+
+    return (
+      <View
+        style={styles.stepIndicator}
+        accessibilityRole="progressbar"
+        accessibilityLabel={`Step ${activeIndex + 1} of ${STEPS.length}: ${STEPS[activeIndex]?.label}`}
+      >
+        {STEPS.map((s, index) => {
+          const isActive = index === activeIndex;
+          const isDone = index < activeIndex;
+          return (
+            <View key={s.key} style={styles.stepItem}>
+              <View
+                style={[
+                  styles.stepBar,
+                  isDone && styles.stepBarDone,
+                  isActive && styles.stepBarActive,
+                ]}
+              />
+              <Text
+                variant="tiny"
+                color={
+                  isActive
+                    ? colors.text.accent
+                    : isDone
+                      ? colors.text.secondary
+                      : colors.text.tertiary
+                }
+              >
+                {s.label}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
 
   const renderProductStep = () => (
     <View style={styles.stepContent}>
-      <Text variant="h3">Choose a Product</Text>
-      <Text variant="bodySmall" color={colors.text.secondary} style={styles.subtitle}>
-        Select how you would like this photo
+      <Text variant="h3">What would you like?</Text>
+      <Text variant="bodySmall" muted style={styles.subtitle}>
+        Pick one to start. You can order more later.
       </Text>
       <ProductPicker selectedType={selectedType} onSelect={handleProductSelect} />
       <Button
         variant="primary"
         size="lg"
+        fullWidth
         onPress={goToSummary}
         disabled={!selectedType}
         style={styles.ctaButton}
@@ -219,25 +250,31 @@ export function OrderBottomSheet({
 
   const renderSummaryStep = () => (
     <View style={styles.stepContent}>
-      <Pressable onPress={goBack} style={styles.backButton}>
-        <Text variant="bodySmallBold" color={colors.primary.amber}>
+      <Pressable
+        onPress={goBack}
+        style={styles.backButton}
+        accessibilityRole="button"
+        accessibilityLabel="Back to product choice"
+      >
+        <Ionicons name="chevron-back" size={16} color={colors.text.accent} />
+        <Text variant="bodySmallBold" color={colors.text.accent}>
           Back
         </Text>
       </Pressable>
 
-      <Text variant="h3">Order Summary</Text>
+      <Text variant="h3">Your order</Text>
 
+      {/* The photo is shown mounted, the way it will be printed. */}
       <View style={styles.summaryRow}>
-        <HiveImage
-          uri={photoUri}
-          style={styles.thumbnail}
-        />
+        <View style={styles.thumbnailMount}>
+          <HiveImage uri={photoUri} style={styles.thumbnail} />
+        </View>
         <View style={styles.summaryDetails}>
           <Text variant="bodyBold">
             {selectedType ? getProductLabel(selectedType) : ''}
           </Text>
-          <Text variant="bodySmall" color={colors.text.secondary}>
-            {formatCents(unitPrice)} each
+          <Text variant="bodySmall" muted>
+            {formatRupees(unitPrice)} each
           </Text>
         </View>
       </View>
@@ -250,15 +287,14 @@ export function OrderBottomSheet({
             onPress={decrementQuantity}
             style={[styles.stepperButton, quantity <= 1 && styles.stepperButtonDisabled]}
             disabled={quantity <= 1}
-            accessibilityLabel="Decrease quantity"
+            accessibilityRole="button"
+            accessibilityLabel="One fewer"
           >
-            <Text
-              variant="h4"
+            <Ionicons
+              name="remove"
+              size={19}
               color={quantity <= 1 ? colors.gray[400] : colors.text.primary}
-              center
-            >
-              -
-            </Text>
+            />
           </Pressable>
           <Text variant="bodyBold" style={styles.quantityText}>
             {quantity}
@@ -266,11 +302,10 @@ export function OrderBottomSheet({
           <Pressable
             onPress={incrementQuantity}
             style={styles.stepperButton}
-            accessibilityLabel="Increase quantity"
+            accessibilityRole="button"
+            accessibilityLabel="One more"
           >
-            <Text variant="h4" center>
-              +
-            </Text>
+            <Ionicons name="add" size={19} color={colors.text.primary} />
           </Pressable>
         </View>
       </View>
@@ -278,18 +313,24 @@ export function OrderBottomSheet({
       {/* Total */}
       <View style={styles.totalRow}>
         <Text variant="bodyBold">Total</Text>
-        <Text variant="h3" color={colors.primary.amberDark}>
-          {formatCents(totalPrice)}
-        </Text>
+        <MotiView
+          key={totalPrice}
+          from={{ scale: 0.94, opacity: 0.6 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', damping: 13, stiffness: 240 }}
+        >
+          <Text variant="priceLarge">{formatRupees(totalPrice)}</Text>
+        </MotiView>
       </View>
 
       <Button
         variant="primary"
         size="lg"
+        fullWidth
         onPress={goToConfirm}
         style={styles.ctaButton}
       >
-        Continue to Checkout
+        Continue
       </Button>
     </View>
   );
@@ -299,29 +340,24 @@ export function OrderBottomSheet({
     if (orderSuccess) {
       return (
         <View style={styles.successContainer}>
-          <View style={styles.checkmarkCircle}>
-            <Text variant="h1" center>
-              {'✓'}
-            </Text>
-          </View>
-          <Text variant="h3" center style={styles.successTitle}>
-            Order Placed!
-          </Text>
-          <Text
-            variant="body"
-            color={colors.text.secondary}
-            center
-            style={styles.successMessage}
+          <ConfettiOverlay trigger={orderSuccess} />
+          <MotiView
+            from={{ scale: 0.6, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', damping: 12, stiffness: 200 }}
+            style={styles.checkmarkCircle}
           >
-            Your order has been submitted successfully. You will receive a
-            confirmation shortly.
+            <Ionicons name="checkmark" size={38} color={colors.success.dark} />
+          </MotiView>
+          <Text variant="h2" center style={styles.successTitle}>
+            Order placed
           </Text>
-          <Button
-            variant="primary"
-            size="md"
-            onPress={handleDismiss}
-            style={styles.ctaButton}
-          >
+          <Text variant="body" muted center style={styles.successMessage}>
+            {formatRupees(totalPrice)} · {quantity} ×{' '}
+            {selectedType ? getProductLabel(selectedType) : ''}. Your school will
+            confirm it shortly, and you can follow it under Orders.
+          </Text>
+          <Button variant="primary" size="md" fullWidth onPress={handleDismiss}>
             Done
           </Button>
         </View>
@@ -330,17 +366,23 @@ export function OrderBottomSheet({
 
     return (
       <View style={styles.stepContent}>
-        <Pressable onPress={goBack} style={styles.backButton}>
-          <Text variant="bodySmallBold" color={colors.primary.amber}>
+        <Pressable
+          onPress={goBack}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Back to the order summary"
+        >
+          <Ionicons name="chevron-back" size={16} color={colors.text.accent} />
+          <Text variant="bodySmallBold" color={colors.text.accent}>
             Back
           </Text>
         </Pressable>
 
-        <Text variant="h3">Confirm Order</Text>
+        <Text variant="h3">Where should it go?</Text>
 
         <TextInput
-          label="Shipping Address"
-          placeholder="Enter your shipping address"
+          label="Delivery address"
+          placeholder="Flat, street, area, city, PIN"
           value={shippingAddress}
           onChangeText={setShippingAddress}
           // The only thing that used to set `addressTouched` was the submit
@@ -351,14 +393,18 @@ export function OrderBottomSheet({
           // touched on blur is what makes the explanation appear, and blur
           // means it never fires at a parent who has not reached the field.
           onBlur={() => setAddressTouched(true)}
-          error={addressTouched && !hasAddress ? 'Shipping address is required' : undefined}
+          error={
+            addressTouched && !hasAddress
+              ? 'We need an address to send the prints to.'
+              : undefined
+          }
           multiline
           containerStyle={styles.input}
         />
 
         <TextInput
-          label="Notes (optional)"
-          placeholder="Any special instructions?"
+          label="Notes for the school"
+          placeholder="Anything they should know? (optional)"
           value={notes}
           onChangeText={setNotes}
           multiline
@@ -368,43 +414,37 @@ export function OrderBottomSheet({
         {/* Order recap */}
         <View style={styles.recapCard}>
           <View style={styles.recapRow}>
-            <Text variant="bodySmall" color={colors.text.secondary}>
-              Product
+            <Text variant="bodySmall" muted>
+              {selectedType ? getProductLabel(selectedType) : ''} × {quantity}
             </Text>
-            <Text variant="bodySmallBold">
-              {selectedType ? getProductLabel(selectedType) : ''}
-            </Text>
+            <Text variant="bodySmallBold">{formatRupees(totalPrice)}</Text>
           </View>
-          <View style={styles.recapRow}>
-            <Text variant="bodySmall" color={colors.text.secondary}>
-              Quantity
-            </Text>
-            <Text variant="bodySmallBold">{quantity}</Text>
-          </View>
-          <View style={styles.divider} />
+          <Divider style={styles.divider} />
           <View style={styles.recapRow}>
             <Text variant="bodyBold">Total</Text>
-            <Text variant="h4" color={colors.primary.amberDark}>
-              {formatCents(totalPrice)}
-            </Text>
+            <Text variant="price">{formatRupees(totalPrice)}</Text>
           </View>
         </View>
 
         {createOrder.isError && (
-          <Text variant="bodySmall" color={colors.error.main} style={styles.errorText}>
-            Failed to place order. Please try again.
-          </Text>
+          <View style={styles.errorBox}>
+            <Ionicons name="alert-circle" size={17} color={colors.error.dark} />
+            <Text variant="bodySmall" color={colors.error.dark} style={styles.errorText}>
+              We couldn't place the order. Check your connection and try again.
+            </Text>
+          </View>
         )}
 
         <Button
           variant="primary"
           size="lg"
+          fullWidth
           onPress={handlePlaceOrder}
           loading={createOrder.isPending}
           disabled={!hasAddress}
           style={styles.ctaButton}
         >
-          Place Order
+          {`Place order · ${formatRupees(totalPrice)}`}
         </Button>
       </View>
     );
@@ -421,12 +461,19 @@ export function OrderBottomSheet({
       <Pressable style={styles.backdrop} onPress={handleDismiss}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <View style={styles.handleIndicatorBar} />
-          <View style={styles.container}>
-            {renderStepIndicator()}
+          {!orderSuccess && renderStepIndicator()}
+          {/* Scrollable: the confirm step's two multiline fields plus the
+              keyboard exceed the sheet's 88% ceiling on a small phone, and
+              without this the Place order button is unreachable. */}
+          <ScrollView
+            contentContainerStyle={styles.container}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             {step === 'product' && renderProductStep()}
             {step === 'summary' && renderSummaryStep()}
             {step === 'confirm' && renderConfirmStep()}
-          </View>
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -441,47 +488,50 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: colors.overlay.scrim,
   },
   sheet: {
-    maxHeight: '85%',
+    maxHeight: '88%',
     backgroundColor: colors.background.cream,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    ...platformShadow(shadows.xlarge),
   },
   container: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
   },
   handleIndicatorBar: {
     alignSelf: 'center',
-    backgroundColor: colors.gray[300],
+    backgroundColor: colors.border.default,
     width: 40,
     height: 4,
     borderRadius: 2,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
+    marginTop: spacing.ms,
+    marginBottom: spacing.md,
   },
 
   // Step indicator
   stepIndicator: {
     flexDirection: 'row',
-    justifyContent: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.md,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
   },
-  stepDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.gray[300],
+  stepItem: {
+    flex: 1,
+    gap: spacing.sm,
   },
-  stepDotActive: {
-    backgroundColor: colors.primary.amber,
-    width: 24,
+  stepBar: {
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.border.light,
   },
-  stepDotCompleted: {
+  stepBarDone: {
     backgroundColor: colors.primary.amberLight,
+  },
+  stepBarActive: {
+    backgroundColor: colors.primary.amber,
   },
 
   // Step content
@@ -494,9 +544,13 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+    marginLeft: -spacing.xs,
     marginBottom: spacing.sm,
     alignSelf: 'flex-start',
-    paddingVertical: spacing.xs,
+    minHeight: 36,
   },
 
   // Summary step
@@ -506,10 +560,16 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     alignItems: 'center',
   },
+  thumbnailMount: {
+    padding: spacing.xs + 2,
+    borderRadius: radius.mount,
+    backgroundColor: colors.background.surface,
+    ...platformShadow(shadows.small),
+  },
   thumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: layout.cardRadius,
+    width: 76,
+    height: 76,
+    borderRadius: radius.print,
   },
   summaryDetails: {
     flex: 1,
@@ -520,20 +580,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingTop: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.border.light,
   },
   stepper: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
+    padding: spacing.xs,
+    borderRadius: radius.pill,
+    backgroundColor: colors.background.surfaceSecondary,
   },
   stepperButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.gray[100],
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.background.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -548,8 +611,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.border.light,
   },
@@ -561,7 +624,7 @@ const styles = StyleSheet.create({
   recapCard: {
     marginTop: spacing.lg,
     backgroundColor: colors.background.surface,
-    borderRadius: layout.cardRadius,
+    borderRadius: radius.lg,
     padding: spacing.md,
     gap: spacing.sm,
   },
@@ -571,20 +634,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   divider: {
-    height: 1,
-    backgroundColor: colors.border.light,
     marginVertical: spacing.xs,
   },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    padding: spacing.ms,
+    borderRadius: radius.sm,
+    backgroundColor: colors.error.background,
+  },
   errorText: {
-    marginTop: spacing.sm,
-    textAlign: 'center',
+    flex: 1,
   },
 
   // Success state
   successContainer: {
     alignItems: 'center',
     paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
   },
   checkmarkCircle: {
     width: 80,
@@ -593,13 +661,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success.background,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   successTitle: {
     marginBottom: spacing.sm,
   },
   successMessage: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
+    maxWidth: 320,
   },
 });
 

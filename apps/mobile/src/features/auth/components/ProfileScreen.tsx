@@ -3,8 +3,9 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, layout } from '@/theme';
-import { Text, Button, Avatar, TextInput } from '@/components/ui';
+import { colors, spacing, radius, layout } from '@/theme';
+import { Text, Button, Avatar, TextInput, Card, Badge, Divider } from '@/components/ui';
+import { Reveal } from '@/components/animation';
 import { ScreenContainer, KeyboardAvoid } from '@/components/layout';
 import { HeaderBar } from '@/components/navigation';
 import { ConfirmDialog, Modal } from '@/components/feedback';
@@ -49,7 +50,7 @@ function EditProfileSheet({
   const handleSave = () => {
     const trimmed = name.trim();
     if (!trimmed) {
-      setError('Name cannot be empty');
+      setError('Enter your name.');
       return;
     }
     setError(null);
@@ -81,6 +82,7 @@ function EditProfileSheet({
                 value={phone}
                 onChangeText={setPhone}
                 placeholder="Optional"
+                hint="Your school uses this to reach you about orders."
                 keyboardType="phone-pad"
               />
 
@@ -97,6 +99,39 @@ function EditProfileSheet({
         </Pressable>
       </Pressable>
     </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Detail row
+// ---------------------------------------------------------------------------
+
+function DetailRow({
+  icon,
+  label,
+  value,
+  muted = false,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  muted?: boolean;
+}) {
+  return (
+    <View style={styles.detailRow}>
+      <Ionicons name={icon} size={17} color={colors.text.tertiary} />
+      <Text variant="bodySmall" color={colors.text.tertiary} style={styles.detailLabel}>
+        {label}
+      </Text>
+      <Text
+        variant="bodySmallBold"
+        color={muted ? colors.text.tertiary : colors.text.primary}
+        numberOfLines={1}
+        style={styles.detailValue}
+      >
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -148,55 +183,69 @@ export function ProfileScreen() {
   const displayName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'User';
   const email = user?.email ?? '';
 
+  const roleLabel = profile?.role
+    ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1)
+    : null;
+
   return (
-    <ScreenContainer edges={['top', 'left', 'right']}>
-      <HeaderBar title="Profile" />
+    <ScreenContainer scroll tabBarClearance edges={['top', 'left', 'right']}>
+      <HeaderBar large title="Profile" />
+
       <View style={styles.content}>
-        <Avatar
-          uri={profile?.avatar_url}
-          name={displayName}
-          size="lg"
-          style={styles.avatar}
-        />
-        <Text variant="h3" style={styles.name}>
-          {displayName}
-        </Text>
-        <Text variant="body" color={colors.text.secondary} style={styles.email}>
-          {email}
-        </Text>
-        {profile?.phone && (
-          <Text variant="bodySmall" color={colors.text.secondary} style={styles.phone}>
-            {profile.phone}
-          </Text>
-        )}
-        {profile?.role && (
-          <View style={styles.roleBadge}>
-            <Text variant="caption" color={colors.primary.amberDark}>
-              {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
-            </Text>
-          </View>
-        )}
+        {/* Identity card. The avatar sits on the card's edge rather than
+            centred above it, so the name reads as a label on a record instead
+            of a social-media header. */}
+        <Reveal>
+          <Card elevation="raised" padding={spacing.lg} style={styles.identityCard}>
+            <View style={styles.identityRow}>
+              <Avatar uri={profile?.avatar_url} name={displayName} size="lg" />
+              <View style={styles.identityText}>
+                <Text variant="h3" numberOfLines={1}>
+                  {displayName}
+                </Text>
+                {roleLabel && (
+                  <Badge
+                    variant="default"
+                    style={styles.roleBadge}
+                  >
+                    {roleLabel}
+                  </Badge>
+                )}
+              </View>
+            </View>
 
-        <Button
-          variant="outline"
-          size="lg"
-          onPress={() => setEditing(true)}
-          leftIcon={
-            <Ionicons name="create-outline" size={18} color={colors.text.primary} />
-          }
-          style={styles.action}
-        >
-          Edit profile
-        </Button>
+            <Divider style={styles.identityDivider} />
 
-        <Button
-          variant="outline"
-          size="lg"
-          onPress={() => setConfirmingSignOut(true)}
-          style={styles.action}
-        >
-          Sign out
-        </Button>
+            <DetailRow icon="mail-outline" label="Email" value={email} />
+            <DetailRow
+              icon="call-outline"
+              label="Phone"
+              value={profile?.phone ?? 'Not added'}
+              muted={!profile?.phone}
+            />
+          </Card>
+        </Reveal>
+
+        <Reveal index={1} style={styles.actions}>
+          <Button
+            variant="outline"
+            fullWidth
+            onPress={() => setEditing(true)}
+            leftIcon={
+              <Ionicons name="create-outline" size={18} color={colors.text.primary} />
+            }
+          >
+            Edit profile
+          </Button>
+
+          <Button
+            variant="ghost"
+            fullWidth
+            onPress={() => setConfirmingSignOut(true)}
+          >
+            Sign out
+          </Button>
+        </Reveal>
       </View>
 
       <EditProfileSheet
@@ -227,68 +276,74 @@ export function ProfileScreen() {
 const styles = StyleSheet.create({
   content: {
     flex: 1,
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    paddingTop: spacing.sm,
+  },
+  identityCard: {},
+  identityRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
+    gap: spacing.md,
   },
-  avatar: {
-    marginBottom: spacing.md,
+  identityText: {
+    flex: 1,
+    gap: spacing.sm,
+    alignItems: 'flex-start',
   },
-  name: {
-    marginBottom: spacing.xs,
+  roleBadge: {},
+  identityDivider: {
+    marginVertical: spacing.md,
   },
-  email: {
-    marginBottom: spacing.xs,
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
   },
-  phone: {
-    marginBottom: spacing.sm,
+  detailLabel: {
+    width: 52,
   },
-  roleBadge: {
-    backgroundColor: colors.primary.amberLight + '30',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: layout.buttonRadius,
-    marginBottom: spacing.xxl,
+  detailValue: {
+    flex: 1,
+    textAlign: 'right',
   },
-  action: {
-    width: '100%',
-    maxWidth: 280,
-    borderRadius: layout.buttonRadius,
-    marginBottom: spacing.sm,
+  actions: {
+    marginTop: spacing.lg,
+    gap: spacing.ms,
   },
 
   // Edit sheet
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: colors.overlay.scrim,
   },
   sheet: {
-    backgroundColor: colors.background.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: colors.background.cream,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
     paddingBottom: spacing.lg,
   },
   handleIndicator: {
     alignSelf: 'center',
-    backgroundColor: colors.gray[300],
+    backgroundColor: colors.border.default,
     width: 40,
     height: 4,
     borderRadius: 2,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
+    marginTop: spacing.ms,
+    marginBottom: spacing.sm,
   },
   sheetContent: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   sheetTitle: {
     marginBottom: spacing.xs,
   },
   sheetActions: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.ms,
     marginTop: spacing.md,
   },
   sheetButton: {

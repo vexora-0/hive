@@ -1,8 +1,9 @@
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { colors, spacing } from '@/theme';
+import { colors, spacing, radius } from '@/theme';
 import { Text } from '@/components/ui/Text';
+import { Button } from '@/components/ui/Button';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,16 +64,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return (
         <View style={styles.container}>
           <Text variant="h2" center style={styles.title}>
-            Oops! Something went wrong
+            This screen stopped working
           </Text>
 
-          <Text
-            variant="body"
-            color={colors.text.secondary}
-            center
-            style={styles.message}
-          >
-            An unexpected error occurred. Please try again.
+          <Text variant="body" muted center style={styles.message}>
+            Nothing was lost. Try again, and if it keeps happening, sign out and
+            back in.
           </Text>
 
           {__DEV__ && this.state.error && (
@@ -83,17 +80,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             </View>
           )}
 
-          <Pressable
-            onPress={this.handleRetry}
-            style={({ pressed }) => [
-              styles.button,
-              pressed && styles.buttonPressed,
-            ]}
-          >
-            <Text variant="bodyBold" color={colors.white}>
-              Try Again
-            </Text>
-          </Pressable>
+          <Button variant="primary" onPress={this.handleRetry}>
+            Try again
+          </Button>
         </View>
       );
     }
@@ -122,22 +111,10 @@ const styles = StyleSheet.create({
   },
   debugBox: {
     backgroundColor: colors.error.background,
-    borderRadius: 8,
+    borderRadius: radius.xs,
     padding: spacing.md,
     marginBottom: spacing.lg,
     maxWidth: '100%',
-  },
-  button: {
-    backgroundColor: colors.primary.amber,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 4,
-    borderRadius: 12,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonPressed: {
-    opacity: 0.85,
   },
 });
 

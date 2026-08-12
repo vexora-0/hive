@@ -2,7 +2,7 @@ import React, { type ReactNode } from 'react';
 import { ScrollView, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { type Edge } from 'react-native-safe-area-context';
 
-import { colors, spacing } from '@/theme';
+import { colors, spacing, layout } from '@/theme';
 import { SafeArea } from './SafeArea';
 import { KeyboardAvoid } from './KeyboardAvoid';
 
@@ -17,7 +17,16 @@ export interface ScreenContainerProps {
   scroll?: boolean;
   /** Wrap content in a KeyboardAvoidingView. @default false */
   keyboard?: boolean;
-  /** Optional style overrides applied to the inner content view. */
+  /**
+   * Adds bottom padding so content clears the floating tab bar. Set this on
+   * any scrolling screen inside a tab group — the bar is absolutely
+   * positioned, so nothing else reserves the space for it.
+   * @default false
+   */
+  tabBarClearance?: boolean;
+  /** Applies the standard horizontal screen padding to the content. */
+  padded?: boolean;
+  /** Style overrides applied to the inner content view. */
   style?: StyleProp<ViewStyle>;
   /**
    * Which safe-area edges to respect.
@@ -31,16 +40,14 @@ export interface ScreenContainerProps {
 // ---------------------------------------------------------------------------
 
 /**
- * `<ScreenContainer>` — a composable screen wrapper that combines
- * `SafeArea`, optional `ScrollView`, and optional `KeyboardAvoidingView`.
+ * `<ScreenContainer>` — the outermost component on every screen.
  *
- * Use this as the outermost component on every screen to get consistent
- * safe-area handling, scrolling, and keyboard behaviour.
+ * Lays the paper ground, handles safe areas, and optionally scrolls, avoids
+ * the keyboard and clears the floating tab bar.
  *
  * ```tsx
- * <ScreenContainer scroll keyboard>
- *   <Text variant="h1">Sign Up</Text>
- *   <TextInput placeholder="Email" />
+ * <ScreenContainer scroll padded tabBarClearance edges={['top']}>
+ *   <SectionHeader title="Orders" />
  * </ScreenContainer>
  * ```
  */
@@ -48,17 +55,25 @@ export function ScreenContainer({
   children,
   scroll = false,
   keyboard = false,
+  tabBarClearance = false,
+  padded = false,
   style,
   edges,
 }: ScreenContainerProps) {
+  const paddingStyle: ViewStyle = {
+    ...(padded ? { paddingHorizontal: layout.screenPaddingHorizontal } : null),
+    ...(tabBarClearance ? { paddingBottom: layout.tabBarClearance } : null),
+  };
+
   let content: ReactNode = (
-    <View style={[styles.content, style]}>{children}</View>
+    <View style={[styles.content, paddingStyle, style]}>{children}</View>
   );
 
   if (scroll) {
     content = (
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, style]}
+        style={styles.scrollHost}
+        contentContainerStyle={[styles.scrollContent, paddingStyle, style]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -83,9 +98,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background.cream,
   },
+  scrollHost: {
+    flex: 1,
+    backgroundColor: colors.background.cream,
+  },
   scrollContent: {
     flexGrow: 1,
-    backgroundColor: colors.background.cream,
     paddingBottom: spacing.xl,
   },
 });

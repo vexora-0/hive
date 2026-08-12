@@ -3,21 +3,25 @@
  *
  * Usage:
  * ```ts
- * import { theme } from '@/theme';
+ * import { colors, spacing, radius, spring } from '@/theme';
  *
- * theme.colors.primary.amber;
- * theme.spacing.md;
- * theme.textStyles.h1;
- * theme.shadows.medium;
- * theme.constants.FEED_PAGE_SIZE;
+ * colors.primary.amber;   // marigold — the acting accent
+ * radius.lg;              // 22 — cards
+ * spring.press;           // press physics
  * ```
  */
 
-export { colors } from './colors';
-export type { Colors } from './colors';
+export {
+  colors,
+  roleAccent,
+  identityColor,
+  identityPalette,
+  withAlpha,
+} from './colors';
+export type { Colors, IdentityPalette } from './colors';
 
-export { spacing, grid, layout } from './spacing';
-export type { Spacing, Layout } from './spacing';
+export { spacing, radius, grid, layout } from './spacing';
+export type { Spacing, Radius, Layout } from './spacing';
 
 export {
   fontFamily,
@@ -33,9 +37,26 @@ export {
   shadowSmall,
   shadowMedium,
   shadowLarge,
+  shadowXLarge,
+  shadowLifted,
+  shadowOnInk,
   platformShadow,
 } from './shadows';
 export type { Shadow, Shadows } from './shadows';
+
+export {
+  motion,
+  spring,
+  duration,
+  easing,
+  timing,
+  stagger,
+  pressScale,
+  travel,
+  useReducedMotion,
+  STAGGER_STEP,
+} from './motion';
+export type { Motion } from './motion';
 
 export {
   MIN_TAP_SIZE,
@@ -53,15 +74,27 @@ export {
 
 // ── Unified theme object ─────────────────────────────────────────────
 
-import { colors } from './colors';
-import { spacing, grid, layout } from './spacing';
+import {
+  colors,
+  roleAccent,
+  identityColor,
+  identityPalette,
+  withAlpha,
+} from './colors';
+import { spacing, radius, grid, layout } from './spacing';
 import { textStyles, getTextStyle, fontFamily, fontSize, lineHeight } from './typography';
 import { shadows, platformShadow } from './shadows';
+import { motion } from './motion';
 import * as constants from './constants';
 
 export const theme = {
   colors,
+  roleAccent,
+  identityColor,
+  identityPalette,
+  withAlpha,
   spacing,
+  radius,
   grid,
   layout,
   fontFamily,
@@ -71,6 +104,7 @@ export const theme = {
   getTextStyle,
   shadows,
   platformShadow,
+  motion,
   constants,
 } as const;
 

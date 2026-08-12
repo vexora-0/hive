@@ -1,8 +1,8 @@
 export { HiveImage } from './HiveImage';
 export type { HiveImageProps } from './HiveImage';
 
-export { PolaroidCard } from './PolaroidCard';
-export type { PolaroidCardProps } from './PolaroidCard';
+export { PhotoMount } from './PhotoMount';
+export type { PhotoMountProps } from './PhotoMount';
 
 export { MasonryGrid } from './MasonryGrid';
 export type { MasonryGridProps } from './MasonryGrid';

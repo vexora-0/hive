@@ -1,12 +1,9 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, {
-  SlideInUp,
-  SlideOutUp,
-} from 'react-native-reanimated';
+import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing } from '@/theme';
+import { colors, spacing, radius, layout, shadows, platformShadow } from '@/theme';
 import { Text } from '@/components/ui/Text';
 
 // ---------------------------------------------------------------------------
@@ -23,15 +20,15 @@ export interface OfflineBannerProps {
 // ---------------------------------------------------------------------------
 
 /**
- * `<OfflineBanner>` — a top-of-screen banner that slides in when the
- * device loses network connectivity.
+ * `<OfflineBanner>` — shown while the device has no connection.
  *
- * Shows a cloud-off icon and "You're offline" message on a warm
- * orange-red background. Slides out when connectivity is restored.
+ * A small ink pill in the flow of the screen rather than a red bar pinned over
+ * the header. Losing signal is a condition, not an error: the app still shows
+ * everything already loaded, so the notice states the fact and gets out of the
+ * way instead of alarming a parent who is on a train.
  *
  * ```tsx
- * const { isConnected } = useNetInfo();
- * <OfflineBanner visible={!isConnected} />
+ * <OfflineBanner visible={isOffline} />
  * ```
  */
 export function OfflineBanner({ visible }: OfflineBannerProps) {
@@ -39,19 +36,15 @@ export function OfflineBanner({ visible }: OfflineBannerProps) {
 
   return (
     <Animated.View
-      entering={SlideInUp.duration(300)}
-      exiting={SlideOutUp.duration(300)}
-      style={styles.container}
+      entering={FadeInUp.duration(240)}
+      exiting={FadeOutUp.duration(200)}
+      style={styles.row}
+      accessibilityRole="alert"
     >
-      <View style={styles.content}>
-        <Ionicons
-          name="cloud-offline-outline"
-          size={18}
-          color={colors.white}
-          style={styles.icon}
-        />
-        <Text variant="bodySmall" color={colors.white}>
-          You're offline
+      <View style={styles.pill}>
+        <Ionicons name="cloud-offline" size={15} color={colors.primary.amberLight} />
+        <Text variant="captionBold" onInk>
+          Offline — showing what's saved
         </Text>
       </View>
     </Animated.View>
@@ -63,24 +56,20 @@ export function OfflineBanner({ visible }: OfflineBannerProps) {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    backgroundColor: colors.error.main,
-    paddingTop: spacing.xl + spacing.md, // account for status bar
+  row: {
+    alignItems: 'center',
+    paddingHorizontal: layout.screenPaddingHorizontal,
     paddingBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
   },
-  content: {
+  pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  icon: {
-    marginRight: spacing.sm,
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    backgroundColor: colors.ink[900],
+    ...platformShadow(shadows.small),
   },
 });
 

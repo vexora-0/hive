@@ -13,8 +13,16 @@ export interface OnboardingSlideData {
   title: string;
   /** Supporting copy below the headline. */
   description: string;
-  /** Tinted background colour for the slide. */
-  backgroundColor: string;
+  /**
+   * Colour of the slide's icon.
+   *
+   * The slides used to tint their whole background instead, which turned the
+   * first three screens of the app into a colour swatch tour and fought the
+   * paper ground everywhere else. The colour now lives in one 96px tile.
+   */
+  tint: string;
+  /** Background of that tile — the wash form of `tint`. */
+  wash: string;
   /**
    * Illustration for the slide.
    *
@@ -33,26 +41,29 @@ export interface OnboardingSlideData {
 export const slides: OnboardingSlideData[] = [
   {
     id: 'capture',
-    title: 'Capture Precious Moments',
+    title: "Your child's day, as it happens",
     description:
-      'Teachers snap photos of your little ones throughout the day',
-    backgroundColor: colors.background.cream,
+      'Teachers share photos from class through the day — painting, playtime, lunch, the lot.',
+    tint: colors.primary.amber,
+    wash: colors.primary.amberWash,
     icon: 'camera',
   },
   {
     id: 'secure',
-    title: 'Safe & Secure',
+    title: 'Seen only by you',
     description:
-      'Only you can see your child\u2019s photos. Privacy is our promise.',
-    backgroundColor: colors.primary.blueLight,
-    icon: 'shield-checkmark',
+      "Every parent sees their own child and nobody else's. That boundary is enforced on our servers, not just in the app.",
+    tint: colors.primary.blue,
+    wash: colors.primary.blueWash,
+    icon: 'lock-closed',
   },
   {
     id: 'prints',
-    title: 'Order Prints & More',
+    title: 'Keep the ones you love',
     description:
-      'Turn your favorite moments into prints, photo books, and keepsakes',
-    backgroundColor: colors.primary.mintLight,
-    icon: 'images',
+      'Turn a favourite moment into a print, a fridge magnet or a photo book. Prints start at ₹30.',
+    tint: colors.primary.rose,
+    wash: colors.primary.roseWash,
+    icon: 'albums',
   },
 ];

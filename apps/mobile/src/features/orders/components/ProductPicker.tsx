@@ -1,11 +1,18 @@
 import React, { useCallback } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, {
+  interpolateColor,
+  useAnimatedStyle,
+  useDerivedValue,
+  withSpring,
+} from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-import { colors, spacing, layout } from '@/theme';
+import { colors, spacing, radius, spring, shadows, platformShadow } from '@/theme';
 import { Text } from '@/components/ui';
 import type { ProductType } from '@/types/supabase';
-import { PRODUCT_PRICES_CENTS, formatCents } from '../constants/products';
+import { PRODUCT_PRICES_PAISE, PRODUCT_LABELS, formatRupees } from '../constants/products';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -24,35 +31,103 @@ export interface ProductPickerProps {
 
 interface ProductMeta {
   type: ProductType;
-  label: string;
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  /** What the parent actually receives. Sets expectations before they buy. */
+  note: string;
 }
 
+/**
+ * Icons rather than emoji. Emoji render differently on iOS and Android, cannot
+ * take a brand colour, and three of the seven products were sharing the same
+ * picture frame glyph — so the grid gave no help telling a 4×6 from an 8×10.
+ */
 const PRODUCTS: ProductMeta[] = [
-  { type: 'print_4x6', label: '4x6 Print', icon: '🖼' },
-  { type: 'print_5x7', label: '5x7 Print', icon: '🖼' },
-  { type: 'print_8x10', label: '8x10 Print', icon: '🖼' },
-  { type: 'digital_download', label: 'Digital Download', icon: '📥' },
-  { type: 'photo_book', label: 'Photo Book', icon: '📖' },
-  { type: 'magnet', label: 'Magnet', icon: '🧲' },
-  { type: 'mug', label: 'Mug', icon: '☕' },
+  { type: 'print_4x6', icon: 'image', note: 'Postcard size' },
+  { type: 'print_5x7', icon: 'image', note: 'Desk frame size' },
+  { type: 'print_8x10', icon: 'expand', note: 'Wall size' },
+  { type: 'digital_download', icon: 'cloud-download', note: 'Full resolution file' },
+  { type: 'photo_book', icon: 'book', note: '20 pages, hardbound' },
+  { type: 'magnet', icon: 'magnet', note: 'For the fridge' },
+  { type: 'mug', icon: 'cafe', note: '330 ml ceramic' },
 ];
 
 // ---------------------------------------------------------------------------
-// Helpers
+// One product
 // ---------------------------------------------------------------------------
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
+interface ProductCardProps {
+  product: ProductMeta;
+  isSelected: boolean;
+  onPress: () => void;
+}
+
+function ProductCard({ product, isSelected, onPress }: ProductCardProps) {
+  const label = PRODUCT_LABELS[product.type];
+  const price = PRODUCT_PRICES_PAISE[product.type];
+
+  const selected = useDerivedValue(
+    () => withSpring(isSelected ? 1 : 0, spring.snappy),
+    [isSelected],
+  );
+
+  const cardStyle = useAnimatedStyle(() => ({
+    borderColor: interpolateColor(
+      selected.value,
+      [0, 1],
+      [colors.border.light, colors.primary.amber],
+    ),
+    backgroundColor: interpolateColor(
+      selected.value,
+      [0, 1],
+      [colors.background.surface, colors.primary.amberWash],
+    ),
+    transform: [{ scale: 1 + selected.value * 0.015 }],
+  }));
+
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isSelected }}
+      accessibilityLabel={`${label}, ${formatRupees(price)}. ${product.note}`}
+      style={[styles.card, cardStyle]}
+    >
+      <View style={styles.cardTop}>
+        <Ionicons
+          name={product.icon}
+          size={19}
+          color={isSelected ? colors.text.accent : colors.text.tertiary}
+        />
+        {isSelected && (
+          <Ionicons name="checkmark-circle" size={19} color={colors.primary.amberDark} />
+        )}
+      </View>
+
+      <Text variant="bodySmallBold" numberOfLines={1} style={styles.label}>
+        {label}
+      </Text>
+      <Text variant="caption" color={colors.text.tertiary} numberOfLines={1}>
+        {product.note}
+      </Text>
+
+      <Text variant="price" style={styles.price}>
+        {formatRupees(price)}
+      </Text>
+    </AnimatedPressable>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 /**
- * `<ProductPicker>` — a 2-column grid of product type cards.
+ * `<ProductPicker>` — the catalogue, as a two-column grid.
  *
- * Each card shows the product name, price, and an icon placeholder.
- * The selected card is highlighted with an amber border.
+ * Selection is carried by a marigold wash and a tick, not by a thicker border:
+ * a border that grows on selection nudges every other card in the row.
  */
 export function ProductPicker({ selectedType, onSelect }: ProductPickerProps) {
   const handleSelect = useCallback(
@@ -65,42 +140,14 @@ export function ProductPicker({ selectedType, onSelect }: ProductPickerProps) {
 
   return (
     <View style={styles.grid}>
-      {PRODUCTS.map((product) => {
-        const isSelected = selectedType === product.type;
-        return (
-          <Pressable
-            key={product.type}
-            onPress={() => handleSelect(product.type)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: isSelected }}
-            accessibilityLabel={`${product.label}, ${formatCents(PRODUCT_PRICES_CENTS[product.type])}`}
-            style={({ pressed }) => [
-              styles.card,
-              isSelected && styles.cardSelected,
-              pressed && styles.cardPressed,
-            ]}
-          >
-            <Text variant="h3" center>
-              {product.icon}
-            </Text>
-            <Text
-              variant="bodySmallBold"
-              center
-              style={styles.label}
-              numberOfLines={1}
-            >
-              {product.label}
-            </Text>
-            <Text
-              variant="bodyBold"
-              color={isSelected ? colors.primary.amberDark : colors.text.accent}
-              center
-            >
-              {formatCents(PRODUCT_PRICES_CENTS[product.type])}
-            </Text>
-          </Pressable>
-        );
-      })}
+      {PRODUCTS.map((product) => (
+        <ProductCard
+          key={product.type}
+          product={product}
+          isSelected={selectedType === product.type}
+          onPress={() => handleSelect(product.type)}
+        />
+      ))}
     </View>
   );
 }
@@ -113,35 +160,28 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: spacing.ms,
   },
   card: {
-    width: '48%',
     flexGrow: 1,
     flexBasis: '45%',
-    backgroundColor: colors.background.surface,
-    borderRadius: layout.cardRadius,
+    borderRadius: radius.lg,
     padding: spacing.md,
-    borderWidth: 2,
-    borderColor: colors.border.light,
-    // iOS shadow
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    // Android shadow
-    elevation: 2,
+    borderWidth: 1.5,
+    ...platformShadow(shadows.small),
   },
-  cardSelected: {
-    borderColor: colors.primary.amber,
-    backgroundColor: colors.primary.amber + '0A', // 4% amber tint
-  },
-  cardPressed: {
-    opacity: 0.85,
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.ms,
+    minHeight: 20,
   },
   label: {
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.xxs,
+  },
+  price: {
+    marginTop: spacing.sm,
   },
 });
 

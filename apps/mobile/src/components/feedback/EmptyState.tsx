@@ -1,9 +1,12 @@
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { type AnimationObject } from 'lottie-react-native';
 
-import { colors, spacing } from '@/theme';
+import { colors, spacing, radius, travel } from '@/theme';
 import { Text } from '@/components/ui/Text';
+import { Button } from '@/components/ui/Button';
+import { Reveal } from '@/components/animation/Reveal';
 import { LottieWrapper } from '@/components/animation/LottieWrapper';
 
 // ---------------------------------------------------------------------------
@@ -11,24 +14,28 @@ import { LottieWrapper } from '@/components/animation/LottieWrapper';
 // ---------------------------------------------------------------------------
 
 export interface EmptyStateAction {
-  /** Button label. */
+  /** Button label — name the action, e.g. "Add a photo". */
   label: string;
   /** Button press handler. */
   onPress: () => void;
 }
 
 export interface EmptyStateProps {
-  /** Heading text. */
+  /** What is not here. One short line. */
   title: string;
-  /** Descriptive message shown below the title. */
+  /** What to do about it. */
   message?: string;
+  /** Ionicons name shown in the mark above the title. */
+  icon?: keyof typeof Ionicons.glyphMap;
   /**
-   * Optional Lottie animation source displayed above the text.
+   * Lottie animation shown instead of the icon mark.
    * Pass the return value of `require('./anim.json')`.
    */
   lottieSource?: AnimationObject | string;
-  /** Optional action button rendered below the message. */
+  /** The way out. */
   action?: EmptyStateAction;
+  /** Renders in the smaller inline form, for empty regions inside a screen. */
+  compact?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -36,64 +43,63 @@ export interface EmptyStateProps {
 // ---------------------------------------------------------------------------
 
 /**
- * `<EmptyState>` — a centred placeholder for empty lists and screens.
+ * `<EmptyState>` — what a screen shows when it has nothing to show.
  *
- * Optionally shows a Lottie animation, a title, a descriptive message,
- * and a call-to-action button.
+ * An empty screen is an invitation, so the title says what is not here and the
+ * action says what to do about it. The mark above is a paper tile, not a
+ * cartoon: this screen appears when a parent opens the app hoping for a photo
+ * of their child, and a bouncing illustration would be the wrong register.
  *
  * ```tsx
  * <EmptyState
+ *   icon="images-outline"
  *   title="No photos yet"
- *   message="Tap the camera button to take the first one!"
- *   lottieSource={require('@/assets/animations/empty-photos.json')}
- *   action={{ label: 'Take a photo', onPress: openCamera }}
+ *   message="Your child's teacher hasn't shared anything this week."
  * />
  * ```
  */
 export function EmptyState({
   title,
   message,
+  icon,
   lottieSource,
   action,
+  compact = false,
 }: EmptyStateProps) {
   return (
-    <View style={styles.container}>
-      {lottieSource && (
-        <LottieWrapper
-          source={lottieSource}
-          autoPlay
-          loop
-          style={styles.animation}
-        />
-      )}
+    <View style={[styles.container, compact && styles.containerCompact]}>
+      {lottieSource ? (
+        <Reveal scale>
+          <LottieWrapper source={lottieSource} autoPlay loop style={styles.animation} />
+        </Reveal>
+      ) : icon ? (
+        <Reveal scale distance={travel.section}>
+          <View style={styles.mark}>
+            <Ionicons name={icon} size={30} color={colors.text.accent} />
+          </View>
+        </Reveal>
+      ) : null}
 
-      <Text variant="h3" center>
-        {title}
-      </Text>
+      <Reveal index={1}>
+        <Text variant="h3" center>
+          {title}
+        </Text>
+      </Reveal>
 
       {message && (
-        <Text
-          variant="body"
-          color={colors.text.secondary}
-          center
-          style={styles.message}
-        >
-          {message}
-        </Text>
+        <Reveal index={2}>
+          <Text variant="body" muted center style={styles.message}>
+            {message}
+          </Text>
+        </Reveal>
       )}
 
       {action && (
-        <Pressable
-          onPress={action.onPress}
-          style={({ pressed }) => [
-            styles.button,
-            pressed && styles.buttonPressed,
-          ]}
-        >
-          <Text variant="bodyBold" color={colors.white}>
+        <Reveal index={3} style={styles.actionRow}>
+          <Button variant="primary" onPress={action.onPress}>
             {action.label}
-          </Text>
-        </Pressable>
+          </Button>
+        </Reveal>
       )}
     </View>
   );
@@ -111,26 +117,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xxl,
   },
+  containerCompact: {
+    flex: 0,
+    paddingVertical: spacing.xl,
+  },
   animation: {
-    width: 200,
-    height: 200,
+    width: 180,
+    height: 180,
+    marginBottom: spacing.md,
+  },
+  /** A tinted paper tile, sized and cornered like a small mount. */
+  mark: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primary.amberWash,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: spacing.lg,
   },
   message: {
     marginTop: spacing.sm,
+    maxWidth: 320,
   },
-  button: {
+  actionRow: {
     marginTop: spacing.lg,
-    backgroundColor: colors.primary.amber,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 4,
-    borderRadius: 12,
-    minHeight: 44,
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonPressed: {
-    opacity: 0.85,
   },
 });
 

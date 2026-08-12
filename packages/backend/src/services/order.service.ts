@@ -4,7 +4,7 @@ import { logger } from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
 import { decodeCursor, encodeCursor } from '../utils/cursor';
 import { createNotification } from './notification.service';
-import { PRODUCT_PRICES_CENTS } from '../constants/products';
+import { PRODUCT_PRICES_PAISE } from '../constants/products';
 import { getSignedPhotoUrls } from '../utils/supabaseStorage';
 import type { CreateOrderInput, OrderStatus } from '../validators/order.validator';
 
@@ -115,7 +115,7 @@ export async function createOrder(
   let subtotal = 0;
 
   const orderItems: Omit<OrderItem, 'id'>[] = items.map((item) => {
-    const unitPrice = PRODUCT_PRICES_CENTS[item.productType];
+    const unitPrice = PRODUCT_PRICES_PAISE[item.productType];
     if (unitPrice === undefined) {
       throw new AppError(
         `Unknown product type: ${item.productType}`,

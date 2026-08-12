@@ -18,7 +18,7 @@ import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { processAndUploadPhoto } from '../utils/imageProcessor';
-import { PRODUCT_PRICES_CENTS } from '../constants/products';
+import { PRODUCT_PRICES_PAISE } from '../constants/products';
 
 const {
   SUPABASE_URL,
@@ -291,7 +291,7 @@ async function seedOrders(ids: Record<string, string>): Promise<void> {
       photo_id: photoIds[n % photoIds.length],
       product_type: item.type,
       quantity: item.qty,
-      unit_price_cents: PRODUCT_PRICES_CENTS[item.type],
+      unit_price_cents: PRODUCT_PRICES_PAISE[item.type],
     }));
     const totalCents = items.reduce((sum, i) => sum + i.unit_price_cents * i.quantity, 0);
 

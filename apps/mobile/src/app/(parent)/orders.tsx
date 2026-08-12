@@ -5,8 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, STALE_TIME_MS } from '@/theme';
-import { Text } from '@/components/ui';
+import { colors, spacing, radius, layout, STALE_TIME_MS } from '@/theme';
 import { ScreenContainer } from '@/components/layout';
 import { SkeletonShimmer, EmptyState, useToast } from '@/components/feedback';
 import { HeaderBar } from '@/components/navigation';
@@ -180,29 +179,28 @@ export default function OrdersScreen() {
     if (isLoading) return null;
     return (
       <EmptyState
+        icon="bag-handle-outline"
         title="No orders yet"
-        message="When you order prints or products from your child's photos, they will appear here."
+        message="Open a photo and tap “Order a print”. Anything you order shows up here with its progress."
+        action={{ label: 'Browse photos', onPress: handleNewOrder }}
       />
     );
-  }, [isLoading]);
-
-  // ── List header with order count ──────────────────────────────────
-  const renderListHeader = useCallback(
-    () =>
-      orders.length > 0 ? (
-        <View style={styles.countRow}>
-          <Text variant="bodySmall" color={colors.text.secondary}>
-            {orders.length} {orders.length === 1 ? 'order' : 'orders'}
-          </Text>
-        </View>
-      ) : null,
-    [orders.length],
-  );
+  }, [isLoading, handleNewOrder]);
 
   // ── Main render ──────────────────────────────────────────────────
+  const orderCount = orders.length;
+
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
-      <HeaderBar title="Orders" />
+      <HeaderBar
+        large
+        title="Orders"
+        eyebrow={
+          orderCount > 0
+            ? `${orderCount} ${orderCount === 1 ? 'order' : 'orders'}`
+            : undefined
+        }
+      />
 
       <View style={styles.container}>
         {isLoading && !isRefetching ? (
@@ -212,7 +210,6 @@ export default function OrdersScreen() {
             data={orders}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
-            ListHeaderComponent={renderListHeader}
             ListEmptyComponent={renderEmpty}
             ListFooterComponent={renderFooter}
             onEndReached={handleEndReached}
@@ -221,8 +218,9 @@ export default function OrdersScreen() {
               <RefreshControl
                 refreshing={isRefetching}
                 onRefresh={handleRefresh}
-                tintColor={colors.primary.amber}
-                colors={[colors.primary.amber]}
+                tintColor={colors.primary.amberDark}
+                colors={[colors.primary.amberDark]}
+                progressBackgroundColor={colors.background.surface}
               />
             }
             contentContainerStyle={styles.listContent}
@@ -243,10 +241,11 @@ export default function OrdersScreen() {
           onClose={handleOrderSheetClose}
         />
 
-        {/* FAB to start new order */}
+        {/* Every order starts from a photo, so the FAB goes to the feed. */}
         <HoneycombFAB
           onPress={handleNewOrder}
-          icon={<Ionicons name="cart-outline" size={24} color="#fff" />}
+          accessibilityLabel="Order from a photo"
+          icon={<Ionicons name="add" size={26} color={colors.ink[900]} />}
         />
       </View>
     </ScreenContainer>
@@ -263,12 +262,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.cream,
   },
   listContent: {
-    paddingBottom: spacing.xxl,
-  },
-  countRow: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
+    paddingBottom: layout.tabBarClearance,
   },
 
   // Skeleton
@@ -277,11 +271,11 @@ const styles = StyleSheet.create({
   },
   skeletonCard: {
     backgroundColor: colors.background.surface,
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
+    marginHorizontal: layout.screenPaddingHorizontal,
+    marginBottom: spacing.ms,
     padding: spacing.md,
-    borderRadius: 16,
-    gap: spacing.sm,
+    borderRadius: radius.lg,
+    gap: spacing.ms,
   },
   skeletonTopRow: {
     flexDirection: 'row',

@@ -3,8 +3,9 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, layout, MAX_OTP_ATTEMPTS } from '@/theme';
+import { colors, spacing, radius, layout, MAX_OTP_ATTEMPTS } from '@/theme';
 import { Text, Button } from '@/components/ui';
+import { Reveal } from '@/components/animation';
 import { ScreenContainer } from '@/components/layout';
 import { EmptyState } from '@/components/feedback';
 import { OTPInput, type OTPInputHandle } from '@/components/forms/OTPInput';
@@ -120,45 +121,45 @@ export default function VerifyOTPScreen() {
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
-          <Ionicons
-            name="arrow-back"
-            size={24}
-            color={colors.text.primary}
-          />
+          <Ionicons name="arrow-back" size={23} color={colors.text.primary} />
         </Pressable>
 
-        {/* Heading */}
-        <Text variant="h2" style={styles.heading}>
-          Enter verification code
-        </Text>
-
-        {/* Subtitle */}
-        <Text
-          variant="body"
-          color={colors.text.secondary}
-          style={styles.subtitle}
-        >
-          We sent a code to{' '}
-          <Text variant="bodyBold" color={colors.text.primary}>
-            {email}
+        <Reveal>
+          <Text variant="eyebrow" color={colors.text.tertiary} style={styles.eyebrow}>
+            Step 2 of 2
           </Text>
-        </Text>
+          <Text variant="h1" style={styles.heading}>
+            Check your email
+          </Text>
+        </Reveal>
+
+        <Reveal index={1}>
+          <Text variant="body" muted style={styles.subtitle}>
+            We sent a 6-digit code to
+          </Text>
+          <View style={styles.emailChip}>
+            <Ionicons name="mail" size={15} color={colors.text.accent} />
+            <Text variant="bodySmallBold" color={colors.text.accent} numberOfLines={1}>
+              {email}
+            </Text>
+          </View>
+        </Reveal>
 
         {/* OTP input */}
-        <View style={styles.otpContainer}>
+        <Reveal index={2} style={styles.otpContainer}>
           <OTPInput
             ref={otpRef}
             onComplete={handleOTPComplete}
             error={!!error && !isLockedOut}
             disabled={isVerifying || isLockedOut}
           />
-        </View>
+        </Reveal>
 
         {/* Error message */}
         {error && (
           <Text
             variant="bodySmall"
-            color={colors.error.main}
+            color={colors.error.dark}
             center
             style={styles.errorText}
           >
@@ -210,7 +211,7 @@ export default function VerifyOTPScreen() {
               loading={isSending}
               disabled={!canResend || isSending}
             >
-              Resend Code
+              Send a new code
             </Button>
           )}
         </View>
@@ -243,20 +244,36 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    paddingTop: spacing.sm,
   },
   backButton: {
     width: 44,
     height: 44,
+    marginLeft: -spacing.ms,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  heading: {
+  eyebrow: {
     marginBottom: spacing.sm,
   },
+  heading: {
+    marginBottom: spacing.ms,
+  },
   subtitle: {
+    marginBottom: spacing.sm,
+  },
+  emailChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: spacing.sm,
+    maxWidth: '100%',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.ms,
+    borderRadius: radius.xs,
+    backgroundColor: colors.primary.amberWash,
     marginBottom: spacing.xl,
   },
   otpContainer: {
@@ -271,7 +288,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.error.background,
-    borderRadius: layout.cardRadius,
+    borderRadius: radius.sm,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     marginBottom: spacing.md,

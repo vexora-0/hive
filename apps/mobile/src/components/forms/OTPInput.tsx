@@ -22,7 +22,16 @@ import Animated, {
   interpolateColor,
 } from 'react-native-reanimated';
 
-import { colors, spacing, layout, fontFamily, fontSize, lineHeight, OTP_LENGTH } from '@/theme';
+import {
+  colors,
+  spacing,
+  radius,
+  fontFamily,
+  fontSize,
+  lineHeight,
+  spring,
+  OTP_LENGTH,
+} from '@/theme';
 import { ShakeAnimation, type ShakeAnimationHandle } from '@/components/animation';
 import { Text } from '@/components/ui';
 
@@ -54,8 +63,6 @@ export interface OTPInputProps {
 // Animated box sub-component
 // ---------------------------------------------------------------------------
 
-const BORDER_SPRING = { damping: 18, stiffness: 220 };
-
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface OTPBoxProps {
@@ -68,23 +75,37 @@ interface OTPBoxProps {
 
 function OTPBox({ value, focused, error, disabled, onPress }: OTPBoxProps) {
   const focusAnim = useSharedValue(0);
+  const fillAnim = useSharedValue(value ? 1 : 0);
 
   useEffect(() => {
-    focusAnim.value = withSpring(focused ? 1 : 0, BORDER_SPRING);
+    focusAnim.value = withSpring(focused ? 1 : 0, spring.snappy);
   }, [focused, focusAnim]);
 
+  // A filled box pops once, so entering a digit is confirmed by the box and
+  // not only by the caret moving on.
+  useEffect(() => {
+    fillAnim.value = withSpring(value ? 1 : 0, spring.bouncy);
+  }, [value, fillAnim]);
+
   const animatedStyle = useAnimatedStyle(() => {
-    const borderColor = error
-      ? colors.error.main
-      : interpolateColor(
-          focusAnim.value,
-          [0, 1],
-          [colors.border.default, colors.primary.amber],
-        );
+    const filled = fillAnim.value;
 
     return {
-      borderColor,
-      borderWidth: focusAnim.value > 0.5 || error ? 2 : 1,
+      borderColor: error
+        ? colors.error.main
+        : interpolateColor(
+            Math.max(focusAnim.value, filled),
+            [0, 1],
+            [colors.border.light, colors.primary.amber],
+          ),
+      backgroundColor: error
+        ? colors.error.background
+        : interpolateColor(
+            Math.max(focusAnim.value, filled),
+            [0, 1],
+            [colors.background.surfaceSecondary, colors.background.surface],
+          ),
+      transform: [{ scale: 1 + filled * 0.04 }],
     };
   });
 
@@ -96,7 +117,7 @@ function OTPBox({ value, focused, error, disabled, onPress }: OTPBoxProps) {
       accessibilityRole="none"
     >
       <Text
-        variant="h3"
+        variant="h2"
         color={disabled ? colors.text.tertiary : colors.text.primary}
         style={styles.boxText}
       >
@@ -295,14 +316,13 @@ const styles = StyleSheet.create({
   box: {
     width: BOX_SIZE,
     height: BOX_SIZE + 8,
-    borderRadius: layout.inputRadius,
-    backgroundColor: colors.background.surface,
+    borderRadius: radius.sm,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
   boxDisabled: {
-    backgroundColor: colors.gray[100],
-    opacity: 0.6,
+    opacity: 0.5,
   },
   boxText: {
     textAlign: 'center',

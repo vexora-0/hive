@@ -2,10 +2,11 @@ import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, layout } from '@/theme';
+import { colors, spacing, radius, shadows, platformShadow } from '@/theme';
 import { Text } from '@/components/ui';
 import { Modal, ConfirmDialog } from '@/components/feedback';
-import { formatCents } from '@/features/orders/constants/products';
+import { formatRupees } from '@/features/orders/constants/products';
+import { ORDER_STATUS } from '@/features/orders/constants/orderStatus';
 import { formatOrderNumber } from '@/features/orders/utils/orderNumber';
 import type { OrderStatus } from '@/types/supabase';
 import type { AdminOrder } from '../services/adminService';
@@ -33,20 +34,24 @@ const NEXT_STATUSES: Record<OrderStatus, readonly OrderStatus[]> = {
   cancelled: [],
 };
 
+/**
+ * Labels come from the shared catalogue so the word an administrator picks is
+ * the word the parent then reads in their own order list.
+ */
 const STATUS_LABELS: Record<OrderStatus, string> = {
-  pending: 'Pending',
-  confirmed: 'Confirmed',
-  processing: 'Processing',
-  shipped: 'Shipped',
-  delivered: 'Delivered',
-  cancelled: 'Cancelled',
+  pending: ORDER_STATUS.pending.label,
+  confirmed: ORDER_STATUS.confirmed.label,
+  processing: ORDER_STATUS.processing.label,
+  shipped: ORDER_STATUS.shipped.label,
+  delivered: ORDER_STATUS.delivered.label,
+  cancelled: ORDER_STATUS.cancelled.label,
 };
 
 const STATUS_ICONS: Record<OrderStatus, keyof typeof Ionicons.glyphMap> = {
   pending: 'time-outline',
   confirmed: 'checkmark-circle-outline',
-  processing: 'construct-outline',
-  shipped: 'airplane-outline',
+  processing: 'print-outline',
+  shipped: 'cube-outline',
   delivered: 'gift-outline',
   cancelled: 'close-circle-outline',
 };
@@ -119,7 +124,7 @@ export function OrderStatusSheet({
                   color={colors.text.secondary}
                   style={styles.subtitle}
                 >
-                  {formatCents(order.total_cents)} · currently{' '}
+                  {formatRupees(order.total_cents)} · currently{' '}
                   {STATUS_LABELS[order.status]}
                 </Text>
 
@@ -198,30 +203,31 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: colors.overlay.scrim,
   },
   sheet: {
-    backgroundColor: colors.background.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: colors.background.cream,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
     paddingBottom: spacing.lg,
+    ...platformShadow(shadows.xlarge),
   },
   handleIndicator: {
     alignSelf: 'center',
-    backgroundColor: colors.gray[300],
+    backgroundColor: colors.border.default,
     width: 40,
     height: 4,
     borderRadius: 2,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
+    marginTop: spacing.ms,
+    marginBottom: spacing.sm,
   },
   content: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
   },
   subtitle: {
     marginTop: spacing.xs,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   terminal: {
     paddingVertical: spacing.md,
@@ -229,20 +235,19 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm + 4,
-    paddingHorizontal: spacing.sm,
-    borderRadius: layout.cardRadius,
-    minHeight: 48,
+    gap: spacing.md,
+    paddingVertical: spacing.ms,
+    paddingHorizontal: spacing.ms,
+    borderRadius: radius.sm,
+    minHeight: 52,
   },
   actionRowPressed: {
-    backgroundColor: colors.gray[100],
+    backgroundColor: colors.background.surfaceSecondary,
   },
   actionRowDisabled: {
-    opacity: 0.6,
+    opacity: 0.55,
   },
-  actionIcon: {
-    marginRight: spacing.md,
-  },
+  actionIcon: {},
 });
 
 export { STATUS_LABELS, NEXT_STATUSES };

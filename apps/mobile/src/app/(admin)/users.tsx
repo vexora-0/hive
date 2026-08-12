@@ -1,8 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
@@ -12,8 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, layout } from '@/theme';
 import { ScreenContainer } from '@/components/layout/ScreenContainer';
 import { HeaderBar } from '@/components/navigation/HeaderBar';
-import { TextInput } from '@/components/ui/TextInput';
-import { Text } from '@/components/ui/Text';
+import { TextInput, Chip } from '@/components/ui';
 import { EmptyState } from '@/components/feedback';
 import { UserListItem } from '@/features/admin/components/UserListItem';
 import { UserEditSheet } from '@/features/admin/components/UserEditSheet';
@@ -127,58 +126,47 @@ export default function UsersScreen() {
     if (!isFetchingNextPage) return null;
     return (
       <View style={styles.footer}>
-        <ActivityIndicator color={colors.primary.amber} />
+        <ActivityIndicator color={colors.text.accent} />
       </View>
     );
   }, [isFetchingNextPage]);
 
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
-      <HeaderBar title="Users" />
+      <HeaderBar large title="People" eyebrow="Teachers, parents and admins" />
 
       <View style={styles.container}>
         {/* Search bar */}
         <View style={styles.searchContainer}>
           <TextInput
-            placeholder="Search by name or email..."
+            placeholder="Search by name or email"
             value={search}
             onChangeText={setSearch}
+            autoCapitalize="none"
+            autoCorrect={false}
             leftIcon={
-              <Ionicons
-                name="search"
-                size={20}
-                color={colors.text.tertiary}
-              />
+              <Ionicons name="search" size={18} color={colors.text.tertiary} />
             }
             containerStyle={styles.searchInput}
           />
         </View>
 
         {/* Role filter chips */}
-        <View style={styles.filterRow}>
-          {ROLE_FILTERS.map((filter) => {
-            const isActive = roleFilter === filter.value;
-            return (
-              <Pressable
-                key={filter.label}
-                onPress={() => setRoleFilter(filter.value)}
-                style={[
-                  styles.chip,
-                  isActive && styles.chipActive,
-                ]}
-                accessibilityRole="button"
-                accessibilityState={{ selected: isActive }}
-              >
-                <Text
-                  variant="captionBold"
-                  color={isActive ? colors.white : colors.text.secondary}
-                >
-                  {filter.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+        >
+          {ROLE_FILTERS.map((filter) => (
+            <Chip
+              key={filter.label}
+              selected={roleFilter === filter.value}
+              onPress={() => setRoleFilter(filter.value)}
+            >
+              {filter.label}
+            </Chip>
+          ))}
+        </ScrollView>
 
         {/* User list */}
         <FlashList
@@ -193,8 +181,9 @@ export default function UsersScreen() {
             <RefreshControl
               refreshing={isRefetching}
               onRefresh={refetch}
-              tintColor={colors.primary.amber}
-              colors={[colors.primary.amber]}
+              tintColor={colors.primary.amberDark}
+              colors={[colors.primary.amberDark]}
+              progressBackgroundColor={colors.background.surface}
             />
           }
           contentContainerStyle={styles.listContent}
@@ -203,21 +192,23 @@ export default function UsersScreen() {
           ListEmptyComponent={
             isLoading ? (
               <View style={styles.centered}>
-                <ActivityIndicator size="large" color={colors.primary.amber} />
+                <ActivityIndicator size="large" color={colors.primary.amberDark} />
               </View>
             ) : isError ? (
               <EmptyState
-                title="Couldn't load users"
+                icon="cloud-offline-outline"
+                title="Couldn't load people"
                 message="Check your connection and try again."
-                action={{ label: 'Retry', onPress: () => refetch() }}
+                action={{ label: 'Try again', onPress: () => refetch() }}
               />
             ) : (
               <EmptyState
-                title={search ? 'No matching users' : 'No users yet'}
+                icon="people-outline"
+                title={search ? 'Nothing matched' : 'Nobody here yet'}
                 message={
                   search
-                    ? `Nothing matched "${search}". Try a different name or email.`
-                    : 'Users will appear here once they sign up.'
+                    ? `No one matched "${search}". Try a different name or email.`
+                    : 'People appear here once they sign in for the first time.'
                 }
               />
             )
@@ -249,9 +240,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   searchContainer: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xs,
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    paddingBottom: spacing.ms,
   },
   searchInput: {
     // TextInput component handles its own width
@@ -259,23 +249,11 @@ const styles = StyleSheet.create({
   filterRow: {
     flexDirection: 'row',
     gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
-    borderRadius: 9999,
-    backgroundColor: colors.background.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-  },
-  chipActive: {
-    backgroundColor: colors.primary.amber,
-    borderColor: colors.primary.amber,
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    paddingBottom: spacing.md,
   },
   listContent: {
-    paddingBottom: spacing.xxl,
+    paddingBottom: layout.tabBarClearance,
   },
   centered: {
     paddingVertical: spacing.xxl,
@@ -285,7 +263,7 @@ const styles = StyleSheet.create({
   separator: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.border.light,
-    marginHorizontal: spacing.md,
+    marginHorizontal: layout.screenPaddingHorizontal,
   },
   footer: {
     paddingVertical: spacing.lg,

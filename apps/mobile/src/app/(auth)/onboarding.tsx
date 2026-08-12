@@ -10,6 +10,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { MotiView } from 'moti';
 
 import { colors, spacing, layout } from '@/theme';
 import { Text, Button } from '@/components/ui';
@@ -28,7 +29,7 @@ import { getRoleRoute } from '@/types/navigation';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DOT_SIZE = 8;
-const DOT_ACTIVE_SIZE = 12;
+const DOT_ACTIVE_WIDTH = 26;
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -38,6 +39,9 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const flatListRef = useRef<FlatList<OnboardingSlideData>>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  // Measured once, then handed to each slide — see the note on
+  // `OnboardingSlideProps.height`.
+  const [pagerHeight, setPagerHeight] = useState(0);
   const [lookupFailed, setLookupFailed] = useState(false);
   const completeOnboarding = useOnboardingStore((s) => s.completeOnboarding);
   const { user, setProfile, setRole } = useAuthStore();
@@ -99,9 +103,9 @@ export default function OnboardingScreen() {
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<OnboardingSlideData>) => (
-      <OnboardingSlide slide={item} />
+      <OnboardingSlide slide={item} height={pagerHeight} />
     ),
-    [],
+    [pagerHeight],
   );
 
   const keyExtractor = useCallback(
@@ -142,9 +146,10 @@ export default function OnboardingScreen() {
           onPress={handleSkip}
           hitSlop={12}
           accessibilityRole="button"
-          accessibilityLabel="Skip onboarding"
+          accessibilityLabel="Skip the introduction"
+          style={styles.skip}
         >
-          <Text variant="bodyBold" color={colors.text.secondary}>
+          <Text variant="bodySmallBold" color={colors.text.tertiary}>
             Skip
           </Text>
         </Pressable>
@@ -156,6 +161,8 @@ export default function OnboardingScreen() {
         data={slides}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
+        style={styles.slides}
+        onLayout={(e) => setPagerHeight(e.nativeEvent.layout.height)}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
@@ -170,30 +177,30 @@ export default function OnboardingScreen() {
 
       {/* Bottom controls */}
       <View style={styles.footer}>
-        {/* Dot indicators */}
-        <View style={styles.dotsRow}>
-          {slides.map((slide, index) => {
-            const isActive = index === activeIndex;
-            return (
-              <View
-                key={slide.id}
-                style={[
-                  styles.dot,
-                  isActive ? styles.dotActive : styles.dotInactive,
-                ]}
-              />
-            );
-          })}
+        {/* Page indicators — the active one stretches into a bar rather than
+            growing into a bigger circle, so progress through the three slides
+            is readable as a length, not just a highlight. */}
+        <View
+          style={styles.dotsRow}
+          accessibilityRole="progressbar"
+          accessibilityLabel={`Slide ${activeIndex + 1} of ${slides.length}`}
+        >
+          {slides.map((slide, index) => (
+            <MotiView
+              key={slide.id}
+              animate={{
+                width: index === activeIndex ? DOT_ACTIVE_WIDTH : DOT_SIZE,
+                backgroundColor:
+                  index === activeIndex ? colors.primary.amber : colors.gray[300],
+              }}
+              transition={{ type: 'spring', damping: 20, stiffness: 260 }}
+              style={styles.dot}
+            />
+          ))}
         </View>
 
-        {/* Next / Get Started button */}
-        <Button
-          variant="primary"
-          size="lg"
-          onPress={handleNext}
-          style={styles.button}
-        >
-          {isLastSlide ? 'Get Started' : 'Next'}
+        <Button variant="primary" size="lg" fullWidth onPress={handleNext}>
+          {isLastSlide ? 'Get started' : 'Next'}
         </Button>
       </View>
     </SafeArea>
@@ -217,12 +224,19 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.ms,
+  },
+  skip: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.ms,
+  },
+  slides: {
+    flex: 1,
   },
   footer: {
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: layout.screenPaddingHorizontal,
     paddingBottom: spacing.lg,
   },
   dotsRow: {
@@ -233,20 +247,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   dot: {
-    borderRadius: 999,
-  },
-  dotActive: {
-    width: DOT_ACTIVE_SIZE,
-    height: DOT_ACTIVE_SIZE,
-    backgroundColor: colors.primary.amber,
-  },
-  dotInactive: {
-    width: DOT_SIZE,
     height: DOT_SIZE,
-    backgroundColor: colors.gray[300],
-  },
-  button: {
-    width: '100%',
-    borderRadius: layout.buttonRadius,
+    borderRadius: DOT_SIZE / 2,
   },
 });

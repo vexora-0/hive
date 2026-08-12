@@ -3,10 +3,11 @@ import { Alert, StyleSheet, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import { MotiView } from 'moti';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { colors, spacing, MAX_UPLOAD_IMAGES } from '@/theme';
-import { Text, Button } from '@/components/ui';
+import { colors, spacing, radius, layout, MAX_UPLOAD_IMAGES } from '@/theme';
+import { Text, Button, SectionHeader } from '@/components/ui';
 import { ScreenContainer } from '@/components/layout';
 import { HeaderBar } from '@/components/navigation';
 import { ClassSelector, type ClassItem } from '@/components/forms/ClassSelector';
@@ -201,29 +202,30 @@ export default function UploadScreen() {
 
   return (
     <ScreenContainer scroll keyboard edges={['top', 'left', 'right']}>
-      <HeaderBar title="Upload Photos" />
+      <HeaderBar large title="Share photos" />
 
       <View style={styles.content}>
-        {/* Step 1: Pick Images */}
+        {/* Step 1: Pick Images.
+            The numbering is real here — this is a sequence a teacher works
+            through in order between activities, not decoration. */}
         <View style={styles.section}>
-          <Text variant="h4" style={styles.stepLabel}>
-            1. Select Photos
-          </Text>
+          <SectionHeader eyebrow="Step 1" title="Choose photos" style={styles.stepHeader} />
           <Button
             variant={hasImages ? 'outline' : 'primary'}
+            fullWidth
             onPress={handlePickImages}
             disabled={isUploading}
             leftIcon={
               <Ionicons
                 name="images-outline"
                 size={20}
-                color={hasImages ? colors.primary.amber : colors.white}
+                color={hasImages ? colors.text.primary : colors.ink[900]}
               />
             }
           >
             {hasImages
-              ? `Add More (${images.length}/${MAX_UPLOAD_IMAGES})`
-              : 'Choose Photos'}
+              ? `Add more · ${images.length} of ${MAX_UPLOAD_IMAGES}`
+              : 'Choose from library'}
           </Button>
         </View>
 
@@ -239,15 +241,17 @@ export default function UploadScreen() {
         {/* Step 3: Class & Student Selection */}
         {hasImages && !isComplete && (
           <View style={styles.section}>
-            <Text variant="h4" style={styles.stepLabel}>
-              2. Class & Students
-            </Text>
+            <SectionHeader
+              eyebrow="Step 2"
+              title="Who is in them?"
+              style={styles.stepHeader}
+            />
 
             <ClassSelector
               classes={classes}
               selectedId={selectedClassId}
               onSelect={handleClassSelect}
-              label="Assign to Class"
+              label="Class"
               placeholder="Select a class"
               style={styles.classSelector}
             />
@@ -255,7 +259,7 @@ export default function UploadScreen() {
             {selectedClassId && (
               <Button
                 variant="outline"
-                size="sm"
+                fullWidth
                 onPress={() => setShowTagger(true)}
                 disabled={studentsLoading}
                 loading={studentsLoading}
@@ -263,14 +267,13 @@ export default function UploadScreen() {
                   <Ionicons
                     name="people-outline"
                     size={18}
-                    color={colors.primary.amber}
+                    color={colors.text.primary}
                   />
                 }
-                style={styles.tagButton}
               >
                 {selectedStudentIds.length > 0
-                  ? `${selectedStudentIds.length} Student${selectedStudentIds.length !== 1 ? 's' : ''} Tagged`
-                  : 'Tag Students'}
+                  ? `${selectedStudentIds.length} child${selectedStudentIds.length !== 1 ? 'ren' : ''} tagged`
+                  : 'Tag children'}
               </Button>
             )}
 
@@ -279,14 +282,13 @@ export default function UploadScreen() {
                 labelled "Optional", which made silently invisible photos the
                 easiest outcome to produce. */}
             {selectedClassId && selectedStudentIds.length === 0 && (
-              <Text
-                variant="bodySmall"
-                color={colors.text.secondary}
-                style={styles.tagHint}
-              >
-                Tag at least one child — photos are only shown to the families
-                of the children in them.
-              </Text>
+              <View style={styles.tagHint}>
+                <Ionicons name="information-circle" size={17} color={colors.text.accent} />
+                <Text variant="bodySmall" color={colors.text.accent} style={styles.tagHintText}>
+                  Tag at least one child. A photo is only shown to the families of
+                  the children tagged in it.
+                </Text>
+              </View>
             )}
           </View>
         )}
@@ -297,19 +299,18 @@ export default function UploadScreen() {
             preconditions are unmet leaves the teacher with nothing to read. */}
         {hasImages && !isUploading && !isComplete && (
           <View style={styles.section}>
-            <Text variant="h4" style={styles.stepLabel}>
-              3. Upload
-            </Text>
+            <SectionHeader eyebrow="Step 3" title="Send them" style={styles.stepHeader} />
             <Button
               variant="primary"
               size="lg"
+              fullWidth
               onPress={handleStartUpload}
               disabled={!canUpload}
               leftIcon={
-                <Ionicons name="cloud-upload-outline" size={22} color={colors.white} />
+                <Ionicons name="cloud-upload" size={20} color={colors.ink[900]} />
               }
             >
-              {`Upload ${pendingCount} Photo${pendingCount !== 1 ? 's' : ''}`}
+              {`Share ${pendingCount} photo${pendingCount !== 1 ? 's' : ''}`}
             </Button>
           </View>
         )}
@@ -317,49 +318,48 @@ export default function UploadScreen() {
         {/* Upload Progress */}
         {isUploading && (
           <View style={styles.progressSection}>
-            <Text variant="bodyBold" color={colors.text.primary}>
-              Uploading... {Math.round(overallProgress * 100)}%
-            </Text>
+            <View style={styles.progressRow}>
+              <Text variant="bodyBold">Sending…</Text>
+              <Text variant="price">{Math.round(overallProgress * 100)}%</Text>
+            </View>
             <View style={styles.overallProgressTrack}>
-              <View
-                style={[
-                  styles.overallProgressFill,
-                  { width: `${Math.round(overallProgress * 100)}%` },
-                ]}
+              <MotiView
+                animate={{ width: `${Math.round(overallProgress * 100)}%` }}
+                transition={{ type: 'timing', duration: 220 }}
+                style={styles.overallProgressFill}
               />
             </View>
+            <Text variant="caption" muted style={styles.progressHint}>
+              Keep this screen open until it finishes.
+            </Text>
           </View>
         )}
 
         {/* Complete state */}
         {isComplete && (
           <View style={styles.completeSection}>
-            <Ionicons
-              name="checkmark-circle"
-              size={48}
-              color={colors.success.main}
-            />
-            <Text variant="h3" style={styles.completeTitle}>
-              All Photos Uploaded!
-            </Text>
-            <Text
-              variant="body"
-              color={colors.text.secondary}
-              center
-              style={styles.completeMessage}
+            <MotiView
+              from={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', damping: 12, stiffness: 200 }}
+              style={styles.completeMark}
             >
-              {images.length} photo{images.length !== 1 ? 's' : ''} uploaded
-              successfully.
+              <Ionicons name="checkmark" size={34} color={colors.success.dark} />
+            </MotiView>
+            <Text variant="h2" center style={styles.completeTitle}>
+              Shared
+            </Text>
+            <Text variant="body" muted center style={styles.completeMessage}>
+              {images.length} photo{images.length !== 1 ? 's are' : ' is'} now in the
+              feed of every family you tagged.
             </Text>
             <Button
               variant="primary"
+              fullWidth
               onPress={handleUploadMore}
-              leftIcon={
-                <Ionicons name="add-circle-outline" size={20} color={colors.white} />
-              }
-              style={styles.uploadMoreButton}
+              leftIcon={<Ionicons name="add" size={20} color={colors.ink[900]} />}
             >
-              Upload More
+              Share more
             </Button>
           </View>
         )}
@@ -387,54 +387,75 @@ export default function UploadScreen() {
 const styles = StyleSheet.create({
   content: {
     flex: 1,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    paddingTop: spacing.sm,
+    paddingBottom: layout.tabBarClearance,
   },
   section: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
-  stepLabel: {
-    marginBottom: spacing.sm,
+  stepHeader: {
+    marginBottom: spacing.md,
   },
   classSelector: {
-    marginBottom: spacing.sm,
-  },
-  tagButton: {
-    alignSelf: 'flex-start',
+    marginBottom: spacing.ms,
   },
   tagHint: {
-    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginTop: spacing.ms,
+    padding: spacing.ms,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primary.amberWash,
+  },
+  tagHintText: {
+    flex: 1,
   },
   progressSection: {
     marginBottom: spacing.lg,
     padding: spacing.md,
-    backgroundColor: colors.background.surfaceSecondary,
-    borderRadius: 12,
+    backgroundColor: colors.background.surface,
+    borderRadius: radius.lg,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   overallProgressTrack: {
     height: 8,
-    backgroundColor: colors.gray[200],
+    backgroundColor: colors.background.surfaceSecondary,
     borderRadius: 4,
     overflow: 'hidden',
-    marginTop: spacing.sm,
+    marginTop: spacing.ms,
   },
   overallProgressFill: {
     height: '100%',
     backgroundColor: colors.primary.amber,
     borderRadius: 4,
   },
+  progressHint: {
+    marginTop: spacing.sm,
+  },
   completeSection: {
     alignItems: 'center',
     paddingVertical: spacing.xl,
   },
+  completeMark: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.success.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
   completeTitle: {
-    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
   completeMessage: {
-    marginTop: spacing.sm,
-  },
-  uploadMoreButton: {
-    marginTop: spacing.lg,
+    marginBottom: spacing.xl,
+    maxWidth: 320,
   },
 });

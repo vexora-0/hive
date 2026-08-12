@@ -10,7 +10,7 @@ import Animated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, layout } from '@/theme';
+import { colors, spacing, radius, layout, shadows, platformShadow } from '@/theme';
 import { Text } from '@/components/ui/Text';
 import type { NotificationType } from '@/types/supabase';
 import type { Notification } from '../services/notificationService';
@@ -39,11 +39,21 @@ const ICON_MAP: Record<NotificationType, keyof typeof Ionicons.glyphMap> = {
   order_status: 'cube-outline',
 };
 
-const ICON_COLOR_MAP: Record<NotificationType, string> = {
-  new_photos: colors.primary.amber,
-  upload_complete: colors.primary.mint,
-  new_order: colors.primary.blue,
-  order_status: colors.primary.lavender,
+/**
+ * Each type gets a tile: a wash to sit on and the deep tone for the glyph.
+ * The saturated hue is deliberately not used — a column of five saturated
+ * squares reads as an error list.
+ */
+const ICON_TILE_MAP: Record<NotificationType, { wash: string; ink: string }> = {
+  new_photos: { wash: colors.primary.amberWash, ink: colors.text.accent },
+  upload_complete: { wash: colors.primary.mintWash, ink: colors.primary.mintDark },
+  new_order: { wash: colors.primary.blueWash, ink: colors.primary.blueDark },
+  order_status: { wash: colors.primary.lavenderWash, ink: colors.primary.lavenderDark },
+};
+
+const DEFAULT_TILE = {
+  wash: colors.primary.amberWash,
+  ink: colors.text.accent,
 };
 
 /**
@@ -98,7 +108,7 @@ export function NotificationCard({
 
   const isRead = notification.is_read;
   const iconName = ICON_MAP[notification.type] ?? 'notifications-outline';
-  const iconColor = ICON_COLOR_MAP[notification.type] ?? colors.primary.amber;
+  const tile = ICON_TILE_MAP[notification.type] ?? DEFAULT_TILE;
   const relativeTime = formatRelativeTime(notification.created_at);
 
   const handleDismiss = useCallback(() => {
@@ -167,32 +177,30 @@ export function NotificationCard({
 
       {/* Card content */}
       <GestureDetector gesture={panGesture}>
-        <Animated.View style={[styles.card, animatedCardStyle]}>
+        <Animated.View
+          style={[styles.card, !isRead && styles.cardUnread, animatedCardStyle]}
+        >
           <Pressable
             onPress={() => onPress?.(notification)}
             style={styles.pressable}
             accessibilityRole="button"
-            accessibilityLabel={`${notification.title}. ${notification.body ?? ''}`}
+            accessibilityLabel={`${isRead ? '' : 'Unread. '}${notification.title}. ${notification.body ?? ''}`}
           >
-            {/* Unread indicator dot */}
-            {!isRead && <View style={styles.unreadDot} />}
+            {/* Unread rail. A rail down the edge survives being glanced at from
+                across a room; an 8px dot floating in the padding does not. */}
+            {!isRead && <View style={styles.unreadRail} />}
 
             {/* Icon */}
-            <View
-              style={[
-                styles.iconContainer,
-                { backgroundColor: iconColor + '1F' },
-              ]}
-            >
-              <Ionicons name={iconName} size={22} color={iconColor} />
+            <View style={[styles.iconContainer, { backgroundColor: tile.wash }]}>
+              <Ionicons name={iconName} size={20} color={tile.ink} />
             </View>
 
             {/* Text content */}
             <View style={styles.content}>
               <View style={styles.titleRow}>
                 <Text
-                  variant={isRead ? 'body' : 'bodyBold'}
-                  numberOfLines={1}
+                  variant={isRead ? 'bodySmall' : 'bodySmallBold'}
+                  numberOfLines={2}
                   style={styles.title}
                 >
                   {notification.title}
@@ -204,8 +212,8 @@ export function NotificationCard({
 
               {notification.body && (
                 <Text
-                  variant="bodySmall"
-                  color={colors.text.secondary}
+                  variant="caption"
+                  color={colors.text.tertiary}
                   numberOfLines={2}
                   style={styles.body}
                 >
@@ -227,13 +235,13 @@ export function NotificationCard({
 const styles = StyleSheet.create({
   wrapper: {
     position: 'relative',
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
+    marginHorizontal: layout.screenPaddingHorizontal,
+    marginBottom: spacing.ms,
   },
   swipeBackground: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.primary.mint,
-    borderRadius: layout.cardRadius,
+    backgroundColor: colors.success.main,
+    borderRadius: radius.lg,
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: spacing.lg,
@@ -244,43 +252,42 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.background.surface,
-    borderRadius: layout.cardRadius,
-    // iOS shadow
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    // Android shadow
-    elevation: 2,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    ...platformShadow(shadows.small),
+  },
+  cardUnread: {
+    backgroundColor: colors.primary.amberWash,
   },
   pressable: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.ms,
     padding: spacing.md,
+    paddingLeft: spacing.md + 4,
     minHeight: 72,
   },
-  unreadDot: {
+  unreadRail: {
     position: 'absolute',
-    left: spacing.sm,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary.blue,
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: colors.primary.amber,
   },
   iconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: radius.xs,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.sm + 4,
   },
   content: {
     flex: 1,
   },
   titleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: spacing.sm,
   },

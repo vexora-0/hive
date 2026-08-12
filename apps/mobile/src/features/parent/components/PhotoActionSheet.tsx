@@ -2,9 +2,8 @@ import React, { useCallback } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing } from '@/theme';
-import { Text } from '@/components/ui';
-import { Badge } from '@/components/ui';
+import { colors, spacing, radius, shadows, platformShadow } from '@/theme';
+import { Text, Badge } from '@/components/ui';
 import type { FeedPhoto } from '../services/parentService';
 import type { PhotoAction } from '../hooks/usePhotoActions';
 import { Modal } from '@/components/feedback';
@@ -39,20 +38,20 @@ export interface PhotoActionSheetProps {
 const ACTIONS: ActionOption[] = [
   {
     key: 'viewFullScreen',
-    label: 'View Full Screen',
+    label: 'Open full screen',
     icon: 'expand-outline',
   },
   {
     key: 'addToCart',
-    label: 'Order Print',
+    label: 'Order a print',
     icon: 'cart-outline',
   },
   {
     key: 'downloadPhoto',
-    label: 'Download',
+    label: 'Save to phone',
     icon: 'download-outline',
     disabled: true,
-    badge: 'Coming Soon',
+    badge: 'Soon',
   },
 ];
 
@@ -149,48 +148,48 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: colors.overlay.scrim,
   },
   sheet: {
-    backgroundColor: colors.background.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: colors.background.cream,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
     paddingBottom: spacing.lg,
+    ...platformShadow(shadows.xlarge),
   },
   handleIndicator: {
     alignSelf: 'center',
-    backgroundColor: colors.gray[300],
+    backgroundColor: colors.border.default,
     width: 40,
     height: 4,
     borderRadius: 2,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
+    marginTop: spacing.ms,
+    marginBottom: spacing.sm,
   },
   content: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.lg,
   },
   photoCaption: {
-    marginBottom: spacing.md,
-    paddingHorizontal: spacing.xs,
+    marginBottom: spacing.ms,
+    paddingHorizontal: spacing.sm,
   },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm + 4,
-    paddingHorizontal: spacing.sm,
-    borderRadius: 12,
-    minHeight: 48,
+    gap: spacing.md,
+    paddingVertical: spacing.ms,
+    paddingHorizontal: spacing.ms,
+    borderRadius: radius.sm,
+    minHeight: 52,
   },
   actionRowPressed: {
-    backgroundColor: colors.gray[100],
+    backgroundColor: colors.background.surfaceSecondary,
   },
   actionRowDisabled: {
-    opacity: 0.6,
+    opacity: 0.55,
   },
-  actionIcon: {
-    marginRight: spacing.md,
-  },
+  actionIcon: {},
   actionLabel: {
     flex: 1,
   },

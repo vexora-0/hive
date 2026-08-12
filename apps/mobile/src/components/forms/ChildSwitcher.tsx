@@ -1,22 +1,28 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
-  View,
   FlatList,
   Pressable,
   StyleSheet,
   type ListRenderItemInfo,
-  type ViewToken,
 } from 'react-native';
 import Animated, {
+  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  interpolate,
 } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 
-import { colors, spacing } from '@/theme';
-import { Avatar } from '@/components/ui';
-import { Text } from '@/components/ui';
+import {
+  colors,
+  spacing,
+  radius,
+  layout,
+  spring,
+  pressScale,
+  MIN_TAP_SIZE,
+} from '@/theme';
+import { Avatar, Text } from '@/components/ui';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,80 +35,86 @@ export interface ChildItem {
 }
 
 export interface ChildSwitcherProps {
-  /** Array of children to display. */
+  /** Children to switch between. */
   children: ChildItem[];
   /** Currently selected child id. */
   selectedId?: string | null;
-  /** Called when a child avatar is tapped. */
+  /** Called when a child is tapped. */
   onSelect: (child: ChildItem) => void;
 }
 
 // ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const AVATAR_SIZE = 64;
-const RING_WIDTH = 3;
-const ITEM_WIDTH = AVATAR_SIZE + RING_WIDTH * 2 + spacing.md;
-
-// ---------------------------------------------------------------------------
-// Animated avatar item
+// One child
 // ---------------------------------------------------------------------------
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-interface ChildAvatarItemProps {
+/** First name only — the surname is the same for every row in most families. */
+function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] ?? name;
+}
+
+interface ChildPillProps {
   item: ChildItem;
   isSelected: boolean;
   onPress: () => void;
 }
 
-function ChildAvatarItem({ item, isSelected, onPress }: ChildAvatarItemProps) {
+function ChildPill({ item, isSelected, onPress }: ChildPillProps) {
   const selected = useSharedValue(isSelected ? 1 : 0);
+  const press = useSharedValue(1);
 
-  React.useEffect(() => {
-    selected.value = withSpring(isSelected ? 1 : 0, {
-      damping: 15,
-      stiffness: 180,
-    });
+  useEffect(() => {
+    selected.value = withSpring(isSelected ? 1 : 0, spring.snappy);
   }, [isSelected, selected]);
 
-  const ringStyle = useAnimatedStyle(() => ({
-    borderWidth: interpolate(selected.value, [0, 1], [0, RING_WIDTH]),
-    borderColor: colors.primary.amber,
-    transform: [
-      { scale: interpolate(selected.value, [0, 1], [0.92, 1]) },
-    ],
+  const pillStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      selected.value,
+      [0, 1],
+      [colors.background.surface, colors.ink[900]],
+    ),
+    borderColor: interpolateColor(
+      selected.value,
+      [0, 1],
+      [colors.border.light, colors.ink[900]],
+    ),
+    transform: [{ scale: press.value }],
   }));
 
   return (
-    <View style={styles.itemContainer}>
-      <AnimatedPressable
-        onPress={onPress}
-        style={[styles.avatarRing, ringStyle]}
-        accessibilityRole="button"
-        accessibilityState={{ selected: isSelected }}
-        accessibilityLabel={`${item.name}${isSelected ? ', selected' : ''}`}
-      >
-        <Avatar
-          uri={item.avatarUrl}
-          name={item.name}
-          size="lg"
-        />
-      </AnimatedPressable>
-
+    <AnimatedPressable
+      onPress={() => {
+        if (isSelected) return;
+        Haptics.selectionAsync();
+        onPress();
+      }}
+      onPressIn={() => {
+        press.value = withSpring(pressScale.button, spring.press);
+      }}
+      onPressOut={() => {
+        press.value = withSpring(1, spring.press);
+      }}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isSelected }}
+      accessibilityLabel={`Show ${item.name}'s photos`}
+      style={[styles.pill, pillStyle]}
+    >
+      <Avatar
+        uri={item.avatarUrl}
+        name={item.name}
+        size="sm"
+        borderColor={isSelected ? colors.primary.amber : undefined}
+        borderWidth={2}
+      />
       <Text
-        variant="caption"
-        color={isSelected ? colors.primary.amberDark : colors.text.secondary}
+        variant="bodySmallBold"
+        color={isSelected ? colors.text.onInk : colors.text.secondary}
         numberOfLines={1}
-        style={[
-          styles.nameLabel,
-          isSelected && styles.nameLabelSelected,
-        ]}
       >
-        {item.name}
+        {firstName(item.name)}
       </Text>
-    </View>
+    </AnimatedPressable>
   );
 }
 
@@ -111,18 +123,16 @@ function ChildAvatarItem({ item, isSelected, onPress }: ChildAvatarItemProps) {
 // ---------------------------------------------------------------------------
 
 /**
- * `<ChildSwitcher>` -- horizontal scroll of circular avatars for switching
- * between children.
+ * `<ChildSwitcher>` — picks whose photos the feed is showing.
  *
- * The active child shows an amber border ring and slightly larger scale.
- * Uses a `FlatList` with horizontal mode and snap-to-item behaviour.
+ * A row of compact pills rather than a carousel of 64px portraits. Most
+ * families have one or two children, so the old carousel spent a quarter of
+ * the screen above the feed to offer a choice of two — and rendered at all
+ * even when there was only one child, which is a control with nothing to
+ * control. It now hides itself below two.
  *
  * ```tsx
- * <ChildSwitcher
- *   children={childrenList}
- *   selectedId={activeChildId}
- *   onSelect={(child) => setActiveChildId(child.id)}
- * />
+ * <ChildSwitcher children={children} selectedId={active?.id} onSelect={setActive} />
  * ```
  */
 export function ChildSwitcher({
@@ -136,13 +146,12 @@ export function ChildSwitcher({
     (child: ChildItem) => {
       onSelect(child);
 
-      // Scroll the selected item into view
       const index = childrenList.findIndex((c) => c.id === child.id);
       if (index !== -1) {
         flatListRef.current?.scrollToIndex({
           index,
           animated: true,
-          viewPosition: 0.5, // center
+          viewPosition: 0.5,
         });
       }
     },
@@ -151,7 +160,7 @@ export function ChildSwitcher({
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<ChildItem>) => (
-      <ChildAvatarItem
+      <ChildPill
         item={item}
         isSelected={item.id === selectedId}
         onPress={() => handleSelect(item)}
@@ -162,16 +171,8 @@ export function ChildSwitcher({
 
   const keyExtractor = useCallback((item: ChildItem) => item.id, []);
 
-  const getItemLayout = useCallback(
-    (_: unknown, index: number) => ({
-      length: ITEM_WIDTH,
-      offset: ITEM_WIDTH * index,
-      index,
-    }),
-    [],
-  );
-
-  if (childrenList.length === 0) return null;
+  // Nothing to switch between.
+  if (childrenList.length < 2) return null;
 
   return (
     <FlatList
@@ -182,9 +183,10 @@ export function ChildSwitcher({
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.listContent}
-      snapToInterval={ITEM_WIDTH}
-      decelerationRate="fast"
-      getItemLayout={getItemLayout}
+      // Pill widths vary with name length, so an estimated getItemLayout would
+      // put scrollToIndex in the wrong place. Letting FlatList measure is
+      // affordable here: a family has a handful of children, not hundreds.
+      onScrollToIndexFailed={() => {}}
     />
   );
 }
@@ -195,28 +197,19 @@ export function ChildSwitcher({
 
 const styles = StyleSheet.create({
   listContent: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: layout.screenPaddingHorizontal,
     paddingVertical: spacing.sm,
+    gap: spacing.sm,
   },
-  itemContainer: {
-    width: ITEM_WIDTH,
+  pill: {
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  avatarRing: {
-    width: AVATAR_SIZE + RING_WIDTH * 2 + 4,
-    height: AVATAR_SIZE + RING_WIDTH * 2 + 4,
-    borderRadius: 9999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderColor: 'transparent',
-  },
-  nameLabel: {
-    marginTop: spacing.xs,
-    textAlign: 'center',
-    maxWidth: ITEM_WIDTH - spacing.xs,
-  },
-  nameLabelSelected: {
-    fontWeight: '600',
+    gap: spacing.sm,
+    minHeight: MIN_TAP_SIZE,
+    paddingLeft: spacing.xs + 1,
+    paddingRight: spacing.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
   },
 });
 

@@ -1,11 +1,14 @@
 /**
- * Hive Shadow Presets
+ * Hive Elevation
  *
- * Each preset contains:
- *  - iOS shadow properties (shadowColor, shadowOffset, shadowOpacity, shadowRadius)
- *  - Android elevation
+ * Shadows are cast by warm light onto warm paper, so they are brown rather
+ * than blue-black, wide rather than tight, and much softer than the previous
+ * set. A tight dark shadow reads as a UI card floating in space; a wide warm
+ * one reads as a print resting on a page, which is the whole premise.
  *
- * The warm-tinted shadowColor keeps shadows consistent with Hive's cream palette.
+ * Each preset carries iOS shadow properties and the matching Android
+ * elevation. Use `platformShadow()` when you need only what the platform
+ * actually honours.
  */
 
 import { Platform, ViewStyle } from 'react-native';
@@ -18,44 +21,66 @@ export interface Shadow {
   elevation: number;
 }
 
-const SHADOW_COLOR = '#1A1A2E';
+/** Warm umber — the colour of a shadow on cream paper, not on white plastic. */
+const SHADOW_COLOR = '#5C4326';
+
+/** Ink shadow, for elements lifted off a dark surface. */
+const SHADOW_COLOR_INK = '#0A0B16';
 
 /**
- * Small shadow — cards, input fields, thumbnails.
- * iOS: 2px y-offset, 4px blur
- * Android: elevation 2
+ * Small — list rows, chips, input fields at rest.
+ * Barely there: it separates, it does not lift.
  */
 export const shadowSmall: Shadow = {
   shadowColor: SHADOW_COLOR,
   shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.08,
-  shadowRadius: 4,
+  shadowOpacity: 0.06,
+  shadowRadius: 8,
   elevation: 2,
 };
 
-/**
- * Medium shadow — floating action buttons, popovers, modals.
- * iOS: 4px y-offset, 8px blur
- * Android: elevation 4
- */
+/** Medium — cards and photo mounts resting on the page. */
 export const shadowMedium: Shadow = {
   shadowColor: SHADOW_COLOR,
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.12,
-  shadowRadius: 8,
-  elevation: 4,
+  shadowOffset: { width: 0, height: 6 },
+  shadowOpacity: 0.1,
+  shadowRadius: 18,
+  elevation: 5,
 };
 
-/**
- * Large shadow — bottom sheets, drawers, dialogs.
- * iOS: 8px y-offset, 16px blur
- * Android: elevation 8
- */
+/** Large — the floating tab bar, FABs, popovers. */
 export const shadowLarge: Shadow = {
   shadowColor: SHADOW_COLOR,
-  shadowOffset: { width: 0, height: 8 },
+  shadowOffset: { width: 0, height: 12 },
   shadowOpacity: 0.16,
-  shadowRadius: 16,
+  shadowRadius: 28,
+  elevation: 10,
+};
+
+/** Extra large — bottom sheets and dialogs over a scrim. */
+export const shadowXLarge: Shadow = {
+  shadowColor: SHADOW_COLOR,
+  shadowOffset: { width: 0, height: 20 },
+  shadowOpacity: 0.22,
+  shadowRadius: 40,
+  elevation: 18,
+};
+
+/** A photo mount picked up off the page — used during the open transition. */
+export const shadowLifted: Shadow = {
+  shadowColor: SHADOW_COLOR,
+  shadowOffset: { width: 0, height: 18 },
+  shadowOpacity: 0.26,
+  shadowRadius: 34,
+  elevation: 16,
+};
+
+/** For elements raised above an ink surface, where an umber shadow vanishes. */
+export const shadowOnInk: Shadow = {
+  shadowColor: SHADOW_COLOR_INK,
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.5,
+  shadowRadius: 20,
   elevation: 8,
 };
 
@@ -64,6 +89,9 @@ export const shadows = {
   small: shadowSmall,
   medium: shadowMedium,
   large: shadowLarge,
+  xlarge: shadowXLarge,
+  lifted: shadowLifted,
+  onInk: shadowOnInk,
   /** No shadow — useful for toggling. */
   none: {
     shadowColor: 'transparent',
@@ -77,12 +105,16 @@ export const shadows = {
 /**
  * Returns a platform-aware shadow style.
  *
- * On iOS it returns the full shadow* properties.
- * On Android it returns only `elevation` (Android ignores iOS shadow props).
+ * On iOS it returns the full shadow* properties. On Android it returns only
+ * `elevation`, plus the shadow colour, which Android *does* honour from API 28
+ * and which is what keeps the elevation warm rather than grey.
  */
 export function platformShadow(shadow: Shadow): ViewStyle {
   if (Platform.OS === 'android') {
-    return { elevation: shadow.elevation };
+    return {
+      elevation: shadow.elevation,
+      shadowColor: shadow.shadowColor,
+    };
   }
 
   return {

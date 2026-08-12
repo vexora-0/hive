@@ -11,7 +11,7 @@ import { MotiView } from 'moti';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, layout, shadows, ANIMATION_DURATION } from '@/theme';
+import { colors, spacing, radius, layout, shadows, platformShadow } from '@/theme';
 import { Text } from '@/components/ui';
 
 type ToastVariant = 'success' | 'error' | 'info';
@@ -40,10 +40,19 @@ interface ToastInternal {
 const ToastContext = createContext<ToastApi | null>(null);
 const ToastInternalContext = createContext<ToastInternal | null>(null);
 
-const VARIANT: Record<ToastVariant, { bg: string; icon: keyof typeof Ionicons.glyphMap }> = {
-  success: { bg: colors.success.main, icon: 'checkmark-circle' },
-  error: { bg: colors.error.main, icon: 'alert-circle' },
-  info: { bg: colors.info.main, icon: 'information-circle' },
+/**
+ * Toasts are ink slabs with a coloured icon, not coloured slabs. A full-width
+ * green or red bar reads as an alert banner and pulls the eye off whatever the
+ * person was doing; the status belongs in the icon, and the toast belongs in
+ * the same material as the tab bar it sits above.
+ */
+const VARIANT: Record<
+  ToastVariant,
+  { icon: keyof typeof Ionicons.glyphMap; tint: string }
+> = {
+  success: { icon: 'checkmark-circle', tint: colors.success.light },
+  error: { icon: 'alert-circle', tint: colors.error.light },
+  info: { icon: 'information-circle', tint: colors.primary.amberLight },
 };
 
 const VISIBLE_MS = 3000;
@@ -149,21 +158,23 @@ function ToastView({ toast, placement, onDismiss }: ToastViewProps) {
 
   const offset =
     placement === 'bottom'
-      ? // Above the tab bar, clear of the home indicator.
-        { bottom: insets.bottom + spacing.xxl + spacing.lg }
+      ? // Above the floating tab bar, clear of the home indicator.
+        { bottom: insets.bottom + layout.tabBarHeight + spacing.lg }
       : // Inside a sheet there is no tab bar and the sheet owns the bottom of
         // the screen, so the toast goes to the top. Android dialogs already
         // start below the status bar — nothing here sets statusBarTranslucent —
         // so adding the inset there would double-count it.
         { top: Platform.OS === 'ios' ? insets.top + spacing.sm : spacing.md };
 
+  const variant = VARIANT[toast.variant];
+
   return (
     <MotiView
       key={toast.id}
-      from={{ opacity: 0, translateY: placement === 'bottom' ? 24 : -24 }}
-      animate={{ opacity: 1, translateY: 0 }}
-      exit={{ opacity: 0, translateY: placement === 'bottom' ? 24 : -24 }}
-      transition={{ type: 'timing', duration: ANIMATION_DURATION }}
+      from={{ opacity: 0, translateY: placement === 'bottom' ? 20 : -20, scale: 0.97 }}
+      animate={{ opacity: 1, translateY: 0, scale: 1 }}
+      exit={{ opacity: 0, translateY: placement === 'bottom' ? 20 : -20, scale: 0.97 }}
+      transition={{ type: 'spring', damping: 22, stiffness: 280, mass: 0.9 }}
       style={[styles.container, offset]}
       pointerEvents="box-none"
     >
@@ -171,11 +182,11 @@ function ToastView({ toast, placement, onDismiss }: ToastViewProps) {
         onPress={onDismiss}
         accessibilityRole="alert"
         accessibilityLabel={toast.message}
-        style={[styles.toast, { backgroundColor: VARIANT[toast.variant].bg }]}
+        style={styles.toast}
       >
-        <Ionicons name={VARIANT[toast.variant].icon} size={20} color={colors.white} />
+        <Ionicons name={variant.icon} size={20} color={variant.tint} />
         <View style={styles.textWrap}>
-          <Text variant="bodySmallBold" color={colors.white} numberOfLines={3}>
+          <Text variant="bodySmallBold" onInk numberOfLines={3}>
             {toast.message}
           </Text>
         </View>
@@ -196,11 +207,12 @@ const styles = StyleSheet.create({
   toast: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
+    gap: spacing.ms,
+    paddingVertical: spacing.ms,
     paddingHorizontal: spacing.md,
-    borderRadius: layout.cardRadius,
-    ...shadows.medium,
+    borderRadius: radius.md,
+    backgroundColor: colors.ink[900],
+    ...platformShadow(shadows.large),
   },
   textWrap: { flex: 1 },
 });

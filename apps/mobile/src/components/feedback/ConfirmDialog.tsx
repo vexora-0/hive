@@ -1,7 +1,8 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
 
-import { colors, spacing, layout, shadows } from '@/theme';
+import { colors, spacing, radius, shadows, platformShadow } from '@/theme';
 import { Text, Button } from '@/components/ui';
 import { Modal } from './Modal';
 
@@ -40,52 +41,55 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={styles.backdrop} onPress={onCancel} accessibilityRole="button">
+      <Pressable style={styles.backdropHost} onPress={onCancel} accessibilityRole="button">
+        <Animated.View entering={FadeIn.duration(180)} style={styles.backdrop} />
+
         {/* Stops a tap inside the card dismissing it. */}
-        <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
-          <Text variant="h3" style={styles.title}>
-            {title}
-          </Text>
-          <Text variant="body" color={colors.text.secondary} style={styles.message}>
-            {message}
-          </Text>
-          <View style={styles.actions}>
-            <Button variant="outline" onPress={onCancel} style={styles.button}>
-              {cancelLabel}
-            </Button>
-            {/* Button has no danger variant; the destructive colour is applied
-                as a style override rather than widening the shared component
-                for one call site. */}
-            <Button
-              variant="primary"
-              onPress={onConfirm}
-              style={[styles.button, destructive && styles.destructive]}
-            >
-              {confirmLabel}
-            </Button>
-          </View>
-        </Pressable>
+        <Animated.View entering={ZoomIn.springify().damping(20).stiffness(220)}>
+          <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
+            <Text variant="h3" style={styles.title}>
+              {title}
+            </Text>
+            <Text variant="body" muted style={styles.message}>
+              {message}
+            </Text>
+            <View style={styles.actions}>
+              <Button variant="outline" onPress={onCancel} style={styles.button}>
+                {cancelLabel}
+              </Button>
+              <Button
+                variant={destructive ? 'danger' : 'primary'}
+                onPress={onConfirm}
+                style={styles.button}
+              >
+                {confirmLabel}
+              </Button>
+            </View>
+          </Pressable>
+        </Animated.View>
       </Pressable>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
+  backdropHost: {
     flex: 1,
-    backgroundColor: colors.overlay.scrim,
     justifyContent: 'center',
     padding: spacing.lg,
   },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.overlay.scrim,
+  },
   card: {
     backgroundColor: colors.background.surface,
-    borderRadius: layout.cardRadius,
+    borderRadius: radius.xl,
     padding: spacing.lg,
-    ...shadows.large,
+    ...platformShadow(shadows.xlarge),
   },
   title: { marginBottom: spacing.sm },
   message: { marginBottom: spacing.lg },
-  actions: { flexDirection: 'row', gap: spacing.sm },
+  actions: { flexDirection: 'row', gap: spacing.ms },
   button: { flex: 1 },
-  destructive: { backgroundColor: colors.error.main },
 });

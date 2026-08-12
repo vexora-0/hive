@@ -1,11 +1,12 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-import { formatCents } from '../constants/products';
+import { formatRupees, PRODUCT_LABELS, type ProductType } from '../constants/products';
+import { ORDER_STATUS } from '../constants/orderStatus';
 import { formatOrderNumber } from '../utils/orderNumber';
 import { colors, spacing, layout } from '@/theme';
-import { Text, Card, Badge, type BadgeVariant } from '@/components/ui';
-import type { OrderStatus } from '@/types/supabase';
+import { Text, Card, Badge, Divider } from '@/components/ui';
 import type { OrderWithItems } from '../services/orderService';
 
 // ---------------------------------------------------------------------------
@@ -13,129 +14,86 @@ import type { OrderWithItems } from '../services/orderService';
 // ---------------------------------------------------------------------------
 
 export interface OrderHistoryCardProps {
-  /** The order data to display. */
+  /** The order to display. */
   order: OrderWithItems;
   /** Called when the card is tapped. */
   onPress: (orderId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
-// Status badge config
-// ---------------------------------------------------------------------------
-
-interface StatusConfig {
-  label: string;
-  variant: BadgeVariant;
-  color: string;
-  backgroundColor: string;
-}
-
-const STATUS_MAP: Record<OrderStatus, StatusConfig> = {
-  pending: {
-    label: 'Pending',
-    variant: 'warning',
-    color: colors.primary.amberDark,
-    backgroundColor: colors.primary.amber + '1F',
-  },
-  confirmed: {
-    label: 'Confirmed',
-    variant: 'default',
-    color: colors.primary.blueDark,
-    backgroundColor: colors.primary.blue + '1F',
-  },
-  processing: {
-    label: 'Processing',
-    variant: 'default',
-    color: colors.primary.lavenderDark,
-    backgroundColor: colors.primary.lavender + '1F',
-  },
-  shipped: {
-    label: 'Shipped',
-    variant: 'default',
-    color: colors.primary.mintDark,
-    backgroundColor: colors.primary.mint + '1F',
-  },
-  delivered: {
-    label: 'Delivered',
-    variant: 'success',
-    color: colors.success.dark,
-    backgroundColor: colors.success.background,
-  },
-  cancelled: {
-    label: 'Cancelled',
-    variant: 'error',
-    color: colors.error.dark,
-    backgroundColor: colors.error.background,
-  },
-};
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-
-
 function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
+  return new Date(dateString).toLocaleDateString('en-IN', {
     day: 'numeric',
+    month: 'short',
     year: 'numeric',
   });
 }
 
+/**
+ * Names what is actually in the order rather than counting rows: "2 × 4×6
+ * print" tells a parent what turns up at the door; "2 items" does not.
+ */
+function describeItems(order: OrderWithItems): string {
+  const items = order.items ?? [];
+  if (items.length === 0) return 'No items';
+
+  const first = items[0];
+  const label = PRODUCT_LABELS[first.product_type as ProductType] ?? 'Item';
+  const firstLine = first.quantity > 1 ? `${first.quantity} × ${label}` : label;
+
+  if (items.length === 1) return firstLine;
+  return `${firstLine} + ${items.length - 1} more`;
+}
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 /**
- * `<OrderHistoryCard>` — a card showing a summary of a past order.
+ * `<OrderHistoryCard>` — one row of the parent's order history.
  *
- * Displays the (truncated) order ID, date, item count, total amount,
- * and a colored status badge.
+ * The two things a parent wants at a glance are what they ordered and where it
+ * has got to, so those get the top line and the badge; the order number is the
+ * quiet part, because nobody looks it up until something has gone wrong.
  */
 export function OrderHistoryCard({ order, onPress }: OrderHistoryCardProps) {
-  const statusConfig = STATUS_MAP[order.status];
-  const itemCount = order.items?.length ?? 0;
+  const status = ORDER_STATUS[order.status];
 
   return (
-    <Card onPress={() => onPress(order.id)} style={styles.card}>
-      {/* Top row: order ID + status */}
+    <Card
+      onPress={() => onPress(order.id)}
+      elevation="low"
+      accessibilityLabel={`Order ${formatOrderNumber(order.id)}, ${status.label}, ${formatRupees(order.total_cents)}`}
+      style={styles.card}
+    >
       <View style={styles.topRow}>
-        <Text variant="captionBold" color={colors.text.secondary}>
-          #{formatOrderNumber(order.id)}
-        </Text>
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: statusConfig.backgroundColor },
-          ]}
-        >
-          <Text variant="captionBold" color={statusConfig.color}>
-            {statusConfig.label}
+        <View style={styles.headline}>
+          <Text variant="bodyBold" numberOfLines={1}>
+            {describeItems(order)}
+          </Text>
+          <Text variant="caption" color={colors.text.tertiary} style={styles.meta}>
+            {formatDate(order.created_at)} · #{formatOrderNumber(order.id)}
           </Text>
         </View>
+
+        <Badge variant={status.variant} dot>
+          {status.label}
+        </Badge>
       </View>
 
-      {/* Middle row: date + item count */}
-      <View style={styles.middleRow}>
-        <Text variant="bodySmall" color={colors.text.secondary}>
-          {formatDate(order.created_at)}
-        </Text>
-        <Text variant="bodySmall" color={colors.text.secondary}>
-          {itemCount} {itemCount === 1 ? 'item' : 'items'}
-        </Text>
-      </View>
+      <Divider style={styles.divider} />
 
-      {/* Bottom row: total */}
       <View style={styles.bottomRow}>
-        <Text variant="body" color={colors.text.secondary}>
-          Total
-        </Text>
-        <Text variant="bodyBold" color={colors.text.primary}>
-          {formatCents(order.total_cents)}
-        </Text>
+        <Text variant="price">{formatRupees(order.total_cents)}</Text>
+        <View style={styles.detailsHint}>
+          <Text variant="bodySmallBold" color={colors.text.accent}>
+            Details
+          </Text>
+          <Ionicons name="chevron-forward" size={15} color={colors.text.accent} />
+        </View>
       </View>
     </Card>
   );
@@ -147,33 +105,33 @@ export function OrderHistoryCard({ order, onPress }: OrderHistoryCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
+    marginHorizontal: layout.screenPaddingHorizontal,
+    marginBottom: spacing.ms,
   },
   topRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
+    gap: spacing.ms,
   },
-  statusBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: 9999,
+  headline: {
+    flex: 1,
   },
-  middleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
+  meta: {
+    marginTop: spacing.xs,
+  },
+  divider: {
+    marginVertical: spacing.ms,
   },
   bottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
+  },
+  detailsHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
 });
 

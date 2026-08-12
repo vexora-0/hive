@@ -3,23 +3,22 @@ import {
   ActivityIndicator,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 
-import { colors, spacing, layout } from '@/theme';
+import { colors, spacing, radius, layout } from '@/theme';
 import { ScreenContainer } from '@/components/layout/ScreenContainer';
 import { HeaderBar } from '@/components/navigation/HeaderBar';
-import { Text } from '@/components/ui/Text';
+import { Text, Badge, Chip } from '@/components/ui';
 import { EmptyState, SkeletonShimmer } from '@/components/feedback';
-import { formatCents } from '@/features/orders/constants/products';
+import { formatRupees } from '@/features/orders/constants/products';
+import { ORDER_STATUS } from '@/features/orders/constants/orderStatus';
 import { formatOrderNumber } from '@/features/orders/utils/orderNumber';
 import { useAdminOrders } from '@/features/admin/hooks/useAdminOrders';
-import {
-  OrderStatusSheet,
-  STATUS_LABELS,
-} from '@/features/admin/components/OrderStatusSheet';
+import { OrderStatusSheet } from '@/features/admin/components/OrderStatusSheet';
 import type { AdminOrder } from '@/features/admin/services/adminService';
 import type { OrderStatus } from '@/types/supabase';
 
@@ -29,24 +28,15 @@ import type { OrderStatus } from '@/types/supabase';
 
 const STATUS_FILTERS: Array<{ label: string; value: OrderStatus | undefined }> = [
   { label: 'All', value: undefined },
-  { label: 'Pending', value: 'pending' },
+  { label: 'Placed', value: 'pending' },
   { label: 'Confirmed', value: 'confirmed' },
-  { label: 'Shipped', value: 'shipped' },
+  { label: 'On the way', value: 'shipped' },
 ];
 
-const STATUS_COLORS: Record<OrderStatus, string> = {
-  pending: colors.primary.amber,
-  confirmed: colors.primary.blue,
-  processing: colors.primary.lavender,
-  shipped: colors.primary.mint,
-  delivered: colors.success.main,
-  cancelled: colors.error.main,
-};
-
 function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    month: 'short',
+  return new Date(dateString).toLocaleDateString('en-IN', {
     day: 'numeric',
+    month: 'short',
     year: 'numeric',
   });
 }
@@ -62,34 +52,29 @@ function OrderRow({
   order: AdminOrder;
   onPress: (order: AdminOrder) => void;
 }) {
+  const status = ORDER_STATUS[order.status];
+
   return (
     <Pressable
       onPress={() => onPress(order)}
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
       accessibilityRole="button"
-      accessibilityLabel={`Order ${formatOrderNumber(order.id)}, ${STATUS_LABELS[order.status]}`}
+      accessibilityLabel={`Order ${formatOrderNumber(order.id)}, ${status.label}, ${formatRupees(order.total_cents)}. Tap to change its status.`}
     >
       <View style={styles.rowMain}>
-        <Text variant="bodyBold">#{formatOrderNumber(order.id)}</Text>
-        <Text variant="caption" color={colors.text.secondary}>
+        <Text variant="bodySmallBold">#{formatOrderNumber(order.id)}</Text>
+        <Text variant="caption" color={colors.text.tertiary}>
           {formatDate(order.created_at)}
         </Text>
       </View>
 
       <View style={styles.rowRight}>
-        <Text variant="bodyBold" color={colors.primary.amberDark}>
-          {formatCents(order.total_cents)}
+        <Text variant="price" style={styles.rowTotal}>
+          {formatRupees(order.total_cents)}
         </Text>
-        <View
-          style={[
-            styles.statusPill,
-            { backgroundColor: STATUS_COLORS[order.status] },
-          ]}
-        >
-          <Text variant="tiny" color={colors.white}>
-            {STATUS_LABELS[order.status]}
-          </Text>
-        </View>
+        <Badge variant={status.variant} dot>
+          {status.label}
+        </Badge>
       </View>
     </Pressable>
   );
@@ -154,42 +139,42 @@ export default function OrdersScreen() {
     if (!isFetchingNextPage) return null;
     return (
       <View style={styles.footer}>
-        <ActivityIndicator color={colors.primary.amber} />
+        <ActivityIndicator color={colors.text.accent} />
       </View>
     );
   }, [isFetchingNextPage]);
 
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
-      <HeaderBar title="Orders" />
+      <HeaderBar large title="Fulfilment" eyebrow="Orders to work through" />
 
       <View style={styles.container}>
-        <View style={styles.filterRow}>
-          {STATUS_FILTERS.map((filter) => {
-            const isActive = statusFilter === filter.value;
-            return (
-              <Pressable
-                key={filter.label}
-                onPress={() => setStatusFilter(filter.value)}
-                style={[styles.chip, isActive && styles.chipActive]}
-                accessibilityRole="button"
-                accessibilityState={{ selected: isActive }}
-              >
-                <Text
-                  variant="captionBold"
-                  color={isActive ? colors.white : colors.text.secondary}
-                >
-                  {filter.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+        >
+          {STATUS_FILTERS.map((filter) => (
+            <Chip
+              key={filter.label}
+              selected={statusFilter === filter.value}
+              onPress={() => setStatusFilter(filter.value)}
+            >
+              {filter.label}
+            </Chip>
+          ))}
+        </ScrollView>
 
         {isLoading ? (
           <View style={styles.skeletonList}>
             {[0, 1, 2, 3].map((i) => (
-              <SkeletonShimmer key={i} width="100%" height={64} borderRadius={12} />
+              <SkeletonShimmer
+                key={i}
+                width="100%"
+                height={68}
+                borderRadius={radius.sm}
+                index={i}
+              />
             ))}
           </View>
         ) : (
@@ -201,11 +186,12 @@ export default function OrdersScreen() {
             ListFooterComponent={renderFooter}
             ListEmptyComponent={
               <EmptyState
-                title="No orders yet"
+                icon="bag-handle-outline"
+                title={statusFilter ? 'Nothing in this stage' : 'No orders yet'}
                 message={
                   statusFilter
-                    ? `No orders are currently ${statusFilter}.`
-                    : 'Orders placed by parents will appear here for fulfilment.'
+                    ? `No orders are at "${ORDER_STATUS[statusFilter].label}" right now.`
+                    : 'Orders placed by parents arrive here for fulfilment.'
                 }
               />
             }
@@ -215,8 +201,9 @@ export default function OrdersScreen() {
               <RefreshControl
                 refreshing={isRefetching}
                 onRefresh={refetch}
-                tintColor={colors.primary.amber}
-                colors={[colors.primary.amber]}
+                tintColor={colors.primary.amberDark}
+                colors={[colors.primary.amberDark]}
+                progressBackgroundColor={colors.background.surface}
               />
             }
             contentContainerStyle={styles.listContent}
@@ -245,38 +232,27 @@ const styles = StyleSheet.create({
   filterRow: {
     flexDirection: 'row',
     gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
-    borderRadius: 9999,
-    backgroundColor: colors.background.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-  },
-  chipActive: {
-    backgroundColor: colors.primary.amber,
-    borderColor: colors.primary.amber,
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    paddingBottom: spacing.md,
   },
   skeletonList: {
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm,
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    gap: spacing.ms,
   },
   listContent: {
-    paddingBottom: spacing.xxl,
+    paddingBottom: layout.tabBarClearance,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
+    gap: spacing.md,
+    paddingHorizontal: layout.screenPaddingHorizontal,
     paddingVertical: spacing.md,
-    minHeight: 64,
+    minHeight: 68,
   },
   rowPressed: {
-    backgroundColor: colors.gray[100],
+    backgroundColor: colors.background.surfaceSecondary,
   },
   rowMain: {
     flex: 1,
@@ -284,17 +260,16 @@ const styles = StyleSheet.create({
   },
   rowRight: {
     alignItems: 'flex-end',
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
-  statusPill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: layout.cardRadius,
+  rowTotal: {
+    // Optical alignment: tabular figures sit slightly high against a badge.
+    marginTop: -2,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.border.light,
-    marginHorizontal: spacing.md,
+    marginHorizontal: layout.screenPaddingHorizontal,
   },
   footer: {
     paddingVertical: spacing.lg,

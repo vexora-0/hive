@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 
-import { colors, spacing } from '@/theme';
+import { colors, spacing, radius } from '@/theme';
 import { Text } from '@/components/ui/Text';
 import { TextInput } from '@/components/ui/TextInput';
 import { Button } from '@/components/ui/Button';
@@ -146,12 +146,12 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: colors.overlay.scrim,
   },
   sheet: {
     backgroundColor: colors.background.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
     paddingBottom: spacing.lg,
     maxHeight: '85%',
   },
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.gray[300],
+    backgroundColor: colors.border.default,
     marginTop: spacing.sm,
     marginBottom: spacing.xs,
   },

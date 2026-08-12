@@ -4,7 +4,7 @@ import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import { colors, spacing } from '@/theme';
+import { colors, spacing, layout } from '@/theme';
 import { Text } from '@/components/ui/Text';
 import { EmptyState } from '@/components/feedback/EmptyState';
 import { SkeletonShimmer } from '@/components/feedback/SkeletonShimmer';
@@ -153,10 +153,12 @@ export function NotificationCenter() {
 
   if (notifications.length === 0) {
     return (
+      // The Lottie this used to render came from a lottiefiles.com URL, so an
+      // empty inbox depended on a third-party CDN and showed nothing offline.
       <EmptyState
-        title="All caught up!"
-        message="No new notifications"
-        lottieSource="https://assets3.lottiefiles.com/packages/lf20_jk6c1n2n.json"
+        icon="checkmark-done-outline"
+        title="You're all caught up"
+        message="New photos, orders and updates will show up here."
       />
     );
   }
@@ -173,7 +175,7 @@ export function NotificationCenter() {
       */}
       {unreadCount > 0 && (
         <View style={styles.toolbar}>
-          <Text variant="bodySmall" color={colors.text.secondary}>
+          <Text variant="eyebrow" color={colors.text.tertiary}>
             {unreadCount} unread
           </Text>
           <Pressable
@@ -189,11 +191,11 @@ export function NotificationCenter() {
             accessibilityLabel={`Mark all ${unreadCount} notifications as read`}
           >
             <Ionicons
-              name="checkmark-done-outline"
-              size={18}
-              color={colors.primary.blue}
+              name="checkmark-done"
+              size={16}
+              color={colors.text.accent}
             />
-            <Text variant="captionBold" color={colors.primary.blue}>
+            <Text variant="captionBold" color={colors.text.accent}>
               Mark all read
             </Text>
           </Pressable>
@@ -233,14 +235,14 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xl,
+    paddingBottom: layout.tabBarClearance,
   },
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    paddingBottom: spacing.sm,
   },
   markAllButton: {
     flexDirection: 'row',

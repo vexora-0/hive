@@ -1,3 +1,6 @@
+export { Reveal } from './Reveal';
+export type { RevealProps } from './Reveal';
+
 export { LottieWrapper } from './LottieWrapper';
 export type { LottieWrapperProps } from './LottieWrapper';
 

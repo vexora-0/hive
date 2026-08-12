@@ -2,8 +2,9 @@ import React from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing } from '@/theme';
+import { colors, spacing, radius, layout, shadows, platformShadow } from '@/theme';
 import { Text } from '@/components/ui';
+import { HoneycombPattern } from '@/components/animation';
 import type { OnboardingSlideData } from '@/features/onboarding/data/slides';
 
 // ---------------------------------------------------------------------------
@@ -11,8 +12,17 @@ import type { OnboardingSlideData } from '@/features/onboarding/data/slides';
 // ---------------------------------------------------------------------------
 
 export interface OnboardingSlideProps {
-  /** Slide data (title, description, background colour). */
+  /** Slide data (title, description, tint). */
   slide: OnboardingSlideData;
+  /**
+   * Height of the pager, measured by the parent.
+   *
+   * A horizontal list gives its items no height to fill — the row is only as
+   * tall as its tallest child — so `flex: 1` on the slide centres nothing and
+   * the copy sits jammed under the status bar. The parent measures once and
+   * passes the number down.
+   */
+  height: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -20,50 +30,38 @@ export interface OnboardingSlideProps {
 // ---------------------------------------------------------------------------
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const ANIMATION_SIZE = SCREEN_WIDTH * 0.65;
+const TILE = 108;
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 /**
- * `<OnboardingSlide>` renders a single slide inside the onboarding FlatList.
+ * `<OnboardingSlide>` — one page of the intro carousel.
  *
- * Layout (top to bottom, centred):
- *   1. Lottie animation placeholder
- *   2. Title (h2)
- *   3. Description (body)
+ * The illustration is a paper tile carrying a tinted icon, sitting on a faint
+ * comb. Slides are left-aligned rather than centred, so the three headlines
+ * share a margin as you swipe and the text does not jump horizontally between
+ * pages.
  */
-export function OnboardingSlide({ slide }: OnboardingSlideProps) {
+export function OnboardingSlide({ slide, height }: OnboardingSlideProps) {
   return (
-    <View
-      style={[styles.container, { backgroundColor: slide.backgroundColor, width: SCREEN_WIDTH }]}
-    >
-      {/* Themed icon rather than emoji: emoji render differently on iOS and
-          Android and cannot take a brand colour. See the note on
-          `OnboardingSlideData.icon` for why this is not a Lottie. */}
-      <View style={styles.animationContainer}>
-        <View style={styles.animationPlaceholder}>
-          <Ionicons
-            name={slide.icon}
-            size={ANIMATION_SIZE * 0.42}
-            color={colors.primary.amber}
-          />
+    <View style={[styles.container, { width: SCREEN_WIDTH, height }]}>
+      <View pointerEvents="none" style={styles.combLayer}>
+        <View style={styles.combInner}>
+          <HoneycombPattern rows={4} cols={5} size={30} color={`${slide.tint}12`} />
         </View>
       </View>
 
-      {/* Title */}
-      <Text variant="h2" center style={styles.title}>
+      <View style={[styles.tile, { backgroundColor: slide.wash }]}>
+        <Ionicons name={slide.icon} size={TILE * 0.42} color={slide.tint} />
+      </View>
+
+      <Text variant="h1" style={styles.title}>
         {slide.title}
       </Text>
 
-      {/* Description */}
-      <Text
-        variant="body"
-        color={colors.text.secondary}
-        center
-        style={styles.description}
-      >
+      <Text variant="body" muted style={styles.description}>
         {slide.description}
       </Text>
     </View>
@@ -76,37 +74,35 @@ export function OnboardingSlide({ slide }: OnboardingSlideProps) {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    backgroundColor: colors.background.cream,
+  },
+  /** Clips the comb so its negative offset cannot widen the pager. */
+  combLayer: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  combInner: {
+    position: 'absolute',
+    top: '12%',
+    right: -50,
+  },
+  tile: {
+    width: TILE,
+    height: TILE,
+    borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-  },
-  animationContainer: {
-    width: ANIMATION_SIZE,
-    height: ANIMATION_SIZE,
     marginBottom: spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  animationPlaceholder: {
-    width: ANIMATION_SIZE,
-    height: ANIMATION_SIZE,
-    borderRadius: ANIMATION_SIZE / 2,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    // Subtle shadow
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    ...platformShadow(shadows.small),
   },
   title: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.ms,
+    maxWidth: 330,
   },
   description: {
-    maxWidth: 300,
+    maxWidth: 330,
   },
 });
 

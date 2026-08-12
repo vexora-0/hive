@@ -10,7 +10,7 @@ import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import { colors, spacing } from '@/theme';
+import { colors, spacing, layout, shadows, platformShadow } from '@/theme';
 import { ScreenContainer } from '@/components/layout/ScreenContainer';
 import { HeaderBar } from '@/components/navigation/HeaderBar';
 import { EmptyState } from '@/components/feedback/EmptyState';
@@ -153,7 +153,7 @@ export default function SchoolsScreen() {
     if (!isFetchingNextPage) return null;
     return (
       <View style={styles.footer}>
-        <ActivityIndicator color={colors.primary.amber} />
+        <ActivityIndicator color={colors.text.accent} />
       </View>
     );
   }, [isFetchingNextPage]);
@@ -162,15 +162,16 @@ export default function SchoolsScreen() {
     if (isLoading) return null;
     return (
       <EmptyState
+        icon="business-outline"
         title="No schools yet"
-        message="Tap the + button to add your first school."
+        message="Add a school, then create its classes and add teachers to them."
       />
     );
   }, [isLoading]);
 
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
-      <HeaderBar title="Schools" />
+      <HeaderBar large title="Schools" />
 
       <View style={styles.container}>
         <FlashList
@@ -186,8 +187,9 @@ export default function SchoolsScreen() {
             <RefreshControl
               refreshing={isRefetching}
               onRefresh={refetch}
-              tintColor={colors.primary.amber}
-              colors={[colors.primary.amber]}
+              tintColor={colors.primary.amberDark}
+              colors={[colors.primary.amberDark]}
+              progressBackgroundColor={colors.background.surface}
             />
           }
           contentContainerStyle={styles.listContent}
@@ -203,7 +205,7 @@ export default function SchoolsScreen() {
           accessibilityRole="button"
           accessibilityLabel="Add school"
         >
-          <Ionicons name="add" size={28} color={colors.white} />
+          <Ionicons name="add" size={28} color={colors.ink[900]} />
         </Pressable>
       </View>
 
@@ -253,12 +255,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: layout.screenPaddingHorizontal,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl + 80, // extra space for FAB
+    // Clears the floating tab bar and the FAB above it.
+    paddingBottom: layout.tabBarClearance + 72,
   },
   separator: {
-    height: spacing.sm,
+    height: spacing.ms,
   },
   footer: {
     paddingVertical: spacing.lg,
@@ -266,23 +269,18 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    right: spacing.lg,
-    bottom: spacing.lg,
+    right: spacing.md,
+    bottom: layout.tabBarClearance,
     width: 56,
     height: 56,
     borderRadius: 28,
     backgroundColor: colors.primary.amber,
     alignItems: 'center',
     justifyContent: 'center',
-    // Shadow
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    ...platformShadow(shadows.large),
   },
   fabPressed: {
     backgroundColor: colors.primary.amberDark,
-    transform: [{ scale: 0.95 }],
+    transform: [{ scale: 0.94 }],
   },
 });
