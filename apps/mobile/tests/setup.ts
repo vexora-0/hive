@@ -42,6 +42,35 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
 }));
 
+// Reanimated, reached through `@/theme`.
+//
+// The theme barrel now re-exports `theme/motion.ts`, which holds every spring,
+// duration and easing curve in the app. That file imports `Easing` and
+// `ReduceMotion` from Reanimated, so *any* module that reads a token — a
+// colour, a spacing step, `MAX_UPLOAD_IMAGES` — now transitively loads
+// Reanimated, and Reanimated reaches for a native worklets module that does
+// not exist outside Metro.
+//
+// Only the two values `theme/motion.ts` evaluates at module scope are needed
+// here. Nothing under test animates; if that changes, this stub grows.
+vi.mock('react-native-reanimated', () => {
+  const identity = (t: number) => t;
+  const curve = () => identity;
+  return {
+    Easing: {
+      bezier: curve,
+      in: curve,
+      out: curve,
+      inOut: curve,
+      cubic: identity,
+      quad: identity,
+      linear: identity,
+    },
+    ReduceMotion: { System: 'system', Always: 'always', Never: 'never' },
+    useReducedMotion: () => false,
+  };
+});
+
 // The toast barrel drags in the whole component library — Reanimated worklets,
 // Moti, Skia — none of which loads outside Metro. `useUpload` uses exactly one
 // export from it.

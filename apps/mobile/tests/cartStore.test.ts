@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 
 import { useCartStore } from '@/features/orders/stores/cartStore';
-import { PRODUCT_PRICES_CENTS } from '@/features/orders/constants/products';
+import { PRODUCT_PRICES_PAISE } from '@/features/orders/constants/products';
 
 /**
  * The cart.
@@ -9,9 +9,15 @@ import { PRODUCT_PRICES_CENTS } from '@/features/orders/constants/products';
  * Two things make this worth pinning despite how small it is. Sign-out now
  * calls `clearCart` — one parent's basket must not survive into the next
  * person's session on a shared device — so `clearCart` is a privacy behaviour,
- * not a convenience. And money here is integer cents throughout: the product
- * catalogue and the order validator disagreed three ways before G-01, one of
- * the disagreements being dollars against cents.
+ * not a convenience. And money here is an integer minor unit throughout: the
+ * product catalogue and the order validator disagreed three ways before G-01,
+ * one of the disagreements being whole units against minor ones.
+ *
+ * The catalogue is now priced in paise. The store's own field names still say
+ * `cents` — `unitPriceCents`, `getTotalCents` — matching the database columns,
+ * which hold whatever the minor unit of the current currency is. Every
+ * assertion below reads its expected value from the catalogue rather than
+ * writing a number, so the prices can move without touching this file.
  */
 
 const cart = () => useCartStore.getState();
@@ -37,8 +43,8 @@ describe('cartStore', () => {
       expect(item.photoUri).toBe('file:///tmp/1.jpg');
       expect(item.productType).toBe('print_4x6');
       expect(item.quantity).toBe(1);
-      // Cents, from the shared catalogue — never a literal, and never dollars.
-      expect(item.unitPriceCents).toBe(PRODUCT_PRICES_CENTS.print_4x6);
+      // From the shared catalogue — never a literal, and never whole rupees.
+      expect(item.unitPriceCents).toBe(PRODUCT_PRICES_PAISE.print_4x6);
       expect(Number.isInteger(item.unitPriceCents)).toBe(true);
     });
 
@@ -64,7 +70,7 @@ describe('cartStore', () => {
 
       expect(cart().getItemCount()).toBe(4);
       expect(cart().getTotalCents()).toBe(
-        PRODUCT_PRICES_CENTS.print_4x6 * 3 + PRODUCT_PRICES_CENTS.photo_book,
+        PRODUCT_PRICES_PAISE.print_4x6 * 3 + PRODUCT_PRICES_PAISE.photo_book,
       );
     });
   });
