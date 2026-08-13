@@ -1,10 +1,11 @@
 import React from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, View } from 'react-native';
+import { MotiView } from 'moti';
 
-import { colors, spacing, radius, layout, shadows, platformShadow } from '@/theme';
+import { colors, spacing, layout } from '@/theme';
 import { Text } from '@/components/ui';
 import { HoneycombPattern } from '@/components/animation';
+import { SlideVignette } from './SlideVignette';
 import type { OnboardingSlideData } from '@/features/onboarding/data/slides';
 
 // ---------------------------------------------------------------------------
@@ -12,25 +13,58 @@ import type { OnboardingSlideData } from '@/features/onboarding/data/slides';
 // ---------------------------------------------------------------------------
 
 export interface OnboardingSlideProps {
-  /** Slide data (title, description, tint). */
+  /** Slide copy and which vignette to draw. */
   slide: OnboardingSlideData;
+  /** Width of one page. */
+  width: number;
   /**
-   * Height of the pager, measured by the parent.
-   *
-   * A horizontal list gives its items no height to fill — the row is only as
-   * tall as its tallest child — so `flex: 1` on the slide centres nothing and
-   * the copy sits jammed under the status bar. The parent measures once and
-   * passes the number down.
+   * True once this slide has come into view, and true from then on. Drives the
+   * entrance.
    */
-  height: number;
+  active: boolean;
 }
 
+/** How long each line waits behind the one before it, in ms. */
+const LINE_STEP = 70;
+
+/** How far an arriving line travels, in px. */
+const LINE_RISE = 22;
+
 // ---------------------------------------------------------------------------
-// Constants
+// One line of copy
 // ---------------------------------------------------------------------------
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const TILE = 108;
+function Line({
+  active,
+  order,
+  style,
+  children,
+}: {
+  active: boolean;
+  order: number;
+  style?: object;
+  children: React.ReactNode;
+}) {
+  return (
+    <MotiView
+      animate={{
+        opacity: active ? 1 : 0,
+        translateY: active ? 0 : LINE_RISE,
+      }}
+      transition={{
+        type: 'spring',
+        damping: 20,
+        stiffness: 180,
+        mass: 1,
+        // Behind the vignette, so the picture lands before its caption.
+        delay: active ? 300 + order * LINE_STEP : 0,
+      }}
+      style={style}
+    >
+      {children}
+    </MotiView>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -39,31 +73,44 @@ const TILE = 108;
 /**
  * `<OnboardingSlide>` — one page of the intro carousel.
  *
- * The illustration is a paper tile carrying a tinted icon, sitting on a faint
- * comb. Slides are left-aligned rather than centred, so the three headlines
- * share a margin as you swipe and the text does not jump horizontally between
- * pages.
+ * The illustration and the copy assemble in turn when the slide arrives: the
+ * photo mounts drop into place one after another, then the eyebrow, headline
+ * and body rise in behind them. It is the same staggered entrance the login
+ * screen uses, so the two screens either side of the front door move alike.
  */
-export function OnboardingSlide({ slide, height }: OnboardingSlideProps) {
+export function OnboardingSlide({ slide, width, active }: OnboardingSlideProps) {
+  const stageWidth = width - layout.screenPaddingHorizontal * 2;
+
   return (
-    <View style={[styles.container, { width: SCREEN_WIDTH, height }]}>
+    <View style={[styles.container, { width }]}>
+      {/* Clipped so the comb's negative offset cannot widen the pager. */}
       <View pointerEvents="none" style={styles.combLayer}>
         <View style={styles.combInner}>
-          <HoneycombPattern rows={4} cols={5} size={30} color={`${slide.tint}12`} />
+          <HoneycombPattern rows={4} cols={4} size={34} />
         </View>
       </View>
 
-      <View style={[styles.tile, { backgroundColor: slide.wash }]}>
-        <Ionicons name={slide.icon} size={TILE * 0.42} color={slide.tint} />
+      <View style={styles.stage}>
+        <SlideVignette kind={slide.vignette} active={active} width={stageWidth} />
       </View>
 
-      <Text variant="h1" style={styles.title}>
-        {slide.title}
-      </Text>
+      <View style={styles.copy}>
+        <Line active={active} order={0} style={styles.eyebrow}>
+          <Text variant="eyebrow" color={colors.text.tertiary}>
+            {slide.eyebrow}
+          </Text>
+        </Line>
 
-      <Text variant="body" muted style={styles.description}>
-        {slide.description}
-      </Text>
+        <Line active={active} order={1} style={styles.title}>
+          <Text variant="h1">{slide.title}</Text>
+        </Line>
+
+        <Line active={active} order={2}>
+          <Text variant="body" muted>
+            {slide.description}
+          </Text>
+        </Line>
+      </View>
     </View>
   );
 }
@@ -74,35 +121,43 @@ export function OnboardingSlide({ slide, height }: OnboardingSlideProps) {
 
 const styles = StyleSheet.create({
   container: {
+    // Never shrink: the pager lays the slides out in a row, and a flex row
+    // will happily compress a child past its stated width.
+    flexShrink: 0,
+    // The height comes from stretching inside the row. It used to be measured
+    // by the parent and passed back down as a prop, which was a feedback loop:
+    // the measurement changed the children, the children changed the layout,
+    // the layout re-fired the measurement. The screen re-rendered continuously
+    // and every entrance restarted before it could finish.
+    alignSelf: 'stretch',
     justifyContent: 'center',
     paddingHorizontal: layout.screenPaddingHorizontal,
+    // Lifts the centred block clear of the page dots below it, which the
+    // description was otherwise sitting right on top of.
+    paddingBottom: spacing.xl,
     backgroundColor: colors.background.cream,
   },
-  /** Clips the comb so its negative offset cannot widen the pager. */
   combLayer: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
   },
   combInner: {
     position: 'absolute',
-    top: '12%',
-    right: -50,
+    top: '4%',
+    right: -46,
+    opacity: 0.5,
   },
-  tile: {
-    width: TILE,
-    height: TILE,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+  stage: {
     marginBottom: spacing.xl,
-    ...platformShadow(shadows.small),
+  },
+  copy: {
+    maxWidth: 360,
+  },
+  eyebrow: {
+    marginBottom: spacing.sm,
   },
   title: {
     marginBottom: spacing.ms,
-    maxWidth: 330,
-  },
-  description: {
-    maxWidth: 330,
   },
 });
 

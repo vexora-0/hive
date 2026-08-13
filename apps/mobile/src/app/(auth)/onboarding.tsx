@@ -1,23 +1,20 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  Dimensions,
-  FlatList,
   Pressable,
   StyleSheet,
+  useWindowDimensions,
   View,
-  type ListRenderItemInfo,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { MotiView } from 'moti';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useRouter } from 'expo-router';
 
 import { colors, spacing, layout } from '@/theme';
 import { Text, Button } from '@/components/ui';
 import { SafeArea } from '@/components/layout';
 import { EmptyState } from '@/components/feedback';
 import { OnboardingSlide } from '@/features/onboarding/components/OnboardingSlide';
-import { slides, type OnboardingSlideData } from '@/features/onboarding/data/slides';
+import { slides } from '@/features/onboarding/data/slides';
 import { useOnboardingStore } from '@/features/onboarding/stores/onboardingStore';
 import { useAuthStore } from '@/features/auth/stores/authStore';
 import { fetchUserProfile } from '@/features/auth/services/authService';
@@ -27,22 +24,51 @@ import { getRoleRoute } from '@/types/navigation';
 // Constants
 // ---------------------------------------------------------------------------
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const DOT_SIZE = 8;
-const DOT_ACTIVE_WIDTH = 26;
+const DOT_SIZE = 7;
+const DOT_ACTIVE_WIDTH = 28;
+
+/** How far a swipe has to travel, in px, before it turns the page. */
+const SWIPE_THRESHOLD = 60;
+
+/** How fast a flick has to be to turn the page regardless of distance. */
+const FLICK_VELOCITY = 400;
+
+/** The page turn. Heavy enough to read as one object moving, not a cut. */
+const PAGE_TRANSITION = {
+  type: 'spring',
+  damping: 22,
+  stiffness: 180,
+  mass: 1,
+} as const;
 
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
+/**
+ * The intro carousel.
+ *
+ * Everything here animates through Moti rather than through Reanimated shared
+ * values. That is a deliberate constraint, not a preference: under this
+ * project's Reanimated 4 setup — which still registers the deprecated
+ * `react-native-reanimated/plugin` — writing a shared value from JavaScript
+ * never reaches `useAnimatedStyle`, and `useAnimatedReaction` never runs at
+ * all. Both failed silently, which cost a long time to find. Moti drives its
+ * own animation loop and works, so the pager, the page indicator and every
+ * entrance are built on it.
+ */
 export default function OnboardingScreen() {
   const router = useRouter();
-  const flatListRef = useRef<FlatList<OnboardingSlideData>>(null);
+  // Read from the hook rather than a module-level `Dimensions.get`: that value
+  // is captured once at import and is wrong after a rotation or a resize.
+  const { width } = useWindowDimensions();
+
   const [activeIndex, setActiveIndex] = useState(0);
-  // Measured once, then handed to each slide — see the note on
-  // `OnboardingSlideProps.height`.
-  const [pagerHeight, setPagerHeight] = useState(0);
+  // Slides whose entrance has played. The first is in from the start, and a
+  // slide is never removed, so swiping back does not replay it.
+  const [revealed, setRevealed] = useState<number[]>([0]);
   const [lookupFailed, setLookupFailed] = useState(false);
+
   const completeOnboarding = useOnboardingStore((s) => s.completeOnboarding);
   const { user, setProfile, setRole } = useAuthStore();
 
@@ -72,6 +98,27 @@ export default function OnboardingScreen() {
     router.replace('/(auth)/login' as never);
   }, [completeOnboarding, user?.id, setProfile, setRole, router]);
 
+  // ── Paging ────────────────────────────────────────────────────────────
+
+  /** Turns to a page and marks it seen, so its entrance plays on arrival. */
+  const goToPage = useCallback((page: number) => {
+    const clamped = Math.min(Math.max(page, 0), slides.length - 1);
+    setActiveIndex(clamped);
+    setRevealed((prev) => (prev.includes(clamped) ? prev : [...prev, clamped]));
+  }, []);
+
+  // `.runOnJS(true)` keeps the callback on the JS thread, where it can set
+  // React state directly.
+  const pan = Gesture.Pan()
+    .runOnJS(true)
+    .activeOffsetX([-12, 12])
+    .onEnd((event) => {
+      const far = Math.abs(event.translationX) > SWIPE_THRESHOLD;
+      const fast = Math.abs(event.velocityX) > FLICK_VELOCITY;
+      if (!far && !fast) return;
+      goToPage(activeIndex + (event.translationX < 0 ? 1 : -1));
+    });
+
   // ── Handlers ──────────────────────────────────────────────────────────
 
   const handleSkip = useCallback(() => {
@@ -81,37 +128,10 @@ export default function OnboardingScreen() {
   const handleNext = useCallback(() => {
     if (isLastSlide) {
       navigateAfterOnboarding();
-    } else {
-      flatListRef.current?.scrollToIndex({
-        index: activeIndex + 1,
-        animated: true,
-      });
+      return;
     }
-  }, [isLastSlide, activeIndex, navigateAfterOnboarding]);
-
-  const handleMomentumScrollEnd = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const index = Math.round(
-        event.nativeEvent.contentOffset.x / SCREEN_WIDTH,
-      );
-      setActiveIndex(index);
-    },
-    [],
-  );
-
-  // ── Render helpers ────────────────────────────────────────────────────
-
-  const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<OnboardingSlideData>) => (
-      <OnboardingSlide slide={item} height={pagerHeight} />
-    ),
-    [pagerHeight],
-  );
-
-  const keyExtractor = useCallback(
-    (item: OnboardingSlideData) => item.id,
-    [],
-  );
+    goToPage(activeIndex + 1);
+  }, [isLastSlide, activeIndex, goToPage, navigateAfterOnboarding]);
 
   // ── UI ────────────────────────────────────────────────────────────────
 
@@ -123,6 +143,7 @@ export default function OnboardingScreen() {
       <SafeArea style={styles.root}>
         <View style={styles.lookupError}>
           <EmptyState
+            icon="cloud-offline-outline"
             title="Couldn't load your account"
             message="Check your connection and try again."
             action={{
@@ -140,7 +161,7 @@ export default function OnboardingScreen() {
 
   return (
     <SafeArea style={styles.root}>
-      {/* Skip button — top right */}
+      {/* Skip — quiet, but always reachable. */}
       <View style={styles.header}>
         <Pressable
           onPress={handleSkip}
@@ -155,31 +176,29 @@ export default function OnboardingScreen() {
         </Pressable>
       </View>
 
-      {/* Slides */}
-      <FlatList
-        ref={flatListRef}
-        data={slides}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        style={styles.slides}
-        onLayout={(e) => setPagerHeight(e.nativeEvent.layout.height)}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        bounces={false}
-        onMomentumScrollEnd={handleMomentumScrollEnd}
-        getItemLayout={(_data, index) => ({
-          length: SCREEN_WIDTH,
-          offset: SCREEN_WIDTH * index,
-          index,
-        })}
-      />
+      <GestureDetector gesture={pan}>
+        <View style={styles.pager}>
+          {/* Sized explicitly. Left to `flex: 1` the row takes the width of the
+              viewport and squashes all three slides into one screen, because a
+              flex row shrinks children past their stated width. */}
+          <MotiView
+            animate={{ translateX: -activeIndex * width }}
+            transition={PAGE_TRANSITION}
+            style={[styles.row, { width: slides.length * width }]}
+          >
+            {slides.map((slide, index) => (
+              <OnboardingSlide
+                key={slide.id}
+                slide={slide}
+                width={width}
+                active={revealed.includes(index)}
+              />
+            ))}
+          </MotiView>
+        </View>
+      </GestureDetector>
 
-      {/* Bottom controls */}
       <View style={styles.footer}>
-        {/* Page indicators — the active one stretches into a bar rather than
-            growing into a bigger circle, so progress through the three slides
-            is readable as a length, not just a highlight. */}
         <View
           style={styles.dotsRow}
           accessibilityRole="progressbar"
@@ -191,7 +210,9 @@ export default function OnboardingScreen() {
               animate={{
                 width: index === activeIndex ? DOT_ACTIVE_WIDTH : DOT_SIZE,
                 backgroundColor:
-                  index === activeIndex ? colors.primary.amber : colors.gray[300],
+                  index === activeIndex
+                    ? colors.primary.amber
+                    : colors.border.default,
               }}
               transition={{ type: 'spring', damping: 20, stiffness: 260 }}
               style={styles.dot}
@@ -231,8 +252,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.ms,
   },
-  slides: {
+  pager: {
     flex: 1,
+    overflow: 'hidden',
+  },
+  row: {
+    flexDirection: 'row',
+    height: '100%',
   },
   footer: {
     alignItems: 'center',
