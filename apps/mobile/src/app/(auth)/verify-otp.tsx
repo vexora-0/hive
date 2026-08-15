@@ -101,7 +101,8 @@ export default function VerifyOTPScreen() {
     return (
       <ScreenContainer style={styles.missingEmail}>
         <EmptyState
-          title="This link is incomplete"
+          variant="error"
+          title="This link is incomplete."
           message="We don't know which email address to verify. Start again from sign in and we'll send you a fresh code."
           action={{ label: 'Back to sign in', onPress: goToLogin }}
         />
@@ -128,8 +129,10 @@ export default function VerifyOTPScreen() {
           <Text variant="eyebrow" color={colors.text.tertiary} style={styles.eyebrow}>
             Step 2 of 2
           </Text>
+          {/* Sentence case with a full stop, which is the house voice for a
+              headline. It is what stops a screen title reading as a tab. */}
           <Text variant="h1" style={styles.heading}>
-            Check your email
+            Check your email.
           </Text>
         </Reveal>
 
@@ -137,8 +140,12 @@ export default function VerifyOTPScreen() {
           <Text variant="body" muted style={styles.subtitle}>
             We sent a 6-digit code to
           </Text>
+          {/* Marigold as a surface, never as a label: the chip is the amber
+              wash and the address on it is `text.accent` (#9C5A10, 4.81:1 on
+              that wash). The glyph takes the same readable tone and the same
+              outline hand as every other icon in the app. */}
           <View style={styles.emailChip}>
-            <Ionicons name="mail" size={15} color={colors.text.accent} />
+            <Ionicons name="mail-outline" size={15} color={colors.text.accent} />
             <Text variant="bodySmallBold" color={colors.text.accent} numberOfLines={1}>
               {email}
             </Text>
@@ -155,45 +162,53 @@ export default function VerifyOTPScreen() {
           />
         </Reveal>
 
-        {/* Error message */}
+        {/* Every message below is set in the semantic `.main` tone rather than
+            `.dark`. In this palette `.main` is the text-grade tier — error
+            #A32E2A is 6.67:1 on paper and 6.07:1 on its own wash — so the
+            darker step was buying contrast nobody needed at the cost of making
+            a mistyped digit look like a system fault. */}
         {error && (
           <Text
             variant="bodySmall"
-            color={colors.error.dark}
+            color={colors.error.main}
             center
+            accessibilityLiveRegion="polite"
+            accessibilityRole="alert"
             style={styles.errorText}
           >
             {error}
           </Text>
         )}
 
-        {/* Lockout message */}
         {isLockedOut && (
-          <View style={styles.lockoutBanner}>
+          <View
+            style={styles.lockoutBanner}
+            accessibilityLiveRegion="polite"
+            accessibilityRole="alert"
+          >
             <Ionicons
               name="lock-closed-outline"
               size={18}
-              color={colors.error.dark}
+              color={colors.error.main}
             />
             <Text
               variant="bodySmall"
-              color={colors.error.dark}
+              color={colors.error.main}
               style={styles.lockoutText}
             >
-              Too many attempts. Try again in {formatTime(lockoutRemaining)}.
+              Too many tries. You can try again in {formatTime(lockoutRemaining)}.
             </Text>
           </View>
         )}
 
-        {/* Attempt counter */}
         {!isLockedOut && attemptsRemaining < MAX_OTP_ATTEMPTS && (
           <Text
             variant="caption"
-            color={colors.warning.dark}
+            color={colors.warning.main}
             center
             style={styles.attemptsText}
           >
-            {attemptsRemaining} attempt{attemptsRemaining !== 1 ? 's' : ''} remaining
+            {attemptsRemaining} tr{attemptsRemaining === 1 ? 'y' : 'ies'} left.
           </Text>
         )}
 
@@ -201,7 +216,7 @@ export default function VerifyOTPScreen() {
         <View style={styles.resendContainer}>
           {resendCountdown > 0 ? (
             <Text variant="bodySmall" color={colors.text.tertiary} center>
-              Resend in {formatTime(resendCountdown)}
+              You can ask again in {formatTime(resendCountdown)}.
             </Text>
           ) : (
             <Button
@@ -216,15 +231,15 @@ export default function VerifyOTPScreen() {
           )}
         </View>
 
-        {/* Loading indicator during verification */}
         {isVerifying && (
           <Text
             variant="bodySmall"
             color={colors.text.tertiary}
             center
+            accessibilityLiveRegion="polite"
             style={styles.verifyingText}
           >
-            Verifying...
+            Checking your code…
           </Text>
         )}
       </View>
