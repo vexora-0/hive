@@ -74,6 +74,35 @@ both worth understanding rather than just accepting:
 
 ---
 
+## What was verified in a browser, and what was not
+
+Every screen below was driven in Chrome at **390×844** (iPhone width) against the real
+backend, signed in as all three roles. **0 console errors** on every screen at the end.
+
+Verified working: sign-in and onboarding · the parent feed, day-grouped with the All chip
+merging both children · the photo viewer with paging on the neutral ground · parent orders ·
+the teacher dashboard and the upload screen's docked chip rail · notifications · profile ·
+the admin dashboard, people, schools, fulfilment, and a class-detail error state.
+
+**Not verified — this is the important caveat.** Web is a convenience, not the target. No
+iOS or Android build was launched, so anything platform-specific is still unproven where it
+ships: the safe-area arithmetic behind the FAB fix (the browser reports an inset of 0, so the
+overlap it corrects is literally invisible here), haptics, the native image picker, and
+`accessibilityElementsHidden` on the sheet scrims. `docs/IMPLEMENTATION-STATUS.md` §5 already
+tracks this gap for the app as a whole.
+
+## One thing the demo data cannot show
+
+**The age stamp on the photo detail renders nothing against seeded data.** The code is
+correct — `ageAt()` returns null rather than inventing an age — but
+`packages/backend/src/scripts/seedDemo.ts` never sets `date_of_birth`, so every seeded
+student has a null DOB and the line degrades to just the child's name.
+
+This is the single feature the research rated highest for parents (FamilyAlbum carries its
+whole emotional payload on it), so it is worth seeing work. Adding a DOB to the seeded
+students is a one-line change per student in the seed script and needs no migration — the
+column already exists. Whoever owns the seed data should add them.
+
 ## Deviation, recorded
 
 `CLAUDE.md` §10 says "Do not redesign the UI. The design system is good." This branch
