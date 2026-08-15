@@ -28,7 +28,15 @@ export interface ChipProps {
   onPress?: () => void;
   /** Icon rendered before the label. */
   icon?: React.ReactNode;
-  /** Colour used when selected. Defaults to marigold. */
+  /**
+   * Colour used when selected. Defaults to marigold.
+   *
+   * When paired with `count` this becomes the counter's *surface*, under an ink
+   * numeral — so it has to be a light one. Marigold works (ink on it is
+   * 8.08:1); the tier-3 identity hues do not, because they are text-grade darks
+   * and an ink numeral on `#9E4F63` lands near 3:1. Reach for `identityColor()`
+   * on a chip without a count, or leave this alone.
+   */
   accent?: string;
   /**
    * A running total shown after the label — "Aarav 7".
