@@ -5,8 +5,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatRupees, PRODUCT_LABELS, type ProductType } from '../constants/products';
 import { ORDER_STATUS } from '../constants/orderStatus';
 import { formatOrderNumber } from '../utils/orderNumber';
-import { colors, spacing, layout } from '@/theme';
+import { colors, spacing, radius, layout } from '@/theme';
 import { Text, Card, Badge, Divider } from '@/components/ui';
+import { SkeletonShimmer } from '@/components/feedback';
 import type { OrderWithItems } from '../services/orderService';
 
 // ---------------------------------------------------------------------------
@@ -24,11 +25,34 @@ export interface OrderHistoryCardProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * When the order was placed, said the way a person would say it.
+ *
+ * "Today" and "Yesterday" for the two days a parent is actually tracking, the
+ * weekday for the rest of the week, and a plain date after that — the year only
+ * when it is not this one. A machine timestamp tells a parent nothing they
+ * cannot work out, and reads like a database export of their own family.
+ */
 function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-IN', {
+  const date = new Date(dateString);
+  const now = new Date();
+
+  const startOfDay = (d: Date) =>
+    new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const daysAgo = Math.round(
+    (startOfDay(now) - startOfDay(date)) / (24 * 60 * 60 * 1000),
+  );
+
+  if (daysAgo === 0) return 'Today';
+  if (daysAgo === 1) return 'Yesterday';
+  if (daysAgo > 1 && daysAgo < 7) {
+    return date.toLocaleDateString(undefined, { weekday: 'long' });
+  }
+
+  return date.toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'short',
-    year: 'numeric',
+    ...(date.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
   });
 }
 
@@ -94,6 +118,50 @@ export function OrderHistoryCard({ order, onPress }: OrderHistoryCardProps) {
           </Text>
           <Ionicons name="chevron-forward" size={15} color={colors.text.accent} />
         </View>
+      </View>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The same card, before it has anything to say
+// ---------------------------------------------------------------------------
+
+/**
+ * `<OrderHistoryCardSkeleton>` — the loading shape of the row above.
+ *
+ * It lives in this file deliberately. The orders screen used to hand-roll its
+ * own three-bar placeholder, which drifted until it had a different padding, a
+ * different radius and a row the real card did not have — so the list visibly
+ * relaid itself the moment the orders arrived. Keeping the skeleton next to the
+ * component it stands in for is the only way the two stay honest: it renders
+ * the **real** `<Card>`, at the real elevation, with the real margins.
+ *
+ * `SkeletonShimmer` waits out its own 200ms, so a cached list never flashes.
+ */
+export function OrderHistoryCardSkeleton({ index = 0 }: { index?: number }) {
+  return (
+    <Card elevation="low" style={styles.card}>
+      <View style={styles.topRow}>
+        <View style={styles.headline}>
+          <SkeletonShimmer width="62%" height={16} borderRadius={4} index={index} />
+          <View style={styles.meta}>
+            <SkeletonShimmer width="45%" height={10} borderRadius={4} index={index} />
+          </View>
+        </View>
+        <SkeletonShimmer
+          width={78}
+          height={22}
+          borderRadius={radius.pill}
+          index={index}
+        />
+      </View>
+
+      <Divider style={styles.divider} />
+
+      <View style={styles.bottomRow}>
+        <SkeletonShimmer width={84} height={20} borderRadius={4} index={index} />
+        <SkeletonShimmer width={62} height={14} borderRadius={4} index={index} />
       </View>
     </Card>
   );

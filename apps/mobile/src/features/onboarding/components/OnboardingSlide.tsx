@@ -2,10 +2,18 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { MotiView } from 'moti';
 
-import { colors, spacing, layout } from '@/theme';
+import {
+  colors,
+  spacing,
+  layout,
+  spring,
+  travel,
+  STAGGER_STEP,
+  useReducedMotion,
+} from '@/theme';
 import { Text } from '@/components/ui';
 import { HoneycombPattern } from '@/components/animation';
-import { SlideVignette } from './SlideVignette';
+import { SlideVignette, VIGNETTE_SETTLED_AT, NO_MOTION } from './SlideVignette';
 import type { OnboardingSlideData } from '@/features/onboarding/data/slides';
 
 // ---------------------------------------------------------------------------
@@ -24,24 +32,40 @@ export interface OnboardingSlideProps {
   active: boolean;
 }
 
-/** How long each line waits behind the one before it, in ms. */
-const LINE_STEP = 70;
-
-/** How far an arriving line travels, in px. */
-const LINE_RISE = 22;
+/**
+ * How long each line waits behind the one before it, and how far it travels.
+ *
+ * Both come from the theme. `STAGGER_STEP` is the app's one stagger interval —
+ * the feed uses it, every `<Reveal>` uses it — so the intro carousel arriving
+ * on the same beat as the screens behind it is not a coincidence worth
+ * re-deciding here.
+ */
+const LINE_STEP = STAGGER_STEP;
+const LINE_RISE = travel.rise;
 
 // ---------------------------------------------------------------------------
 // One line of copy
 // ---------------------------------------------------------------------------
 
+/**
+ * One line of the caption, rising in behind the picture.
+ *
+ * **This is not a second staggered group.** The vignette and the copy are one
+ * choreography with one clock: the pieces of the illustration assemble first,
+ * and the lines start at {@link VIGNETTE_SETTLED_AT}, which is the vignette's
+ * own published finishing delay rather than a number guessed to look about
+ * right. Change the illustration's timing and the caption follows it.
+ */
 function Line({
   active,
   order,
+  reduced,
   style,
   children,
 }: {
   active: boolean;
   order: number;
+  reduced: boolean;
   style?: object;
   children: React.ReactNode;
 }) {
@@ -51,14 +75,17 @@ function Line({
         opacity: active ? 1 : 0,
         translateY: active ? 0 : LINE_RISE,
       }}
-      transition={{
-        type: 'spring',
-        damping: 20,
-        stiffness: 180,
-        mass: 1,
-        // Behind the vignette, so the picture lands before its caption.
-        delay: active ? 300 + order * LINE_STEP : 0,
-      }}
+      transition={
+        reduced
+          ? NO_MOTION
+          : {
+              type: 'spring',
+              damping: spring.gentle.damping,
+              stiffness: spring.gentle.stiffness,
+              mass: spring.gentle.mass,
+              delay: active ? VIGNETTE_SETTLED_AT + order * LINE_STEP : 0,
+            }
+      }
       style={style}
     >
       {children}
@@ -80,6 +107,9 @@ function Line({
  */
 export function OnboardingSlide({ slide, width, active }: OnboardingSlideProps) {
   const stageWidth = width - layout.screenPaddingHorizontal * 2;
+  // Moti runs its own animation loop and does not read Reanimated's
+  // `reduceMotion` flag, so it has to be branched by hand.
+  const reduced = useReducedMotion();
 
   return (
     <View style={[styles.container, { width }]}>
@@ -95,17 +125,21 @@ export function OnboardingSlide({ slide, width, active }: OnboardingSlideProps) 
       </View>
 
       <View style={styles.copy}>
-        <Line active={active} order={0} style={styles.eyebrow}>
-          <Text variant="eyebrow" color={colors.text.tertiary}>
+        {/* Sentence case, not a spaced capital eyebrow. These three strings —
+            "What you get", "Who can see", "If you want it" — are the halves of
+            spoken sentences, and set in caps they read as a system shouting
+            headings at somebody who has not yet signed in. */}
+        <Line active={active} order={0} reduced={reduced} style={styles.eyebrow}>
+          <Text variant="label" color={colors.text.secondary}>
             {slide.eyebrow}
           </Text>
         </Line>
 
-        <Line active={active} order={1} style={styles.title}>
+        <Line active={active} order={1} reduced={reduced} style={styles.title}>
           <Text variant="h1">{slide.title}</Text>
         </Line>
 
-        <Line active={active} order={2}>
+        <Line active={active} order={2} reduced={reduced}>
           <Text variant="body" muted>
             {slide.description}
           </Text>

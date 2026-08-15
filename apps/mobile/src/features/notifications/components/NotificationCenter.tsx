@@ -4,7 +4,15 @@ import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import { colors, spacing, layout } from '@/theme';
+import {
+  colors,
+  spacing,
+  radius,
+  layout,
+  shadows,
+  platformShadow,
+  MIN_TAP_SIZE,
+} from '@/theme';
 import { Text } from '@/components/ui/Text';
 import { EmptyState } from '@/components/feedback/EmptyState';
 import { SkeletonShimmer } from '@/components/feedback/SkeletonShimmer';
@@ -13,32 +21,56 @@ import { NotificationCard } from './NotificationCard';
 import type { Notification } from '../services/notificationService';
 
 // ---------------------------------------------------------------------------
-// Skeleton loader
+// Loading
 // ---------------------------------------------------------------------------
 
-const SKELETON_COUNT = 6;
+/**
+ * How many placeholder rows to draw.
+ *
+ * Five, not six: five rows of the real card height fill the first screenful on
+ * every phone the app supports without running a sixth one off the bottom edge,
+ * where it is doing nothing but costing an animation.
+ */
+const SKELETON_COUNT = 5;
 
-function NotificationSkeleton() {
+/** Mirrors `NotificationCard`: a 40pt tile, a title line and a body line. */
+const TILE_SIZE = 40;
+const CARD_MIN_HEIGHT = MIN_TAP_SIZE + spacing.lg;
+
+/**
+ * One placeholder row.
+ *
+ * Built to the card's own measurements — same 22pt corner, same paper, same
+ * 40pt tile at the same 10pt radius, same padding, same minimum height — so
+ * that when the notifications land nothing on the screen moves. A skeleton
+ * whose shape does not match what replaces it is a reflow with extra steps.
+ *
+ * The 200ms wait before any of this appears belongs to `SkeletonShimmer`
+ * itself, so a warm cache renders straight to content with no grey flash. The
+ * hand-rolled six-row version this replaces had no delay at all.
+ */
+function NotificationRowSkeleton({ index }: { index: number }) {
   return (
     <View style={styles.skeletonCard}>
-      <View style={styles.skeletonIcon}>
-        <SkeletonShimmer width={44} height={44} borderRadius={12} />
-      </View>
+      <SkeletonShimmer
+        width={TILE_SIZE}
+        height={TILE_SIZE}
+        borderRadius={radius.xs}
+        index={index}
+      />
       <View style={styles.skeletonContent}>
-        <SkeletonShimmer width="70%" height={16} borderRadius={4} />
-        <View style={styles.skeletonBodyRow}>
-          <SkeletonShimmer width="90%" height={12} borderRadius={4} />
-        </View>
+        <SkeletonShimmer width="62%" height={14} index={index} />
+        <SkeletonShimmer width="88%" height={12} index={index + 1} />
       </View>
     </View>
   );
 }
 
-function LoadingSkeleton() {
+function NotificationsSkeleton() {
   return (
-    <View style={styles.skeletonContainer}>
+    <View style={styles.skeletonList}>
       {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
-        <NotificationSkeleton key={index} />
+        <NotificationRowSkeleton key={index} index={index} />
       ))}
     </View>
   );
@@ -49,25 +81,28 @@ function LoadingSkeleton() {
 // ---------------------------------------------------------------------------
 
 /**
- * `<NotificationCenter>` — full notification list, reusable across all role
- * screens (teacher, parent, admin).
+ * `<NotificationCenter>` — everything that has happened, newest first.
  *
- * Features:
- * - Infinite scrolling via FlashList
- * - Pull to refresh
- * - Empty state with bee Lottie animation
- * - Skeleton loading placeholders during initial load
- * - Swipe-to-dismiss on individual notification cards
+ * One component behind three tabs: the parent's, the teacher's and the admin's
+ * notification screens are twenty-five byte-identical lines each, wrapping
+ * this. The API returns whatever belongs to the authenticated user, so there is
+ * nothing role-specific to say here.
  *
- * ```tsx
- * <NotificationCenter />
- * ```
+ * **Four states, and the empty one is not a failure.** An inbox with nothing in
+ * it is the good outcome — you have seen everything — so it takes the first-use
+ * variant and, deliberately, **no call to action**: there is no button that
+ * would fill it, and a dead button teaches people that Hive's buttons do not
+ * work. A failed request is a different sentence entirely and gets its own
+ * state with a retry, because a dropped connection used to render "You're all
+ * caught up", which is the app telling a parent their inbox is clear when it
+ * has no idea.
  */
 export function NotificationCenter() {
   const router = useRouter();
   const {
     notifications,
     isLoading,
+    isError,
     isFetchingNextPage,
     fetchNextPage,
     hasNextPage,
@@ -84,6 +119,10 @@ export function NotificationCenter() {
   const handleMarkAllAsRead = useCallback(() => {
     markAllAsRead();
   }, [markAllAsRead]);
+
+  const handleRetry = useCallback(() => {
+    refetch();
+  }, [refetch]);
 
   const handlePress = useCallback(
     (notification: Notification) => {
@@ -127,6 +166,10 @@ export function NotificationCenter() {
 
   // -- Render helpers -----------------------------------------------------
 
+  // No entrance animation on the rows. FlashList keeps a pool of cells and
+  // hands a recycled one new props as you scroll, so a staggered entrance
+  // re-fires under the finger mid-scroll — the list arrives as content, and
+  // only the screen around it is choreographed.
   const renderItem = useCallback(
     ({ item }: { item: Notification }) => (
       <NotificationCard
@@ -138,32 +181,52 @@ export function NotificationCenter() {
     [handlePress, handleDismiss],
   );
 
-  const keyExtractor = useCallback(
-    (item: Notification) => item.id,
-    [],
-  );
+  const keyExtractor = useCallback((item: Notification) => item.id, []);
 
-  // -- Loading state ------------------------------------------------------
+  // -- 1. Loading ---------------------------------------------------------
 
   if (isLoading) {
-    return <LoadingSkeleton />;
+    return <NotificationsSkeleton />;
   }
 
-  // -- Empty state --------------------------------------------------------
+  // -- 2. The request failed, and there is nothing to fall back on --------
+  //
+  // The length check is load-bearing. React Query flips the query to `error`
+  // on a **failed refetch too**, cached pages and all, so testing `isError`
+  // alone would wipe a parent's full inbox off the screen the moment a
+  // pull-to-refresh in a tunnel ran out of retries. Stale notifications are far
+  // better than a panel saying there are none: keep what we have, and show this
+  // only when the alternative is a blank page.
 
-  if (notifications.length === 0) {
+  if (isError && notifications.length === 0) {
     return (
-      // The Lottie this used to render came from a lottiefiles.com URL, so an
-      // empty inbox depended on a third-party CDN and showed nothing offline.
-      <EmptyState
-        icon="checkmark-done-outline"
-        title="You're all caught up"
-        message="New photos, orders and updates will show up here."
-      />
+      <View style={styles.container}>
+        <EmptyState
+          variant="error"
+          title="We couldn't load your updates."
+          message="Check your connection and try again — nothing has been lost."
+          action={{ label: 'Try again', onPress: handleRetry }}
+        />
+      </View>
     );
   }
 
-  // -- Notification list --------------------------------------------------
+  // -- 3. Nothing to show -------------------------------------------------
+
+  if (notifications.length === 0) {
+    return (
+      <View style={styles.container}>
+        <EmptyState
+          variant="first-use"
+          illustration="plane"
+          title="You're all caught up."
+          message="New photos, orders and updates land here as they happen."
+        />
+      </View>
+    );
+  }
+
+  // -- 4. Content ---------------------------------------------------------
 
   return (
     <View style={styles.container}>
@@ -175,23 +238,22 @@ export function NotificationCenter() {
       */}
       {unreadCount > 0 && (
         <View style={styles.toolbar}>
-          <Text variant="eyebrow" color={colors.text.tertiary}>
+          <Text variant="bodySmallBold" color={colors.text.secondary}>
             {unreadCount} unread
           </Text>
           <Pressable
             onPress={handleMarkAllAsRead}
             disabled={isMarkingAllAsRead}
-            hitSlop={8}
             style={({ pressed }) => [
-              styles.markAllButton,
-              (pressed || isMarkingAllAsRead) && styles.markAllButtonPressed,
+              styles.markAll,
+              (pressed || isMarkingAllAsRead) && styles.markAllPressed,
             ]}
             accessibilityRole="button"
             accessibilityState={{ disabled: isMarkingAllAsRead }}
             accessibilityLabel={`Mark all ${unreadCount} notifications as read`}
           >
             <Ionicons
-              name="checkmark-done"
+              name="checkmark-done-outline"
               size={16}
               color={colors.text.accent}
             />
@@ -214,9 +276,9 @@ export function NotificationCenter() {
         showsVerticalScrollIndicator={false}
         ListFooterComponent={
           isFetchingNextPage ? (
-            <View style={styles.footer}>
-              <SkeletonShimmer width="60%" height={14} borderRadius={4} />
-            </View>
+            // The next page arriving looks like the page you have: one more
+            // row of the same shape, not a spinner in the margin.
+            <NotificationRowSkeleton index={0} />
           ) : null
         }
       />
@@ -244,45 +306,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: layout.screenPaddingHorizontal,
     paddingBottom: spacing.sm,
   },
-  markAllButton: {
+  markAll: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
+    // Was ~41pt tall, which is under the floor every other control in the app
+    // honours. Text-only controls are where this slips.
+    minHeight: MIN_TAP_SIZE,
+    // Keeps the label on the screen edge despite the padding above.
+    marginRight: -spacing.sm,
   },
-  markAllButtonPressed: {
+  markAllPressed: {
     opacity: 0.5,
   },
-  footer: {
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
 
-  // Skeleton
-  skeletonContainer: {
+  // ── Skeleton — mirrors NotificationCard exactly ──────────────────────
+  skeletonList: {
     flex: 1,
     paddingTop: spacing.sm,
-    paddingHorizontal: spacing.md,
     backgroundColor: colors.background.cream,
   },
   skeletonCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background.surface,
-    borderRadius: 16,
+    gap: spacing.ms,
+    marginHorizontal: layout.screenPaddingHorizontal,
+    marginBottom: spacing.ms,
     padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  skeletonIcon: {
-    marginRight: spacing.sm + 4,
+    minHeight: CARD_MIN_HEIGHT,
+    backgroundColor: colors.background.surface,
+    borderRadius: radius.lg,
+    ...platformShadow(shadows.small),
   },
   skeletonContent: {
     flex: 1,
     gap: spacing.sm,
-  },
-  skeletonBodyRow: {
-    marginTop: 4,
   },
 });
 

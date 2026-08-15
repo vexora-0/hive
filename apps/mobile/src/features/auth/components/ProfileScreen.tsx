@@ -1,16 +1,37 @@
-import React, { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, radius, layout } from '@/theme';
+import { colors, spacing, layout } from '@/theme';
 import { Text, Button, Avatar, TextInput, Card, Badge, Divider } from '@/components/ui';
 import { Reveal } from '@/components/animation';
-import { ScreenContainer, KeyboardAvoid } from '@/components/layout';
+import { ScreenContainer } from '@/components/layout';
 import { HeaderBar } from '@/components/navigation';
-import { ConfirmDialog, Modal } from '@/components/feedback';
+import { BottomSheet, ConfirmDialog } from '@/components/feedback';
+import type { UserRole } from '@/types/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useUpdateProfile } from '../hooks/useUpdateProfile';
+
+// ---------------------------------------------------------------------------
+// Role
+// ---------------------------------------------------------------------------
+
+/**
+ * What each role is called on their own profile.
+ *
+ * Written out rather than title-cased from the enum: "Admin" is the database's
+ * word for the row, and the person reading it is a nursery manager, not a
+ * record type. The badge is deliberately **neutral grey in all three cases**.
+ * Tinting it by role would put a third hue on a screen whose only job is to
+ * confirm who you are, and the avatar beside it already carries a deterministic
+ * identity colour derived from the name.
+ */
+const ROLE_LABEL: Record<UserRole, string> = {
+  parent: 'Parent',
+  teacher: 'Teacher',
+  admin: 'Administrator',
+};
 
 // ---------------------------------------------------------------------------
 // Edit sheet
@@ -25,6 +46,15 @@ interface EditSheetProps {
   onClose: () => void;
 }
 
+/**
+ * The edit form, on the app's one sheet.
+ *
+ * This used to be a hand-rolled `Modal` with its own backdrop, its own 40×4
+ * handle bar, its own cream ground and its own corner radius — one of fourteen
+ * such sheets, no two of which agreed on all four. `<BottomSheet>` owns the
+ * scrim, the handle, the safe-area inset, the keyboard inset and the height
+ * ceiling now, so this file is only the two fields and the two buttons.
+ */
 function EditProfileSheet({
   visible,
   initialName,
@@ -39,7 +69,7 @@ function EditProfileSheet({
 
   // Re-seed the fields each time the sheet opens, so a cancelled edit does not
   // persist into the next one.
-  React.useEffect(() => {
+  useEffect(() => {
     if (visible) {
       setName(initialName);
       setPhone(initialPhone);
@@ -47,7 +77,7 @@ function EditProfileSheet({
     }
   }, [visible, initialName, initialPhone]);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     const trimmed = name.trim();
     if (!trimmed) {
       setError('Enter your name.');
@@ -55,58 +85,87 @@ function EditProfileSheet({
     }
     setError(null);
     onSave(trimmed, phone.trim());
-  };
+  }, [name, phone, onSave]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <KeyboardAvoid>
-            <View style={styles.handleIndicator} />
-            <View style={styles.sheetContent}>
-              <Text variant="h3" style={styles.sheetTitle}>
-                Edit profile
-              </Text>
+    <BottomSheet
+      visible={visible}
+      onClose={onClose}
+      title="Edit profile"
+      subtitle="Your school sees this name on photos and orders."
+      keyboard
+      // Two fields fit without it on most phones, but not on a small one with
+      // the keyboard up — and `keyboardShouldPersistTaps` comes with it, so a
+      // tap on Save while the keyboard is open lands on Save rather than only
+      // dismissing the keyboard.
+      scroll
+      footer={
+        <View style={styles.sheetActions}>
+          <Button
+            variant="outline"
+            onPress={onClose}
+            disabled={isSaving}
+            style={styles.sheetButton}
+          >
+            Cancel
+          </Button>
+          <Button
+            onPress={handleSave}
+            loading={isSaving}
+            style={styles.sheetButton}
+          >
+            Save
+          </Button>
+        </View>
+      }
+    >
+      <View style={styles.sheetFields}>
+        <TextInput
+          label="Name"
+          value={name}
+          onChangeText={setName}
+          placeholder="Your name"
+          autoCapitalize="words"
+          autoComplete="name"
+          textContentType="name"
+          error={error ?? undefined}
+          editable={!isSaving}
+        />
 
-              <TextInput
-                label="Name"
-                value={name}
-                onChangeText={setName}
-                placeholder="Your name"
-                autoCapitalize="words"
-                error={error ?? undefined}
-              />
-
-              <TextInput
-                label="Phone"
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="Optional"
-                hint="Your school uses this to reach you about orders."
-                keyboardType="phone-pad"
-              />
-
-              <View style={styles.sheetActions}>
-                <Button variant="outline" onPress={onClose} style={styles.sheetButton}>
-                  Cancel
-                </Button>
-                <Button onPress={handleSave} loading={isSaving} style={styles.sheetButton}>
-                  Save
-                </Button>
-              </View>
-            </View>
-          </KeyboardAvoid>
-        </Pressable>
-      </Pressable>
-    </Modal>
+        <TextInput
+          label="Phone"
+          value={phone}
+          onChangeText={setPhone}
+          placeholder="Optional"
+          hint="Your school uses this to reach you about orders."
+          keyboardType="phone-pad"
+          autoComplete="tel"
+          textContentType="telephoneNumber"
+          editable={!isSaving}
+        />
+      </View>
+    </BottomSheet>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Detail row
+// Contact line
 // ---------------------------------------------------------------------------
 
-function DetailRow({
+/**
+ * One way to reach this person.
+ *
+ * **Not a key-value row.** The previous shape was `Email ······ you@x.com`,
+ * right-aligned against a fixed 52pt label column, which is how a database
+ * record looks and not how a contact card does. An envelope in front of an
+ * address needs no word "Email" — the glyph is the label, the address is the
+ * content, and dropping the middle column gives the value the whole width it
+ * needs before it starts truncating.
+ *
+ * The glyph carries no accessible name of its own; the line's own text is what
+ * gets read, prefixed by `label` so "you@example.com" is not announced bare.
+ */
+function ContactLine({
   icon,
   label,
   value,
@@ -118,16 +177,23 @@ function DetailRow({
   muted?: boolean;
 }) {
   return (
-    <View style={styles.detailRow}>
-      <Ionicons name={icon} size={17} color={colors.text.tertiary} />
-      <Text variant="bodySmall" color={colors.text.tertiary} style={styles.detailLabel}>
-        {label}
-      </Text>
+    <View
+      style={styles.contactLine}
+      accessible
+      accessibilityLabel={`${label}: ${value}`}
+    >
+      <Ionicons
+        name={icon}
+        size={18}
+        color={colors.text.tertiary}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      />
       <Text
-        variant="bodySmallBold"
+        variant="body"
         color={muted ? colors.text.tertiary : colors.text.primary}
         numberOfLines={1}
-        style={styles.detailValue}
+        style={styles.contactValue}
       >
         {value}
       </Text>
@@ -144,10 +210,15 @@ function DetailRow({
  *
  * The teacher, parent and admin profile screens were three near-identical
  * copies. Making the profile editable in three places would have meant three
- * copies of the edit sheet too, so they now all render this.
+ * copies of the edit sheet too, so they now all render this — which means this
+ * one file is what a parent, a teacher and a nursery manager each see, and it
+ * has to read correctly as all three.
  *
- * Role and school are shown but not editable: they decide what the user can
- * see, and the server rejects any attempt to set them here.
+ * It is deliberately a short screen. A profile is somewhere you confirm who you
+ * are and occasionally correct a phone number; padding it out with settings
+ * rows that lead nowhere would be inventing a console. Role and school are
+ * shown but not editable — they decide what the user can see, and the server
+ * rejects any attempt to set them here.
  */
 export function ProfileScreen() {
   const router = useRouter();
@@ -182,45 +253,35 @@ export function ProfileScreen() {
 
   const displayName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'User';
   const email = user?.email ?? '';
-
-  const roleLabel = profile?.role
-    ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1)
-    : null;
+  const roleLabel = profile?.role ? ROLE_LABEL[profile.role] : null;
 
   return (
     <ScreenContainer scroll tabBarClearance edges={['top', 'left', 'right']}>
       <HeaderBar large title="Profile" />
 
       <View style={styles.content}>
-        {/* Identity card. The avatar sits on the card's edge rather than
-            centred above it, so the name reads as a label on a record instead
+        {/* The identity card. The avatar sits on the card's edge rather than
+            centred above it, so the name reads as a person on a record instead
             of a social-media header. */}
         <Reveal>
-          <Card elevation="raised" padding={spacing.lg} style={styles.identityCard}>
+          <Card elevation="raised" padding={spacing.lg}>
             <View style={styles.identityRow}>
               <Avatar uri={profile?.avatar_url} name={displayName} size="lg" />
               <View style={styles.identityText}>
-                <Text variant="h3" numberOfLines={1}>
+                <Text variant="h3" numberOfLines={2}>
                   {displayName}
                 </Text>
-                {roleLabel && (
-                  <Badge
-                    variant="default"
-                    style={styles.roleBadge}
-                  >
-                    {roleLabel}
-                  </Badge>
-                )}
+                {roleLabel && <Badge variant="neutral">{roleLabel}</Badge>}
               </View>
             </View>
 
             <Divider style={styles.identityDivider} />
 
-            <DetailRow icon="mail-outline" label="Email" value={email} />
-            <DetailRow
+            <ContactLine icon="mail-outline" label="Email" value={email} />
+            <ContactLine
               icon="call-outline"
               label="Phone"
-              value={profile?.phone ?? 'Not added'}
+              value={profile?.phone ?? 'No phone number yet'}
               muted={!profile?.phone}
             />
           </Card>
@@ -234,9 +295,14 @@ export function ProfileScreen() {
             leftIcon={
               <Ionicons name="create-outline" size={18} color={colors.text.primary} />
             }
+            accessibilityHint="Opens a sheet where you can change your name and phone number."
           >
             Edit profile
           </Button>
+
+          {/* Set apart rather than stacked as a peer of Edit: leaving is not
+              the other half of a pair of edits. */}
+          <Divider style={styles.signOutDivider} />
 
           <Button
             variant="ghost"
@@ -279,7 +345,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: layout.screenPaddingHorizontal,
     paddingTop: spacing.sm,
   },
-  identityCard: {},
   identityRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -290,61 +355,33 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     alignItems: 'flex-start',
   },
-  roleBadge: {},
   identityDivider: {
     marginVertical: spacing.md,
   },
-  detailRow: {
+  contactLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.ms,
     paddingVertical: spacing.sm,
   },
-  detailLabel: {
-    width: 52,
-  },
-  detailValue: {
+  contactValue: {
     flex: 1,
-    textAlign: 'right',
   },
   actions: {
     marginTop: spacing.lg,
-    gap: spacing.ms,
+  },
+  signOutDivider: {
+    marginVertical: spacing.md,
   },
 
-  // Edit sheet
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: colors.overlay.scrim,
-  },
-  sheet: {
-    backgroundColor: colors.background.cream,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingBottom: spacing.lg,
-  },
-  handleIndicator: {
-    alignSelf: 'center',
-    backgroundColor: colors.border.default,
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    marginTop: spacing.ms,
-    marginBottom: spacing.sm,
-  },
-  sheetContent: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
+  // ── Edit sheet ───────────────────────────────────────────────────────
+  sheetFields: {
     gap: spacing.md,
-  },
-  sheetTitle: {
-    marginBottom: spacing.xs,
+    paddingBottom: spacing.md,
   },
   sheetActions: {
     flexDirection: 'row',
     gap: spacing.ms,
-    marginTop: spacing.md,
   },
   sheetButton: {
     flex: 1,

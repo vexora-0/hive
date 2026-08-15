@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { StyleProp, StyleSheet, TextStyle } from 'react-native';
+import React, { useEffect, useMemo } from 'react';
+import { Platform, StyleProp, StyleSheet, TextStyle } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedProps,
@@ -70,6 +70,35 @@ export const AnimatedCounter: React.FC<AnimatedCounterProps> = ({
     });
   }, [value, duration, animatedValue]);
 
+  /**
+   * How wide the finished number will be, in characters.
+   *
+   * The figure is painted into a `TextInput`, because Reanimated can only
+   * drive `text` from the UI thread. On react-native-web that is a real
+   * `<input>`, and an input with no width claims the browser's default
+   * intrinsic size — about twenty characters. A single digit at 40px measured
+   * **459pt of claimed width against a 310pt row**, which is why the label
+   * beside it had nowhere to go: the admin roster rendered "Photographs
+   * shared" as "P.".
+   *
+   * It cannot be left to `width: auto` either, since the element is empty on
+   * the JS side — the text only ever arrives through an animated prop the DOM
+   * never sees as a value. So the width is derived from the *destination*
+   * value, which is known here, and held steady while the count runs so the
+   * layout does not jitter as digits appear. `ch` is the browser's own
+   * character unit; native ignores the whole thing, having never had the
+   * phantom width in the first place.
+   */
+  const widthCh = useMemo(() => {
+    const settled =
+      format === 'rupees'
+        ? `₹${Math.floor(Math.abs(value) / 100).toLocaleString('en-IN')}`
+        : `${prefix}${Math.abs(value).toFixed(decimalPlaces)}${suffix}`;
+    // A digit in a proportional face is wider than the `ch` unit's reference
+    // "0" in some cuts, so a little slack keeps the last glyph off the edge.
+    return settled.length + 0.5;
+  }, [value, format, prefix, suffix, decimalPlaces]);
+
   const animatedProps = useAnimatedProps(() => {
     let displayed: string;
 
@@ -119,7 +148,13 @@ export const AnimatedCounter: React.FC<AnimatedCounterProps> = ({
       importantForAccessibility="no-hide-descendants"
       pointerEvents="none"
       animatedProps={animatedProps}
-      style={[styles.text, style]}
+      style={[
+        styles.text,
+        // Web only: see the note on `widthCh`. `width` in `ch` is meaningless
+        // to the native text input, which sizes itself to its content.
+        Platform.OS === 'web' ? ({ width: `${widthCh}ch` } as object) : null,
+        style,
+      ]}
     />
   );
 };
@@ -138,6 +173,7 @@ const styles = StyleSheet.create({
     // Reset default TextInput styling
     borderWidth: 0,
     backgroundColor: 'transparent',
+    alignSelf: 'flex-start',
   },
 });
 

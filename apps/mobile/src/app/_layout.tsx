@@ -9,6 +9,8 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import {
+  Fraunces_300Light,
+  Fraunces_400Regular_Italic,
   Fraunces_600SemiBold,
   Fraunces_700Bold,
 } from '@expo-google-fonts/fraunces';
@@ -50,6 +52,11 @@ function RootLayout() {
   // Fraunces carries the three display sizes; Plus Jakarta Sans does
   // everything else. See src/theme/typography.ts for which weight does what.
   const [fontsLoaded, fontError] = useFonts({
+    // Light is the airy hero cut and italic is the one editorial line a screen
+    // is allowed. Both ship inside the already-pinned @expo-google-fonts
+    // package, so neither is a dependency change.
+    Fraunces_300Light,
+    Fraunces_400Regular_Italic,
     Fraunces_600SemiBold,
     Fraunces_700Bold,
     PlusJakartaSans_400Regular,

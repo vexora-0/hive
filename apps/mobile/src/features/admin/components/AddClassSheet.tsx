@@ -1,29 +1,26 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { StyleSheet } from 'react-native';
 
-import { colors, spacing, radius } from '@/theme';
-import { Text } from '@/components/ui/Text';
+import { spacing } from '@/theme';
 import { TextInput } from '@/components/ui/TextInput';
 import { Button } from '@/components/ui/Button';
+import { BottomSheet } from '@/components/feedback';
 import type { CreateClassData } from '@/features/admin/services/adminService';
-import { Modal } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export interface AddClassSheetProps {
+  /** Whether the sheet is visible. */
   isVisible: boolean;
+  /** The school the class is being added to — shown, never asked for. */
   schoolName: string;
+  /** Called when the sheet is dismissed. */
   onClose: () => void;
+  /** Called with the class details when the form is submitted. */
   onSubmit: (data: CreateClassData) => void;
+  /** Whether submission is in progress. */
   isSubmitting?: boolean;
 }
 
@@ -32,7 +29,13 @@ export interface AddClassSheetProps {
 // ---------------------------------------------------------------------------
 
 /**
- * Sheet form for adding a class to a school. Fields: name (required), grade (optional).
+ * `<AddClassSheet>` — a class inside a school: a name, and the year group it
+ * belongs to.
+ *
+ * The school is stated in the subtitle rather than offered as a picker,
+ * because the sheet was opened from that school's own card. Re-asking a
+ * question the interface already answered is how a two-field form becomes a
+ * three-field one.
  */
 export function AddClassSheet({
   isVisible,
@@ -56,7 +59,7 @@ export function AddClassSheet({
   const handleSubmit = useCallback(() => {
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setNameError('Class name is required');
+      setNameError('A class needs a name.');
       return;
     }
     setNameError(undefined);
@@ -67,68 +70,46 @@ export function AddClassSheet({
   }, [name, grade, onSubmit]);
 
   return (
-    <Modal
+    <BottomSheet
       visible={isVisible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
+      title="Add a class"
+      subtitle={`at ${schoolName}`}
+      scroll
+      keyboard
+      footer={
+        <Button
+          fullWidth
+          onPress={handleSubmit}
+          loading={isSubmitting}
+          disabled={!name.trim()}
+        >
+          Add class
+        </Button>
+      }
     >
-      <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <Pressable style={styles.backdrop} onPress={onClose}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.handleBar} />
-            <ScrollView
-              style={styles.scrollContent}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <Text variant="h3" style={styles.title}>
-                Add Class
-              </Text>
-              <Text variant="bodySmall" color={colors.text.secondary} style={styles.schoolLabel}>
-                to {schoolName}
-              </Text>
+      <TextInput
+        label="Name"
+        placeholder="Sunflower"
+        value={name}
+        onChangeText={(text) => {
+          setName(text);
+          if (nameError) setNameError(undefined);
+        }}
+        error={nameError}
+        autoCapitalize="words"
+        containerStyle={styles.field}
+      />
 
-              <TextInput
-                label="Class Name"
-                placeholder="e.g. Morning Star, Pre-K A"
-                value={name}
-                onChangeText={(text) => {
-                  setName(text);
-                  if (nameError) setNameError(undefined);
-                }}
-                error={nameError}
-                autoCapitalize="words"
-                containerStyle={styles.field}
-              />
-
-              <TextInput
-                label="Grade (optional)"
-                placeholder="e.g. Pre-K, K"
-                value={grade}
-                onChangeText={setGrade}
-                autoCapitalize="words"
-                containerStyle={styles.field}
-              />
-
-              <Button
-                variant="primary"
-                size="lg"
-                onPress={handleSubmit}
-                loading={isSubmitting}
-                disabled={!name.trim()}
-                style={styles.submitButton}
-              >
-                Create Class
-              </Button>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </KeyboardAvoidingView>
-    </Modal>
+      <TextInput
+        label="Year group (optional)"
+        placeholder="Pre-K"
+        value={grade}
+        onChangeText={setGrade}
+        autoCapitalize="words"
+        containerStyle={styles.lastField}
+      />
+    </BottomSheet>
   );
 }
 
@@ -137,46 +118,11 @@ export function AddClassSheet({
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  keyboardView: {
-    flex: 1,
-  },
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: colors.overlay.scrim,
-  },
-  sheet: {
-    backgroundColor: colors.background.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingBottom: spacing.lg,
-    maxHeight: '85%',
-  },
-  handleBar: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border.default,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  title: {
-    marginBottom: spacing.xs,
-  },
-  schoolLabel: {
-    marginBottom: spacing.lg,
-  },
   field: {
     marginBottom: spacing.md,
   },
-  submitButton: {
-    marginTop: spacing.md,
-    marginBottom: spacing.md,
+  lastField: {
+    marginBottom: spacing.sm,
   },
 });
 

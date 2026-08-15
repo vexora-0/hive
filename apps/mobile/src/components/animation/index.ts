@@ -10,9 +10,6 @@ export type { HoneycombPatternProps } from './HoneycombPattern';
 export { HoneycombFAB } from './HoneycombFAB';
 export type { HoneycombFABProps } from './HoneycombFAB';
 
-export { ConfettiOverlay } from './ConfettiOverlay';
-export type { ConfettiOverlayProps } from './ConfettiOverlay';
-
 export { ShakeAnimation } from './ShakeAnimation';
 export type { ShakeAnimationHandle, ShakeAnimationProps } from './ShakeAnimation';
 

@@ -1,16 +1,10 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  TextInput as RNTextInput,
-  View,
-} from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, radius, layout, fontFamily, fontSize, lineHeight, MIN_TAP_SIZE } from '@/theme';
-import { Avatar } from '@/components/ui';
-import { Text } from '@/components/ui';
-import { Modal } from '@/components/feedback';
+import { colors, spacing, radius, MIN_TAP_SIZE } from '@/theme';
+import { Avatar, Button, Text, TextInput } from '@/components/ui';
+import { BottomSheet } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,17 +30,62 @@ export interface StudentTaggerProps {
 }
 
 // ---------------------------------------------------------------------------
+// Checkbox
+// ---------------------------------------------------------------------------
+
+interface TagCheckboxProps {
+  checked: boolean;
+  /** Some but not all of the rows below are selected. */
+  mixed?: boolean;
+}
+
+/**
+ * The tick.
+ *
+ * Marigold is a surface and never a label, so a selected box is a marigold
+ * *fill* carrying an **ink** check — 8.08:1, the same letterpress pairing as
+ * the primary button. It used to be a white check on marigold, which measures
+ * about 1.9:1 and effectively disappeared under classroom light.
+ *
+ * Round rather than square: it sits beside a round avatar in every row, and a
+ * filled circle is the selection idiom the phone's own photo apps use.
+ */
+function TagCheckbox({ checked, mixed = false }: TagCheckboxProps) {
+  const active = checked || mixed;
+
+  return (
+    <View style={[styles.checkbox, active && styles.checkboxActive]}>
+      {active && (
+        <Ionicons
+          name={mixed && !checked ? 'remove' : 'checkmark'}
+          size={16}
+          color={colors.ink[900]}
+        />
+      )}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 /**
- * `<StudentTagger>` -- bottom sheet for multi-selecting students to tag in
- * photos.
+ * `<StudentTagger>` — who is in these photographs.
  *
- * Features:
- * - Search / filter input at the top.
- * - "Select All" toggle.
- * - Checkbox list with avatars and names.
+ * This is the teacher's most-used surface: forty photos across twenty-five
+ * children, several times a week. So it is dense and scannable rather than
+ * decorative — a person-first row (face, then name, then the tick), a running
+ * count of coverage in the sheet's own subtitle, and one pinned action.
+ *
+ * Selection is carried by the tick alone. A wash behind every selected row
+ * would flood the sheet with marigold the moment a teacher used "select all",
+ * and the eye reads a single column of ticks far faster than twenty-five
+ * tinted bands.
+ *
+ * The chrome — scrim, radius, handle, safe-area inset, height ceiling — belongs
+ * to `@/components/feedback/BottomSheet`. `height="full"` because this sheet
+ * owns the screen while it is open.
  *
  * ```tsx
  * <StudentTagger
@@ -65,15 +104,16 @@ export function StudentTagger({
   isVisible,
   onClose,
 }: StudentTaggerProps) {
-  const searchInputRef = useRef<RNTextInput>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   // ── Derived data ─────────────────────────────────────────────────────
+  const trimmedQuery = searchQuery.trim();
+
   const filteredStudents = useMemo(() => {
-    if (!searchQuery.trim()) return students;
-    const q = searchQuery.toLowerCase().trim();
+    if (!trimmedQuery) return students;
+    const q = trimmedQuery.toLowerCase();
     return students.filter((s) => s.name.toLowerCase().includes(q));
-  }, [students, searchQuery]);
+  }, [students, trimmedQuery]);
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
@@ -84,10 +124,18 @@ export function StudentTagger({
     [filteredStudents, selectedSet],
   );
 
+  const someFilteredSelected = useMemo(
+    () =>
+      !allFilteredSelected && filteredStudents.some((s) => selectedSet.has(s.id)),
+    [allFilteredSelected, filteredStudents, selectedSet],
+  );
+
   const handleClose = useCallback(() => {
     setSearchQuery('');
     onClose();
   }, [onClose]);
+
+  const handleClearSearch = useCallback(() => setSearchQuery(''), []);
 
   // ── Selection handlers ───────────────────────────────────────────────
   const toggleStudent = useCallback(
@@ -125,33 +173,24 @@ export function StudentTagger({
           onPress={() => toggleStudent(item.id)}
           style={({ pressed }) => [
             styles.studentRow,
-            pressed && styles.studentRowPressed,
+            pressed && styles.rowPressed,
           ]}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: isChecked }}
           accessibilityLabel={item.name}
         >
-          {/* Checkbox */}
-          <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
-            {isChecked && (
-              <Text variant="caption" color={colors.white} style={styles.checkIcon}>
-                {'✓'}
-              </Text>
-            )}
-          </View>
+          <Avatar uri={item.avatarUrl} name={item.name} size="sm" />
 
-          {/* Avatar */}
-          <Avatar uri={item.avatarUrl} name={item.name} size="sm" style={styles.studentAvatar} />
-
-          {/* Name */}
           <Text
-            variant="body"
+            variant={isChecked ? 'bodyBold' : 'body'}
             color={colors.text.primary}
             numberOfLines={1}
             style={styles.studentName}
           >
             {item.name}
           </Text>
+
+          <TagCheckbox checked={isChecked} />
         </Pressable>
       );
     },
@@ -160,118 +199,119 @@ export function StudentTagger({
 
   const keyExtractor = useCallback((item: StudentItem) => item.id, []);
 
-  const listHeader = useMemo(
-    () => (
-      <View>
-        {/* Search input */}
-        <View style={styles.searchContainer}>
-          <RNTextInput
-            ref={searchInputRef}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search students..."
-            placeholderTextColor={colors.text.tertiary}
-            selectionColor={colors.primary.amber}
-            style={styles.searchInput}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="search"
-          />
-        </View>
+  // ── Render ───────────────────────────────────────────────────────────
+  //
+  // The search field and the select-all row sit outside the list, so they stay
+  // put while a long roster scrolls under them. `contentStyle` claims the
+  // remaining height for the body: the list needs a bounded parent to scroll
+  // inside instead of overflowing it, and gives up the body's own horizontal
+  // padding so rows can run edge to edge.
+  return (
+    <BottomSheet
+      visible={isVisible}
+      onClose={handleClose}
+      title="Who is in them?"
+      subtitle={
+        students.length > 0
+          ? `${selectedIds.length} of ${students.length} tagged`
+          : undefined
+      }
+      showClose
+      height="full"
+      contentStyle={styles.sheetBody}
+      footer={
+        <Button fullWidth onPress={handleClose}>
+          Done
+        </Button>
+      }
+    >
+      <View style={styles.searchContainer}>
+        <TextInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search students"
+          accessibilityLabel="Search students"
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          leftIcon={
+            <Ionicons name="search-outline" size={18} color={colors.text.tertiary} />
+          }
+          rightIcon={
+            trimmedQuery.length > 0 ? (
+              <Pressable
+                onPress={handleClearSearch}
+                // 18pt glyph + 14 either side clears the 44pt target.
+                hitSlop={14}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+              >
+                {/* Outline, not the filled cut: fill is reserved for the
+                    selected state, and clearing a search is neither. */}
+                <Ionicons
+                  name="close-circle-outline"
+                  size={18}
+                  color={colors.text.tertiary}
+                />
+              </Pressable>
+            ) : undefined
+          }
+        />
+      </View>
 
-        {/* Select all row */}
-        <Pressable
-          onPress={toggleSelectAll}
-          style={({ pressed }) => [
-            styles.selectAllRow,
-            pressed && styles.studentRowPressed,
-          ]}
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: allFilteredSelected }}
-          accessibilityLabel="Select all students"
-        >
-          <View
-            style={[
-              styles.checkbox,
-              allFilteredSelected && styles.checkboxChecked,
-            ]}
+      {filteredStudents.length > 0 && (
+        <>
+          <Pressable
+            onPress={toggleSelectAll}
+            style={({ pressed }) => [styles.selectAllRow, pressed && styles.rowPressed]}
+            accessibilityRole="checkbox"
+            accessibilityState={{
+              checked: allFilteredSelected
+                ? true
+                : someFilteredSelected
+                  ? 'mixed'
+                  : false,
+            }}
+            accessibilityLabel={
+              trimmedQuery ? 'Select everyone matching the search' : 'Select everyone'
+            }
           >
-            {allFilteredSelected && (
-              <Text variant="caption" color={colors.white} style={styles.checkIcon}>
-                {'✓'}
-              </Text>
+            <Text variant="bodyBold" color={colors.text.primary} style={styles.selectAllLabel}>
+              {trimmedQuery ? 'Select all matches' : 'Select everyone'}
+            </Text>
+
+            <TagCheckbox checked={allFilteredSelected} mixed={someFilteredSelected} />
+          </Pressable>
+
+          <View style={styles.separator} />
+        </>
+      )}
+
+      <FlatList
+        data={filteredStudents}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text variant="body" muted center>
+              {trimmedQuery
+                ? `Nobody in this class matches “${trimmedQuery}”.`
+                : 'No students in this class yet.'}
+            </Text>
+            {trimmedQuery.length > 0 && (
+              <Button variant="ghost" onPress={handleClearSearch} style={styles.emptyAction}>
+                Clear search
+              </Button>
             )}
           </View>
-          <Text variant="bodyBold" color={colors.text.primary} style={styles.selectAllLabel}>
-            Select All
-          </Text>
-          <Text variant="caption" color={colors.text.secondary}>
-            {selectedIds.length}/{students.length}
-          </Text>
-        </Pressable>
-
-        {/* Separator */}
-        <View style={styles.separator} />
-      </View>
-    ),
-    [
-      searchQuery,
-      toggleSelectAll,
-      allFilteredSelected,
-      selectedIds.length,
-      students.length,
-    ],
-  );
-
-  // ── Render ───────────────────────────────────────────────────────────
-  return (
-    <Modal
-      visible={isVisible}
-      transparent
-      animationType="slide"
-      onRequestClose={handleClose}
-    >
-      <Pressable style={styles.backdrop} onPress={handleClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.handleBar} />
-          <View style={styles.sheetHeader}>
-            <Text variant="h4" color={colors.text.primary}>
-              Tag Students
-            </Text>
-            <Pressable
-              onPress={handleClose}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-            >
-              <Text variant="bodyBold" color={colors.text.accent}>
-                Done
-              </Text>
-            </Pressable>
-          </View>
-
-          <FlatList
-            data={filteredStudents}
-            keyExtractor={keyExtractor}
-            renderItem={renderItem}
-            ListHeaderComponent={listHeader}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Text variant="body" color={colors.text.tertiary} center>
-                  {searchQuery
-                    ? 'No students match your search.'
-                    : 'No students available.'}
-                </Text>
-              </View>
-            }
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            style={styles.list}
-          />
-        </Pressable>
-      </Pressable>
-    </Modal>
+        }
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      />
+    </BottomSheet>
   );
 }
 
@@ -279,113 +319,76 @@ export function StudentTagger({
 // Styles
 // ---------------------------------------------------------------------------
 
-const CHECKBOX_SIZE = 22;
+const CHECKBOX_SIZE = 26;
 
 const styles = StyleSheet.create({
-  backdrop: {
+  /** Claim the sheet's remaining height; the rows own their own padding. */
+  sheetBody: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: colors.overlay.scrim,
-  },
-  sheet: {
-    maxHeight: '85%',
-    backgroundColor: colors.background.cream,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-  },
-  handleBar: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border.default,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  list: {
-    maxHeight: 400,
-  },
-  sheetHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.sm,
+    paddingHorizontal: 0,
   },
   searchContainer: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  searchInput: {
-    height: MIN_TAP_SIZE,
-    borderRadius: layout.inputRadius,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    backgroundColor: colors.background.surface,
-    paddingHorizontal: spacing.md,
-    fontFamily: fontFamily.bodyRegular,
-    fontSize: fontSize.body,
-    lineHeight: lineHeight.body,
-    color: colors.text.primary,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.ms,
   },
   selectAllRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    gap: spacing.ms,
     minHeight: MIN_TAP_SIZE,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
   selectAllLabel: {
     flex: 1,
-    marginLeft: spacing.sm,
+  },
+  rowPressed: {
+    backgroundColor: colors.background.surfaceSecondary,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.border.light,
-    marginHorizontal: spacing.md,
-    marginVertical: spacing.xs,
+    marginHorizontal: spacing.lg,
+  },
+  list: {
+    flex: 1,
   },
   listContent: {
-    paddingBottom: spacing.xxl,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.md,
   },
   studentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
+    gap: spacing.ms,
+    minHeight: 52,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    minHeight: MIN_TAP_SIZE,
   },
-  studentRowPressed: {
-    backgroundColor: colors.gray[100],
+  studentName: {
+    flex: 1,
   },
   checkbox: {
     width: CHECKBOX_SIZE,
     height: CHECKBOX_SIZE,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: colors.gray[400],
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.border.dark,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.background.surface,
   },
-  checkboxChecked: {
+  checkboxActive: {
     backgroundColor: colors.primary.amber,
     borderColor: colors.primary.amber,
   },
-  checkIcon: {
-    marginTop: -1,
-  },
-  studentAvatar: {
-    marginLeft: spacing.sm,
-  },
-  studentName: {
-    flex: 1,
-    marginLeft: spacing.sm,
-  },
   emptyContainer: {
     paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+  },
+  emptyAction: {
+    marginTop: spacing.sm,
   },
 });
 

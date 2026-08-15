@@ -1,19 +1,14 @@
 import React, { useCallback, useState, useEffect } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, radius, layout } from '@/theme';
+import { colors, spacing, radius, MIN_TAP_SIZE } from '@/theme';
 import { Text } from '@/components/ui/Text';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
-import { ConfirmDialog, Modal } from '@/components/feedback';
+import { SectionHeader } from '@/components/ui/SectionHeader';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { BottomSheet, ConfirmDialog } from '@/components/feedback';
 import type { AdminUser, AdminSchool } from '@/features/admin/services/adminService';
 import type { UserRole } from '@/types/supabase';
 
@@ -21,282 +16,259 @@ import type { UserRole } from '@/types/supabase';
 // Types
 // ---------------------------------------------------------------------------
 
+/** What the admin changed. Absent keys were not touched. */
+export interface UserChanges {
+  role?: UserRole;
+  schoolId?: string | null;
+}
+
 export interface UserEditSheetProps {
-  /** The user to edit, or null when hidden. */
+  /** The person being edited, or null when hidden. */
   user: AdminUser | null;
   /** Whether the sheet is visible. */
   isVisible: boolean;
-  /** List of schools for assignment picker. */
+  /** Schools available to assign to. */
   schools: AdminSchool[];
   /** Called when the sheet is dismissed. */
   onClose: () => void;
-  /** Called with the updated role when the user taps Save Role. */
-  onSaveRole: (userId: string, role: UserRole) => void;
-  /** Called with the school id when the user taps Assign. */
-  onAssignSchool: (userId: string, schoolId: string | null) => void;
-  /** Whether a role save is in progress. */
-  isSavingRole?: boolean;
-  /** Whether a school assignment is in progress. */
-  isAssigningSchool?: boolean;
+  /**
+   * Applies both changes in one press.
+   *
+   * There used to be two buttons — Save Role and Assign School — each firing
+   * its own mutation and each closing the sheet, so changing both meant two
+   * round trips, two toasts, and a sheet that shut before the second one
+   * landed. One decision, one action.
+   */
+  onSave: (userId: string, changes: UserChanges) => void | Promise<void>;
+  /** Whether a save is in flight. */
+  isSaving?: boolean;
 }
 
 // ---------------------------------------------------------------------------
-// Role options
+// Roles
 // ---------------------------------------------------------------------------
 
-const ROLE_OPTIONS: Array<{ value: UserRole; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
-  { value: 'teacher', label: 'Teacher', icon: 'school-outline' },
-  { value: 'parent', label: 'Parent', icon: 'people-outline' },
-  { value: 'admin', label: 'Admin', icon: 'shield-outline' },
+const ROLE_OPTIONS: Array<{ value: UserRole; label: string }> = [
+  { value: 'parent', label: 'Parent' },
+  { value: 'teacher', label: 'Teacher' },
+  { value: 'admin', label: 'Admin' },
 ];
+
+const ROLE_LABEL: Record<UserRole, string> = {
+  parent: 'Parent',
+  teacher: 'Teacher',
+  admin: 'Admin',
+};
+
+/** What each role can reach, said plainly rather than as a permission matrix. */
+const ROLE_NOTE: Record<UserRole, string> = {
+  parent: 'Sees photographs of their own children, and orders prints of them.',
+  teacher: 'Uploads and tags photographs for the classes they are assigned.',
+  admin: 'Manages every school, every person and every order on Hive.',
+};
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
+/**
+ * `<UserEditSheet>` — the two things an admin can change about a person from a
+ * phone: what they are, and where they belong.
+ *
+ * Everything else about an account — the name, the email address, the
+ * photograph, deactivation — is deliberately absent. Those are desk work, and
+ * a companion app that offers every field a web console offers is just a small
+ * web console.
+ *
+ * Three roles is exactly what a `SegmentedControl` is for, so the hand-rolled
+ * radio list is gone: three bordered rows with their own amber tint, three
+ * icons and three radio circles, to express one choice from three. The note
+ * under the control changes with the selection, because "Admin" means nothing
+ * to someone who has not read the permissions table.
+ *
+ * **The confirmation is spent where it counts.** A role change is reversible —
+ * change it back — so under the brief's own rule it does not earn a dialog.
+ * Promotion *to admin* is the exception: it hands over every school on the
+ * platform, and the person doing it should have to say so twice.
+ */
 export function UserEditSheet({
   user,
   isVisible,
   schools,
   onClose,
-  onSaveRole,
-  onAssignSchool,
-  isSavingRole = false,
-  isAssigningSchool = false,
+  onSave,
+  isSaving = false,
 }: UserEditSheetProps) {
   const [selectedRole, setSelectedRole] = useState<UserRole>('teacher');
   const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null);
-  /** True while the role change awaits confirmation. */
-  const [confirmingRole, setConfirmingRole] = useState(false);
+  /** True while a promotion to admin awaits confirmation. */
+  const [confirmingAdmin, setConfirmingAdmin] = useState(false);
 
   useEffect(() => {
     if (user) {
       setSelectedRole(user.role);
       setSelectedSchoolId(user.school_id);
-      setConfirmingRole(false);
+      setConfirmingAdmin(false);
     }
   }, [user]);
 
-  // A role change silently widens or narrows what someone can reach, so it
-  // asks first. Saving is deferred to `confirmSaveRole`.
-  const handleSaveRole = useCallback(() => {
-    setConfirmingRole(true);
-  }, []);
+  const roleChanged = user ? selectedRole !== user.role : false;
+  const schoolChanged = user ? selectedSchoolId !== user.school_id : false;
+  const dirty = roleChanged || schoolChanged;
 
-  const confirmSaveRole = useCallback(() => {
-    if (user) onSaveRole(user.id, selectedRole);
-    setConfirmingRole(false);
-  }, [user, selectedRole, onSaveRole]);
+  const commit = useCallback(() => {
+    if (!user) return;
+    onSave(user.id, {
+      ...(roleChanged ? { role: selectedRole } : null),
+      ...(schoolChanged ? { schoolId: selectedSchoolId } : null),
+    });
+  }, [user, onSave, roleChanged, schoolChanged, selectedRole, selectedSchoolId]);
 
-  const handleAssignSchool = useCallback(() => {
-    if (user) onAssignSchool(user.id, selectedSchoolId);
-  }, [user, selectedSchoolId, onAssignSchool]);
+  const handleSave = useCallback(() => {
+    if (roleChanged && selectedRole === 'admin') {
+      setConfirmingAdmin(true);
+      return;
+    }
+    commit();
+  }, [roleChanged, selectedRole, commit]);
+
+  const confirmAdmin = useCallback(() => {
+    setConfirmingAdmin(false);
+    commit();
+  }, [commit]);
 
   if (!user) return null;
 
-  const currentSchool = schools.find((s) => s.id === user.school_id);
-  const roleChanged = selectedRole !== user.role;
-  const schoolChanged = selectedSchoolId !== user.school_id;
-
-  const selectedRoleLabel =
-    ROLE_OPTIONS.find((r) => r.value === selectedRole)?.label ?? selectedRole;
-
   return (
-    <Modal
+    <BottomSheet
       visible={isVisible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
+      scroll
+      showClose
+      footer={
+        <Button
+          fullWidth
+          onPress={handleSave}
+          loading={isSaving}
+          disabled={!dirty}
+          accessibilityHint={
+            dirty ? 'Applies the changes to this person' : undefined
+          }
+        >
+          {dirty ? 'Save changes' : 'Nothing to save'}
+        </Button>
+      }
     >
-      <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <Pressable style={styles.backdrop} onPress={onClose}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.handleBar} />
-            <ScrollView
-              style={styles.scrollContent}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              {/* User header */}
-              <View style={styles.header}>
-                <Avatar
-                  uri={user.avatar_url}
-                  name={user.full_name}
-                  size="lg"
-                />
-                <View style={styles.headerInfo}>
-                  <Text variant="h4" numberOfLines={1}>
-                    {user.full_name}
-                  </Text>
-                  <Text variant="bodySmall" color={colors.text.secondary} numberOfLines={1}>
-                    {user.email}
-                  </Text>
-                  {currentSchool && (
-                    <Text variant="caption" color={colors.primary.amberDark} numberOfLines={1}>
-                      {currentSchool.name}
-                    </Text>
-                  )}
-                </View>
-              </View>
+      {/* ── Who this is ──────────────────────────────────────────── */}
+      <View style={styles.identity}>
+        <Avatar uri={user.avatar_url} name={user.full_name} size="lg" />
+        <View style={styles.identityText}>
+          <Text variant="h3" numberOfLines={1}>
+            {user.full_name}
+          </Text>
+          <Text variant="bodySmall" muted numberOfLines={1}>
+            {user.email}
+          </Text>
+        </View>
+      </View>
 
-              {/* Role selector */}
-              <Text variant="bodyBold" style={styles.sectionLabel}>
-                Role
-              </Text>
+      {/* ── Role ─────────────────────────────────────────────────── */}
+      <SectionHeader size="sm" title="Role" style={styles.sectionHeader} />
 
-              <View style={styles.roleList}>
-                {ROLE_OPTIONS.map((option) => {
-                  const isSelected = selectedRole === option.value;
-                  return (
-                    <Pressable
-                      key={option.value}
-                      onPress={() => setSelectedRole(option.value)}
-                      style={[
-                        styles.roleOption,
-                        isSelected && styles.roleOptionSelected,
-                      ]}
-                      accessibilityRole="radio"
-                      accessibilityState={{ checked: isSelected }}
-                    >
-                      <View
-                        style={[
-                          styles.radioOuter,
-                          isSelected && styles.radioOuterSelected,
-                        ]}
-                      >
-                        {isSelected && <View style={styles.radioInner} />}
-                      </View>
-                      <Ionicons
-                        name={option.icon}
-                        size={20}
-                        color={isSelected ? colors.primary.amber : colors.text.secondary}
-                      />
-                      <Text
-                        variant="body"
-                        color={isSelected ? colors.text.primary : colors.text.secondary}
-                      >
-                        {option.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+      <SegmentedControl
+        options={ROLE_OPTIONS}
+        value={selectedRole}
+        onChange={setSelectedRole}
+        accessibilityLabel="Role"
+      />
 
-              <Button
-                variant="primary"
-                size="md"
-                onPress={handleSaveRole}
-                loading={isSavingRole}
-                disabled={!roleChanged}
-                style={styles.saveButton}
-              >
-                Save Role
-              </Button>
+      <Text variant="bodySmall" muted style={styles.roleNote}>
+        {ROLE_NOTE[selectedRole]}
+      </Text>
 
-              {/* School assignment */}
-              <Text variant="bodyBold" style={styles.sectionLabel}>
-                Assign to School
-              </Text>
+      {/* ── School ───────────────────────────────────────────────── */}
+      <SectionHeader
+        size="sm"
+        title="School"
+        subtitle="Teachers and admins only see the school they belong to."
+        style={styles.sectionHeader}
+      />
 
-              <View style={styles.roleList}>
-                {/* Unassign option */}
-                <Pressable
-                  onPress={() => setSelectedSchoolId(null)}
-                  style={[
-                    styles.roleOption,
-                    selectedSchoolId === null && styles.roleOptionSelected,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.radioOuter,
-                      selectedSchoolId === null && styles.radioOuterSelected,
-                    ]}
-                  >
-                    {selectedSchoolId === null && <View style={styles.radioInner} />}
-                  </View>
-                  <Ionicons
-                    name="close-circle-outline"
-                    size={20}
-                    color={selectedSchoolId === null ? colors.primary.amber : colors.text.secondary}
-                  />
-                  <Text
-                    variant="body"
-                    color={selectedSchoolId === null ? colors.text.primary : colors.text.secondary}
-                  >
-                    No School
-                  </Text>
-                </Pressable>
+      <View style={styles.schoolList}>
+        <SchoolOption
+          label="No school"
+          selected={selectedSchoolId === null}
+          onPress={() => setSelectedSchoolId(null)}
+        />
 
-                {schools.map((school) => {
-                  const isSelected = selectedSchoolId === school.id;
-                  return (
-                    <Pressable
-                      key={school.id}
-                      onPress={() => setSelectedSchoolId(school.id)}
-                      style={[
-                        styles.roleOption,
-                        isSelected && styles.roleOptionSelected,
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.radioOuter,
-                          isSelected && styles.radioOuterSelected,
-                        ]}
-                      >
-                        {isSelected && <View style={styles.radioInner} />}
-                      </View>
-                      <Ionicons
-                        name="business-outline"
-                        size={20}
-                        color={isSelected ? colors.primary.amber : colors.text.secondary}
-                      />
-                      <Text
-                        variant="body"
-                        color={isSelected ? colors.text.primary : colors.text.secondary}
-                        numberOfLines={1}
-                        style={styles.schoolName}
-                      >
-                        {school.name}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              <Button
-                variant="primary"
-                size="md"
-                onPress={handleAssignSchool}
-                loading={isAssigningSchool}
-                disabled={!schoolChanged}
-                style={styles.saveButton}
-              >
-                Assign School
-              </Button>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </KeyboardAvoidingView>
+        {schools.map((school) => (
+          <SchoolOption
+            key={school.id}
+            label={school.name}
+            selected={selectedSchoolId === school.id}
+            onPress={() => setSelectedSchoolId(school.id)}
+          />
+        ))}
+      </View>
 
       {/* Nested, not a sibling. iOS presents a Modal from the nearest
           UIViewController up the responder chain, so a sibling presents from
           the root VC — already presenting this sheet — and UIKit silently
           refuses. See the matching note in ParentListSheet. */}
       <ConfirmDialog
-        visible={confirmingRole}
-        title="Change role"
-        message={`Change ${user.full_name} to ${selectedRoleLabel}? This changes what they can access.`}
-        confirmLabel="Change role"
+        visible={confirmingAdmin}
+        title="Make this person an admin?"
+        message={`${user.full_name} will be able to see and change every school, every person and every order on Hive.`}
+        confirmLabel="Make admin"
         destructive
-        onConfirm={confirmSaveRole}
-        onCancel={() => setConfirmingRole(false)}
+        onConfirm={confirmAdmin}
+        onCancel={() => setConfirmingAdmin(false)}
       />
-    </Modal>
+    </BottomSheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// School option
+//
+// A selected row is marked by a tick and a recessed ground, not by a coloured
+// border: the tick is the one mark that means "this one" everywhere in the app,
+// and a hue would be the third thing on this sheet trying to say the same word.
+// ---------------------------------------------------------------------------
+
+function SchoolOption({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.schoolOption,
+        selected && styles.schoolOptionSelected,
+        pressed && styles.schoolOptionPressed,
+      ]}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      accessibilityLabel={label}
+    >
+      <Text
+        variant={selected ? 'bodyBold' : 'body'}
+        numberOfLines={1}
+        style={styles.schoolName}
+      >
+        {label}
+      </Text>
+
+      {selected && (
+        <Ionicons name="checkmark" size={19} color={colors.text.accent} />
+      )}
+    </Pressable>
   );
 }
 
@@ -305,90 +277,43 @@ export function UserEditSheet({
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  keyboardView: {
-    flex: 1,
-  },
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: colors.overlay.scrim,
-  },
-  sheet: {
-    backgroundColor: colors.background.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingBottom: spacing.lg,
-    maxHeight: '85%',
-  },
-  handleBar: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border.default,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  header: {
+  identity: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    marginBottom: spacing.lg,
+    paddingBottom: spacing.lg,
   },
-  headerInfo: {
+  identityText: {
     flex: 1,
-    gap: 2,
+    gap: spacing.xxs,
   },
-  sectionLabel: {
+  sectionHeader: {
     marginBottom: spacing.sm,
-    marginTop: spacing.md,
+    marginTop: spacing.lg,
   },
-  roleList: {
-    gap: spacing.sm,
+  roleNote: {
+    marginTop: spacing.sm,
   },
-  roleOption: {
+  schoolList: {
+    gap: spacing.xs,
+    paddingBottom: spacing.md,
+  },
+  schoolOption: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    borderRadius: layout.inputRadius,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-    backgroundColor: colors.background.surface,
+    minHeight: MIN_TAP_SIZE,
+    borderRadius: radius.sm,
   },
-  roleOptionSelected: {
-    borderColor: colors.primary.amber,
-    backgroundColor: colors.primary.amber + '0D',
+  schoolOptionSelected: {
+    backgroundColor: colors.background.surfaceSecondary,
   },
-  radioOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: colors.gray[400],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioOuterSelected: {
-    borderColor: colors.primary.amber,
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.primary.amber,
+  schoolOptionPressed: {
+    backgroundColor: colors.gray[100],
   },
   schoolName: {
     flex: 1,
-  },
-  saveButton: {
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
   },
 });
 

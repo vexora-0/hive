@@ -1,28 +1,39 @@
-import React, { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, RefreshControl, StyleSheet, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, layout } from '@/theme';
+import { colors, spacing, radius, layout } from '@/theme';
 import { ScreenContainer } from '@/components/layout/ScreenContainer';
 import { HeaderBar } from '@/components/navigation/HeaderBar';
 import { TextInput, Chip } from '@/components/ui';
-import { EmptyState } from '@/components/feedback';
+import { EmptyState, SkeletonShimmer } from '@/components/feedback';
 import { UserListItem } from '@/features/admin/components/UserListItem';
-import { UserEditSheet } from '@/features/admin/components/UserEditSheet';
+import {
+  UserEditSheet,
+  type UserChanges,
+} from '@/features/admin/components/UserEditSheet';
 import { useAdminUsers } from '@/features/admin/hooks/useAdminUsers';
 import { useAdminSchools } from '@/features/admin/hooks/useAdminSchools';
 import type { AdminUser } from '@/features/admin/services/adminService';
 import type { UserRole } from '@/types/supabase';
 
 // ---------------------------------------------------------------------------
-// Filter chip configuration
+// Filters
+//
+// Four labelled pills, which is the cap. Icon-only filters and a fifth pill
+// both fail for the same reason: the strip stops being readable at a glance,
+// which is the only thing a filter strip has to be.
+//
+// **All four have to be visible at rest.** The strip used to be a horizontal
+// scroller, so at 390pt the fourth pill was sliced down the middle and read
+// "Adm…" — and a word cut in half is the loudest possible signal that a screen
+// is broken, whether or not it scrolls. Measured at 390: the four pills wanted
+// 453pt against 390 available. "Everyone" became "All" — the word the brief
+// gives the same idea on the parent feed's child switcher, and 47pt narrower —
+// and the pills take the denser `ms` inset a four-up strip needs, 8pt narrower
+// each. That lands the strip at 372pt, inside 390 with room to spare. The
+// screen's own eyebrow already says whom the list is of.
 // ---------------------------------------------------------------------------
 
 const ROLE_FILTERS: Array<{ label: string; value: UserRole | undefined }> = [
@@ -33,12 +44,49 @@ const ROLE_FILTERS: Array<{ label: string; value: UserRole | undefined }> = [
 ];
 
 // ---------------------------------------------------------------------------
+// Skeleton
+//
+// Shaped like `UserListItem` — a 44pt circle, then the three lines the row
+// actually has: a name, an email, and the school it belongs to. At the row's
+// own height, so the list does not reflow when the people land. The 200ms delay
+// is served inside `SkeletonShimmer`.
+// ---------------------------------------------------------------------------
+
+function PeopleSkeleton() {
+  return (
+    <View>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <View key={i} style={styles.skeletonRow}>
+          <SkeletonShimmer width={44} height={44} borderRadius={radius.pill} index={i} />
+          <View style={styles.skeletonText}>
+            <SkeletonShimmer width="55%" height={15} borderRadius={radius.xs} index={i} />
+            <SkeletonShimmer width="78%" height={13} borderRadius={radius.xs} index={i} />
+            <SkeletonShimmer width="42%" height={11} borderRadius={radius.xs} index={i} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
 /**
- * Admin users screen with search, role filters, infinite-scroll user list,
- * and a bottom-sheet editor for updating user roles.
+ * People — everyone who has ever signed in, and the two things about them an
+ * admin can change from a phone.
+ *
+ * Every row leads with a person: their photograph or their initials, then their
+ * name, then the school they belong to. The same fields laid out as User ID /
+ * Email / Role / School / Created At would read as a table export at identical
+ * spacing, and that is the difference between a companion and a console.
+ *
+ * **This screen has no primary action, and that is deliberate.** People arrive
+ * in Hive by signing in; there is no invite endpoint, so a "Add someone" button
+ * would be a dead CTA — the one thing worse than no button. What the screen
+ * offers instead is the search field, and a row that opens onto the only two
+ * decisions there are.
  */
 export default function UsersScreen() {
   const {
@@ -62,6 +110,13 @@ export default function UsersScreen() {
 
   const { schools } = useAdminSchools();
 
+  /** School names by id, so a row can say "Sunshine" instead of a UUID. */
+  const schoolNames = useMemo(() => {
+    const map = new Map<string, string>();
+    schools.forEach((school) => map.set(school.id, school.name));
+    return map;
+  }, [schools]);
+
   // ── Edit sheet state ──────────────────────────────────────────────
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
@@ -76,32 +131,40 @@ export default function UsersScreen() {
     setSelectedUser(null);
   }, []);
 
-  // Failures are reported by the toast in useAdminUsers. Catching stops the
-  // rejection escaping unhandled, and leaves the sheet open on failure — a
-  // sheet that closes on a rejected role change reads as success.
-  const handleSaveRole = useCallback(
-    async (userId: string, role: UserRole) => {
+  /**
+   * Applies both changes, in the order that leaves the account coherent if the
+   * second one fails: the role first, then the school it belongs to.
+   *
+   * Both outcomes are announced by the toasts inside `useAdminUsers` — success
+   * as well as failure — so this says nothing of its own; a third toast on top
+   * of "Role updated" and "School assigned" is noise, not confirmation.
+   * Catching stops the rejection escaping unhandled and leaves the sheet open,
+   * because a sheet that closes on a rejected change reads as success.
+   */
+  const handleSave = useCallback(
+    async (userId: string, changes: UserChanges) => {
       try {
-        await updateRole(userId, role);
+        if (changes.role) {
+          await updateRole(userId, changes.role);
+        }
+        if ('schoolId' in changes) {
+          await assignSchool(userId, changes.schoolId ?? null);
+        }
         handleSheetClose();
       } catch {
         // Surfaced by the hook's onError toast.
       }
     },
-    [updateRole, handleSheetClose],
+    [updateRole, assignSchool, handleSheetClose],
   );
 
-  const handleAssignSchool = useCallback(
-    async (userId: string, schoolId: string | null) => {
-      try {
-        await assignSchool(userId, schoolId);
-        handleSheetClose();
-      } catch {
-        // Surfaced by the hook's onError toast.
-      }
-    },
-    [assignSchool, handleSheetClose],
-  );
+  // ── Filters ───────────────────────────────────────────────────────
+  const isFiltered = Boolean(search.trim() || roleFilter);
+
+  const clearFilters = useCallback(() => {
+    setSearch('');
+    setRoleFilter(undefined);
+  }, [setSearch, setRoleFilter]);
 
   // ── List handlers ─────────────────────────────────────────────────
   const handleEndReached = useCallback(() => {
@@ -112,15 +175,16 @@ export default function UsersScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: AdminUser }) => (
-      <UserListItem user={item} onPress={handleUserPress} />
+      <UserListItem
+        user={item}
+        schoolName={item.school_id ? schoolNames.get(item.school_id) : undefined}
+        onPress={handleUserPress}
+      />
     ),
-    [handleUserPress],
+    [handleUserPress, schoolNames],
   );
 
-  const renderSeparator = useCallback(
-    () => <View style={styles.separator} />,
-    [],
-  );
+  const renderSeparator = useCallback(() => <View style={styles.separator} />, []);
 
   const renderFooter = useCallback(() => {
     if (!isFetchingNextPage) return null;
@@ -131,12 +195,53 @@ export default function UsersScreen() {
     );
   }, [isFetchingNextPage]);
 
+  // The four states, in the order they can occur. A failed request is never
+  // dressed up as an empty list, and "nothing matched your search" is never
+  // dressed up as "nobody has ever signed in".
+  const renderEmpty = useCallback(() => {
+    if (isLoading) return <PeopleSkeleton />;
+
+    if (isError) {
+      return (
+        <EmptyState
+          variant="error"
+          title="Couldn't load people."
+          message="Check your connection and try again."
+          action={{ label: 'Try again', onPress: () => refetch() }}
+        />
+      );
+    }
+
+    if (isFiltered) {
+      return (
+        <EmptyState
+          variant="filtered"
+          title="Nobody matched."
+          message={
+            search.trim()
+              ? `No one here is called "${search.trim()}".`
+              : 'No one holds that role yet.'
+          }
+          action={{ label: 'Clear filters', onPress: clearFilters }}
+        />
+      );
+    }
+
+    return (
+      <EmptyState
+        variant="first-use"
+        illustration="school"
+        title="Nobody here yet."
+        message="Teachers, parents and admins appear the first time they sign in."
+      />
+    );
+  }, [isLoading, isError, isFiltered, search, refetch, clearFilters]);
+
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
-      <HeaderBar large title="People" eyebrow="Teachers, parents and admins" />
+      <HeaderBar large title="People" eyebrow="Everyone who has signed in" />
 
       <View style={styles.container}>
-        {/* Search bar */}
         <View style={styles.searchContainer}>
           <TextInput
             placeholder="Search by name or email"
@@ -144,40 +249,37 @@ export default function UsersScreen() {
             onChangeText={setSearch}
             autoCapitalize="none"
             autoCorrect={false}
-            leftIcon={
-              <Ionicons name="search" size={18} color={colors.text.tertiary} />
-            }
-            containerStyle={styles.searchInput}
+            leftIcon={<Ionicons name="search" size={18} color={colors.text.tertiary} />}
           />
         </View>
 
-        {/* Role filter chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll}
-          contentContainerStyle={styles.filterRow}
-        >
+        {/* A wrapping row, not a scroller: there are exactly four filters and
+            there will never be a fifth, so nothing here needs to be reachable
+            by dragging. At a larger text size the last pill drops to a second
+            line, which is legible; sliced in half, it was not. */}
+        <View style={styles.filterRow}>
           {ROLE_FILTERS.map((filter) => (
             <Chip
               key={filter.label}
               selected={roleFilter === filter.value}
               onPress={() => setRoleFilter(filter.value)}
+              style={styles.filterChip}
             >
               {filter.label}
             </Chip>
           ))}
-        </ScrollView>
+        </View>
 
-        {/* User list */}
         <FlashList
           data={users}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           ItemSeparatorComponent={renderSeparator}
           ListFooterComponent={renderFooter}
+          ListEmptyComponent={renderEmpty}
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
@@ -188,45 +290,16 @@ export default function UsersScreen() {
             />
           }
           contentContainerStyle={styles.listContent}
-          // Without this the first paint and a genuinely empty result were
-          // both just a blank area, with nothing to say which had happened.
-          ListEmptyComponent={
-            isLoading ? (
-              <View style={styles.centered}>
-                <ActivityIndicator size="large" color={colors.primary.amberDark} />
-              </View>
-            ) : isError ? (
-              <EmptyState
-                icon="cloud-offline-outline"
-                title="Couldn't load people"
-                message="Check your connection and try again."
-                action={{ label: 'Try again', onPress: () => refetch() }}
-              />
-            ) : (
-              <EmptyState
-                icon="people-outline"
-                title={search ? 'Nothing matched' : 'Nobody here yet'}
-                message={
-                  search
-                    ? `No one matched "${search}". Try a different name or email.`
-                    : 'People appear here once they sign in for the first time.'
-                }
-              />
-            )
-          }
         />
       </View>
 
-      {/* User edit bottom sheet */}
       <UserEditSheet
         user={selectedUser}
         isVisible={sheetVisible}
         schools={schools}
         onClose={handleSheetClose}
-        onSaveRole={handleSaveRole}
-        onAssignSchool={handleAssignSchool}
-        isSavingRole={isUpdatingRole}
-        isAssigningSchool={isAssigningSchool}
+        onSave={handleSave}
+        isSaving={isUpdatingRole || isAssigningSchool}
       />
     </ScreenContainer>
   );
@@ -244,29 +317,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: layout.screenPaddingHorizontal,
     paddingBottom: spacing.ms,
   },
-  searchInput: {
-    // TextInput component handles its own width
-  },
-  // react-native-web gives a ScrollView flex: 1, so without this the chip row
-  // stretches down the page and pushes the list to the bottom of the screen.
-  // Native sizes it to content, which is why this only showed up in a browser.
-  filterScroll: {
-    flexGrow: 0,
-    flexShrink: 0,
-  },
   filterRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     paddingHorizontal: layout.screenPaddingHorizontal,
     paddingBottom: spacing.md,
   },
+  /** Four abreast at 390pt needs the denser inset — see the note on
+   *  `ROLE_FILTERS`. A pill on its own keeps the component's `md`. */
+  filterChip: {
+    paddingHorizontal: spacing.ms,
+  },
   listContent: {
     paddingBottom: layout.tabBarClearance,
-  },
-  centered: {
-    paddingVertical: spacing.xxl,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   separator: {
     height: StyleSheet.hairlineWidth,
@@ -276,5 +340,19 @@ const styles = StyleSheet.create({
   footer: {
     paddingVertical: spacing.lg,
     alignItems: 'center',
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.ms,
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    paddingVertical: spacing.ms,
+    // 93 = the real row: a 27pt name line, a 21pt email, a 17pt caption, their
+    // 2pt gaps and 12pt of padding top and bottom.
+    minHeight: 93,
+  },
+  skeletonText: {
+    flex: 1,
+    gap: spacing.sm,
   },
 });

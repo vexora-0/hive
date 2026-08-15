@@ -5,47 +5,40 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, radius, layout, STALE_TIME_MS } from '@/theme';
+import { colors, spacing, layout, STALE_TIME_MS } from '@/theme';
 import { ScreenContainer } from '@/components/layout';
-import { SkeletonShimmer, EmptyState, useToast } from '@/components/feedback';
+import { EmptyState, useToast } from '@/components/feedback';
 import { HeaderBar } from '@/components/navigation';
 import { HoneycombFAB } from '@/components/animation';
 import { getPhotoDetails } from '@/features/parent/services/parentService';
 
 import { useOrders } from '@/features/orders/hooks/useOrders';
-import { OrderHistoryCard } from '@/features/orders/components/OrderHistoryCard';
+import {
+  OrderHistoryCard,
+  OrderHistoryCardSkeleton,
+} from '@/features/orders/components/OrderHistoryCard';
 import { OrderDetailSheet } from '@/features/orders/components/OrderDetailSheet';
 import { OrderBottomSheet } from '@/features/orders/components/OrderBottomSheet';
 import type { OrderWithItems } from '@/features/orders/services/orderService';
 
 // ---------------------------------------------------------------------------
-// Skeleton loader
+// Loading
 // ---------------------------------------------------------------------------
 
-function OrderSkeleton() {
-  return (
-    <View style={styles.skeletonCard}>
-      <View style={styles.skeletonTopRow}>
-        <SkeletonShimmer width={100} height={14} borderRadius={4} />
-        <SkeletonShimmer width={80} height={22} borderRadius={11} />
-      </View>
-      <View style={styles.skeletonMiddleRow}>
-        <SkeletonShimmer width={120} height={14} borderRadius={4} />
-        <SkeletonShimmer width={60} height={14} borderRadius={4} />
-      </View>
-      <View style={styles.skeletonBottomRow}>
-        <SkeletonShimmer width={40} height={16} borderRadius={4} />
-        <SkeletonShimmer width={70} height={18} borderRadius={4} />
-      </View>
-    </View>
-  );
-}
-
+/**
+ * Five of the real card, with the words missing.
+ *
+ * This screen used to hand-roll its own three-bar placeholder, and it had
+ * drifted from the card it stood in for — different padding, different radius,
+ * a row the card does not have — so the list visibly relaid itself the moment
+ * the orders arrived. `OrderHistoryCardSkeleton` lives beside the component it
+ * mirrors, which is the only arrangement in which the two stay in step.
+ */
 function OrderSkeletonList() {
   return (
-    <View style={styles.skeletonContainer}>
+    <View style={styles.skeletonList}>
       {Array.from({ length: 5 }).map((_, i) => (
-        <OrderSkeleton key={i} />
+        <OrderHistoryCardSkeleton key={i} index={i} />
       ))}
     </View>
   );
@@ -56,14 +49,16 @@ function OrderSkeletonList() {
 // ---------------------------------------------------------------------------
 
 /**
- * Orders screen -- displays the parent's full order history.
+ * The parent's orders.
  *
- * Features:
- * - FlashList of OrderHistoryCards with infinite scroll
- * - Pull-to-refresh
- * - Skeleton loading state while the first page loads
- * - Empty state with a helpful message
- * - Tap a card to open OrderDetailSheet
+ * Four states, as every list owes: the skeleton above, an **error with a
+ * retry**, an empty state that does not pretend to be one, and the orders
+ * themselves. The error state is the one that was missing: a failed request
+ * raised a toast and then showed "No orders yet", which tells a parent whose
+ * connection dropped that the print they placed last week does not exist.
+ *
+ * Ordering does not start here. It starts at the photograph — the FAB leads
+ * back to the feed rather than opening a second, worse gallery.
  */
 export default function OrdersScreen() {
   const { photoId } = useLocalSearchParams<{ photoId?: string }>();
@@ -73,6 +68,7 @@ export default function OrdersScreen() {
   const {
     data,
     isLoading,
+    isError,
     isRefetching,
     refetch,
     fetchNextPage,
@@ -87,10 +83,7 @@ export default function OrdersScreen() {
   const [orderPhotoId, setOrderPhotoId] = useState<string | null>(null);
 
   // Fetch photo details when photoId is provided (need URI for OrderBottomSheet)
-  const {
-    data: photoForOrder,
-    isError: photoForOrderError,
-  } = useQuery({
+  const { data: photoForOrder, isError: photoForOrderError } = useQuery({
     queryKey: ['photo-for-order', orderPhotoId],
     queryFn: () => getPhotoDetails(orderPhotoId!),
     enabled: !!orderPhotoId,
@@ -98,7 +91,7 @@ export default function OrdersScreen() {
   });
 
   // The sheet only opens once the photo has loaded, so a failed lookup used to
-  // mean the parent tapped "Order Print", landed on this tab, and nothing at
+  // mean the parent tapped "Order a print", landed on this tab, and nothing at
   // all happened — no sheet, no message.
   useEffect(() => {
     if (photoForOrderError && orderPhotoId) {
@@ -127,8 +120,8 @@ export default function OrdersScreen() {
     refetch();
   }, [router, refetch]);
 
-  const handleNewOrder = useCallback(() => {
-    router.push('/(parent)/feed' as any);
+  const handleBrowsePhotos = useCallback(() => {
+    router.push('/(parent)/feed' as never);
   }, [router]);
 
   // Flatten paginated data into a single array
@@ -167,25 +160,44 @@ export default function OrdersScreen() {
   // ── Footer loader for infinite scroll ────────────────────────────
   const renderFooter = useCallback(() => {
     if (!isFetchingNextPage) return null;
-    return (
-      <View style={styles.footerLoader}>
-        <OrderSkeleton />
-      </View>
-    );
+    return <OrderHistoryCardSkeleton />;
   }, [isFetchingNextPage]);
 
-  // ── Empty state ──────────────────────────────────────────────────
+  // ── Empty and failed ─────────────────────────────────────────────
   const renderEmpty = useCallback(() => {
     if (isLoading) return null;
+
+    // The host view is load-bearing: FlashList drops the empty component
+    // straight into the scroll content, where `EmptyState`'s own `flex: 1`
+    // resolves against a container sized by its content and collapses the
+    // panel to nothing. The floor gives it something to fill.
     return (
-      <EmptyState
-        icon="bag-handle-outline"
-        title="No orders yet"
-        message="Open a photo and tap “Order a print”. Anything you order shows up here with its progress."
-        action={{ label: 'Browse photos', onPress: handleNewOrder }}
-      />
+      <View style={styles.emptyHost}>
+        {isError ? (
+          // A failed request is not an empty history. It gets its own state,
+          // and the way out is a retry rather than a toast that has already
+          // gone.
+          <EmptyState
+            variant="error"
+            title="Couldn't load your orders."
+            message="It may just be the connection. Try again in a moment."
+            action={{ label: 'Try again', onPress: () => refetch() }}
+          />
+        ) : (
+          // First use, and deliberately without a button: the way to start an
+          // order is to open a photograph, and a "Browse photos" button here
+          // would be the second-best route to it while the FAB is already the
+          // first.
+          <EmptyState
+            variant="first-use"
+            illustration="prints"
+            title="No orders yet."
+            message="Open a photo you love and tap “Order a print”. Anything you order turns up here, with its progress."
+          />
+        )}
+      </View>
     );
-  }, [isLoading, handleNewOrder]);
+  }, [isLoading, isError, refetch]);
 
   // ── Main render ──────────────────────────────────────────────────
   const orderCount = orders.length;
@@ -218,20 +230,20 @@ export default function OrdersScreen() {
               <RefreshControl
                 refreshing={isRefetching}
                 onRefresh={handleRefresh}
+                // The readable marigold: `primary.amber` is 2.03:1 and a
+                // spinner drawn in it disappears against paper.
                 tintColor={colors.primary.amberDark}
                 colors={[colors.primary.amberDark]}
                 progressBackgroundColor={colors.background.surface}
               />
             }
             contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
           />
         )}
 
         {/* Order detail bottom sheet */}
-        <OrderDetailSheet
-          orderId={selectedOrderId}
-          onClose={handleDetailClose}
-        />
+        <OrderDetailSheet orderId={selectedOrderId} onClose={handleDetailClose} />
 
         {/* Order creation bottom sheet */}
         <OrderBottomSheet
@@ -241,11 +253,12 @@ export default function OrdersScreen() {
           onClose={handleOrderSheetClose}
         />
 
-        {/* Every order starts from a photo, so the FAB goes to the feed. */}
+        {/* Every order starts from a photograph, so the one persistent action
+            on this screen leads back to the wall. */}
         <HoneycombFAB
-          onPress={handleNewOrder}
-          accessibilityLabel="Order from a photo"
-          icon={<Ionicons name="add" size={26} color={colors.ink[900]} />}
+          onPress={handleBrowsePhotos}
+          accessibilityLabel="Browse photos to order a print"
+          icon={<Ionicons name="images-outline" size={24} color={colors.ink[900]} />}
         />
       </View>
     </ScreenContainer>
@@ -262,42 +275,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.cream,
   },
   listContent: {
+    paddingTop: spacing.sm,
     paddingBottom: layout.tabBarClearance,
   },
-
-  // Skeleton
-  skeletonContainer: {
+  skeletonList: {
     paddingTop: spacing.sm,
   },
-  skeletonCard: {
-    backgroundColor: colors.background.surface,
-    marginHorizontal: layout.screenPaddingHorizontal,
-    marginBottom: spacing.ms,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    gap: spacing.ms,
-  },
-  skeletonTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  skeletonMiddleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  skeletonBottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
-  },
 
-  // Footer
-  footerLoader: {
-    paddingVertical: spacing.sm,
+  /**
+   * A floor under the empty and error states — see the note at the call site.
+   * Without it FlashList's empty component resolves to zero height and the
+   * state is perfectly correct and perfectly invisible.
+   */
+  emptyHost: {
+    minHeight: 420,
   },
 });

@@ -1,23 +1,29 @@
 import React, { useCallback } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, radius } from '@/theme';
+import { colors, spacing, radius, MIN_TAP_SIZE } from '@/theme';
 import { Text } from '@/components/ui/Text';
-import { Button } from '@/components/ui/Button';
+import { Avatar } from '@/components/ui/Avatar';
+import { BottomSheet, EmptyState } from '@/components/feedback';
 import type { TeacherOption } from '@/features/admin/services/adminService';
-import { Modal } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export interface AssignTeacherSheetProps {
+  /** Whether the sheet is visible. */
   isVisible: boolean;
+  /** Everyone at the school who holds the teacher role. */
   teachers: TeacherOption[];
+  /** Who has the class today, or null. */
   currentTeacherId: string | null;
+  /** Called when the sheet is dismissed. */
   onClose: () => void;
+  /** Called with the chosen teacher, or null to leave the class unassigned. */
   onSelect: (teacherId: string | null) => void;
+  /** Whether the change is in flight. */
   isSubmitting?: boolean;
 }
 
@@ -25,6 +31,18 @@ export interface AssignTeacherSheetProps {
 // Component
 // ---------------------------------------------------------------------------
 
+/**
+ * `<AssignTeacherSheet>` — who has this class.
+ *
+ * A choice, not a form: the tap *is* the decision, so there is no Save and no
+ * Cancel button underneath it. The change is reversible in the same two taps,
+ * which is exactly the case the brief says should be stated rather than
+ * confirmed in advance.
+ *
+ * Every option leads with the teacher — their photograph or their initials —
+ * because a list of names in a school has duplicates in it, and an email
+ * address in secondary ink is what tells two Priyas apart.
+ */
 export function AssignTeacherSheet({
   isVisible,
   teachers,
@@ -41,94 +59,75 @@ export function AssignTeacherSheet({
   );
 
   return (
-    <Modal
+    <BottomSheet
       visible={isVisible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
+      title="Who teaches this class?"
+      subtitle="They will be able to upload and tag photographs of these children."
+      scroll
+      showClose
     >
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.handleBar} />
-          <View style={styles.content}>
-            <Text variant="h3" style={styles.title}>
-              Assign Teacher
-            </Text>
-
-            <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-              {/* Unassign option */}
+      {teachers.length === 0 ? (
+        <EmptyState
+          compact
+          variant="first-use"
+          title="No teachers here yet."
+          message="Give someone the teacher role under People, and they will appear in this list."
+        />
+      ) : (
+        <View style={styles.list}>
+          {teachers.map((teacher) => {
+            const selected = currentTeacherId === teacher.id;
+            return (
               <Pressable
-                onPress={() => handleSelect(null)}
-                style={[
+                key={teacher.id}
+                onPress={() => handleSelect(teacher.id)}
+                disabled={isSubmitting}
+                style={({ pressed }) => [
                   styles.option,
-                  currentTeacherId === null && styles.optionSelected,
+                  selected && styles.optionSelected,
+                  pressed && styles.optionPressed,
                 ]}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected, disabled: isSubmitting }}
+                accessibilityLabel={teacher.full_name}
               >
-                <Ionicons
-                  name="close-circle-outline"
-                  size={20}
-                  color={colors.text.secondary}
-                />
+                <Avatar name={teacher.full_name} size="sm" />
+
                 <View style={styles.optionText}>
-                  <Text variant="body" color={colors.text.secondary}>
-                    No teacher (unassign)
+                  <Text variant={selected ? 'bodyBold' : 'body'} numberOfLines={1}>
+                    {teacher.full_name}
+                  </Text>
+                  <Text variant="caption" muted numberOfLines={1}>
+                    {teacher.email}
                   </Text>
                 </View>
-                {currentTeacherId === null && (
-                  <Ionicons name="checkmark" size={20} color={colors.primary.amberDark} />
+
+                {selected && (
+                  <Ionicons name="checkmark" size={19} color={colors.text.accent} />
                 )}
               </Pressable>
+            );
+          })}
 
-              {teachers.map((teacher) => (
-                <Pressable
-                  key={teacher.id}
-                  onPress={() => handleSelect(teacher.id)}
-                  style={[
-                    styles.option,
-                    currentTeacherId === teacher.id && styles.optionSelected,
-                  ]}
-                >
-                  <Ionicons
-                    name="person-outline"
-                    size={20}
-                    color={currentTeacherId === teacher.id ? colors.primary.amberDark : colors.text.primary}
-                  />
-                  <View style={styles.optionText}>
-                    <Text
-                      variant="body"
-                      color={currentTeacherId === teacher.id ? colors.primary.amberDark : colors.text.primary}
-                    >
-                      {teacher.full_name}
-                    </Text>
-                    <Text variant="bodySmall" color={colors.text.secondary}>
-                      {teacher.email}
-                    </Text>
-                  </View>
-                  {currentTeacherId === teacher.id && (
-                    <Ionicons name="checkmark" size={20} color={colors.primary.amberDark} />
-                  )}
-                </Pressable>
-              ))}
-
-              {teachers.length === 0 && (
-                <Text variant="body" color={colors.text.secondary} center style={styles.empty}>
-                  No teachers available
-                </Text>
-              )}
-            </ScrollView>
-
-            <Button
-              variant="outline"
-              size="md"
-              onPress={onClose}
-              style={styles.cancelButton}
+          {/* Unassigning is a correction rather than a choice, so it sits under
+              the list in quieter ink instead of competing at the top of it. */}
+          {currentTeacherId !== null && (
+            <Pressable
+              onPress={() => handleSelect(null)}
+              disabled={isSubmitting}
+              style={({ pressed }) => [styles.unassign, pressed && styles.optionPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Leave this class without a teacher"
             >
-              Cancel
-            </Button>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+              <Text variant="bodySmallBold" muted>
+                Leave it unassigned
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+    </BottomSheet>
   );
 }
 
@@ -137,56 +136,35 @@ export function AssignTeacherSheet({
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: colors.overlay.scrim,
-  },
-  sheet: {
-    backgroundColor: colors.background.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingBottom: spacing.lg,
-    maxHeight: '70%',
-  },
-  handleBar: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border.default,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  title: {
-    marginBottom: spacing.md,
-  },
   list: {
-    maxHeight: 300,
+    gap: spacing.xs,
+    paddingBottom: spacing.sm,
   },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.md,
-    borderRadius: 12,
-    marginBottom: spacing.xs,
+    gap: spacing.ms,
+    paddingHorizontal: spacing.ms,
+    paddingVertical: spacing.sm,
+    minHeight: MIN_TAP_SIZE,
+    borderRadius: radius.sm,
   },
   optionSelected: {
-    backgroundColor: colors.primary.amberLight + '20',
+    backgroundColor: colors.background.surfaceSecondary,
+  },
+  optionPressed: {
+    backgroundColor: colors.gray[100],
   },
   optionText: {
     flex: 1,
+    gap: spacing.xxs,
   },
-  empty: {
-    paddingVertical: spacing.xl,
-  },
-  cancelButton: {
-    marginTop: spacing.md,
+  unassign: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: MIN_TAP_SIZE,
+    marginTop: spacing.xs,
   },
 });
+
+export default AssignTeacherSheet;
