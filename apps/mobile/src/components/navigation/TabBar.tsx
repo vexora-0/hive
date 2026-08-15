@@ -30,13 +30,32 @@ import { useUnreadCount } from '@/features/notifications/hooks/useNotifications'
 // ---------------------------------------------------------------------------
 
 const BAR_HEIGHT = layout.tabBarHeight;
-const PUCK_SIZE = 38;
+const ICON_SIZE = 22;
+const LABEL_LINE = 13;
+const TAB_PAD_TOP = spacing.sm;
+const TAB_PAD_BOTTOM = spacing.xs + 2;
 /**
- * Where the icon's centre lands inside the bar, given the tab's own padding
- * and gap below. The puck is centred on the same point rather than on the bar,
- * so it sits behind the icon and not behind the icon-and-label pair.
+ * Clearance between icon and label.
+ *
+ * The puck is a circle drawn around a 22px icon, so it reaches
+ * (PUCK_SIZE - ICON_SIZE) / 2 below the icon. The gap has to exceed that or
+ * the puck sits on top of the label — which it did: a 38px puck reached 8px
+ * past a 22px icon into a 3px gap, overlapping the text by 5px.
  */
-const ICON_CENTER_Y = 24;
+const ICON_LABEL_GAP = 8;
+const PUCK_SIZE = 32;
+
+/**
+ * Where the icon's centre lands inside the bar.
+ *
+ * Derived rather than hardcoded. It has to track the padding, gap and label
+ * height exactly, and the previous fixed value silently stopped matching them.
+ */
+const CONTENT_HEIGHT = ICON_SIZE + ICON_LABEL_GAP + LABEL_LINE;
+const ICON_CENTER_Y =
+  TAB_PAD_TOP +
+  (BAR_HEIGHT - TAB_PAD_TOP - TAB_PAD_BOTTOM - CONTENT_HEIGHT) / 2 +
+  ICON_SIZE / 2;
 
 type TabRoute = BottomTabBarProps['state']['routes'][number];
 
@@ -73,6 +92,11 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const visibleIndex = visibleRoutes.findIndex((r) => r.key === currentRoute?.key);
   const activeIndex = visibleIndex >= 0 ? visibleIndex : 0;
 
+  // A hidden route is a full-screen destination, not a tab. `href: null` keeps
+  // it out of the tab list but still draws the bar over it, which left the
+  // photo viewer with a navigation bar and a stray puck across the image.
+  const onHiddenRoute = HIDDEN_TAB_NAMES.includes(currentRoute?.name as string);
+
   // Tab width is only known after layout, so the puck stays hidden until then
   // rather than flashing at x=0 and sliding into place on first paint.
   const [tabWidth, setTabWidth] = useState(0);
@@ -102,6 +126,8 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     opacity: puckReady.value,
     transform: [{ translateX: puckX.value }],
   }));
+
+  if (onHiddenRoute) return null;
 
   return (
     <View
@@ -204,7 +230,7 @@ function Tab({
         {icon?.({
           focused,
           color: focused ? colors.ink[900] : colors.text.onInkMuted,
-          size: 22,
+          size: ICON_SIZE,
         })}
         {badgeCount > 0 && (
           <View style={styles.badge}>
@@ -262,12 +288,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: MIN_TAP_SIZE,
     height: BAR_HEIGHT,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xs + 2,
-    gap: 3,
+    paddingTop: TAB_PAD_TOP,
+    paddingBottom: TAB_PAD_BOTTOM,
+    paddingHorizontal: 2,
+    gap: ICON_LABEL_GAP,
+    // Lets the tab shrink below its label's intrinsic width, so a long label
+    // ellipsizes inside its own slot instead of spilling past the bar.
+    minWidth: 0,
+    overflow: 'hidden',
   },
   label: {
     textAlign: 'center',
+    alignSelf: 'stretch',
   },
   badge: {
     position: 'absolute',
