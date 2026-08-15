@@ -1,18 +1,18 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   StyleSheet,
+  useWindowDimensions,
   View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, radius, layout, fontFamily, MIN_TAP_SIZE } from '@/theme';
+import { colors, spacing, layout, MIN_TAP_SIZE } from '@/theme';
 import { Text } from '@/components/ui';
-import { Modal } from '@/components/feedback';
+import { BottomSheet } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,14 +46,36 @@ export interface ClassSelectorProps {
 }
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/**
+ * How tall the list of classes may grow.
+ *
+ * The sheet's own ceiling is a fraction of the window, but a `FlatList` with no
+ * bound of its own does not shrink to fit it — RN's default `flexShrink` is 0,
+ * so an unbounded list inside a clamped parent overflows and clips instead of
+ * scrolling. The bound therefore goes on the list itself. Half the window on a
+ * small phone, 360 on anything larger, which is seven or eight classes visible
+ * at once — past that a teacher is scrolling either way.
+ */
+const LIST_MAX_HEIGHT = 360;
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 /**
- * `<ClassSelector>` -- dropdown-style picker backed by a bottom sheet.
+ * `<ClassSelector>` — a disclosure control that opens the class list in a sheet.
  *
- * Shows the selected class name (with grade context) in a pressable trigger.
- * Tapping opens a `@gorhom/bottom-sheet` list of all available classes.
+ * The trigger is a recessed well rather than an outlined box, so it matches
+ * `<TextInput>`: at rest it is a sunk paper tone, and pressing raises it. A
+ * form of three quiet wells reads better than a grid of empty rectangles.
+ *
+ * The sheet is `@/components/feedback/BottomSheet` — this component used to
+ * hand-roll its own backdrop, 65%-tall panel and 40×4 handle, one of fourteen
+ * such copies in the app, each with a different height ceiling and two
+ * different grounds between them.
  *
  * ```tsx
  * <ClassSelector
@@ -74,6 +96,7 @@ export function ClassSelector({
   style,
 }: ClassSelectorProps) {
   const [sheetVisible, setSheetVisible] = useState(false);
+  const { height: windowHeight } = useWindowDimensions();
 
   const selectedClass = useMemo(
     () => classes.find((c) => c.id === selectedId) ?? null,
@@ -92,6 +115,10 @@ export function ClassSelector({
   );
 
   // ── List item renderer ───────────────────────────────────────────────
+  //
+  // Rows run the full width of the sheet and carry their own padding, so the
+  // selected band is a full-width wash rather than a floating pill. Their text
+  // starts on the same margin as the sheet's title.
   const renderItem = useCallback(
     ({ item }: { item: ClassItem }) => {
       const isSelected = item.id === selectedId;
@@ -106,12 +133,14 @@ export function ClassSelector({
           ]}
           accessibilityRole="button"
           accessibilityState={{ selected: isSelected }}
+          accessibilityLabel={
+            item.grade ? `${item.name}, ${item.grade}` : item.name
+          }
         >
           <View style={styles.listItemContent}>
             <Text
-              variant="body"
-              color={isSelected ? colors.primary.amberDark : colors.text.primary}
-              style={isSelected ? { fontFamily: fontFamily.bodySemiBold } : undefined}
+              variant={isSelected ? 'bodyBold' : 'body'}
+              color={isSelected ? colors.text.accent : colors.text.primary}
             >
               {item.name}
             </Text>
@@ -123,11 +152,12 @@ export function ClassSelector({
           </View>
 
           {isSelected && (
-            <View style={styles.checkmark}>
-              <Text variant="body" color={colors.text.accent}>
-                {'✓'}
-              </Text>
-            </View>
+            <Ionicons
+              name="checkmark"
+              size={20}
+              color={colors.text.accent}
+              style={styles.checkmark}
+            />
           )}
         </Pressable>
       );
@@ -140,24 +170,20 @@ export function ClassSelector({
   // ── Render ───────────────────────────────────────────────────────────
   return (
     <View style={[styles.container, style]}>
-      {/* Label */}
       {label && (
-        <Text variant="bodySmallBold" color={colors.text.secondary} style={styles.label}>
+        <Text variant="label" color={colors.text.secondary} style={styles.label}>
           {label}
         </Text>
       )}
 
-      {/* Trigger button */}
       <Pressable
         onPress={handleOpen}
-        style={({ pressed }) => [
-          styles.trigger,
-          pressed && styles.triggerPressed,
-        ]}
+        style={({ pressed }) => [styles.trigger, pressed && styles.triggerPressed]}
         accessibilityRole="button"
+        accessibilityState={{ expanded: sheetVisible }}
         accessibilityLabel={
           selectedClass
-            ? `Selected class: ${selectedClass.name}${
+            ? `${label ? `${label}: ` : ''}${selectedClass.name}${
                 selectedClass.grade ? `, ${selectedClass.grade}` : ''
               }. Tap to change.`
             : placeholder
@@ -165,7 +191,7 @@ export function ClassSelector({
       >
         {selectedClass ? (
           <View style={styles.triggerContent}>
-            <Text variant="body" color={colors.text.primary} numberOfLines={1}>
+            <Text variant="bodyMedium" color={colors.text.primary} numberOfLines={1}>
               {selectedClass.name}
             </Text>
             {selectedClass.grade && (
@@ -175,55 +201,41 @@ export function ClassSelector({
             )}
           </View>
         ) : (
-          <Text variant="body" color={colors.text.tertiary}>
+          <Text variant="body" color={colors.text.tertiary} style={styles.triggerContent}>
             {placeholder}
           </Text>
         )}
 
-        {/* Chevron */}
-        <Text variant="body" color={colors.text.tertiary} style={styles.chevron}>
-          {'▾'}
-        </Text>
+        {/* One icon hand: the chevron is Ionicons like every other glyph in the
+            app. It used to be a literal down-arrow character set as text, which
+            sat on a different baseline and at a different weight from every icon
+            beside it. */}
+        <Ionicons name="chevron-down" size={18} color={colors.text.tertiary} />
       </Pressable>
 
-      <Modal
+      <BottomSheet
         visible={sheetVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={handleClose}
+        onClose={handleClose}
+        title="Select a class"
+        contentStyle={styles.sheetBody}
       >
-        <KeyboardAvoidingView
-          style={styles.keyboardView}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <Pressable style={styles.backdrop} onPress={handleClose}>
-            <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-              <View style={styles.handleBar} />
-              <View style={styles.sheetHeader}>
-                <Text variant="h4" color={colors.text.primary}>
-                  Select Class
-                </Text>
-              </View>
-
-              {classes.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Text variant="body" color={colors.text.secondary} center>
-                    No classes available
-                  </Text>
-                </View>
-              ) : (
-                <FlatList
-                  data={classes}
-                  keyExtractor={keyExtractor}
-                  renderItem={renderItem}
-                  contentContainerStyle={styles.listContent}
-                  showsVerticalScrollIndicator={false}
-                />
-              )}
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
+        {classes.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text variant="body" muted center>
+              No classes yet.
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={classes}
+            keyExtractor={keyExtractor}
+            renderItem={renderItem}
+            style={{ maxHeight: Math.min(LIST_MAX_HEIGHT, windowHeight * 0.5) }}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </BottomSheet>
     </View>
   );
 }
@@ -237,89 +249,58 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   label: {
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
   trigger: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: MIN_TAP_SIZE,
+    gap: spacing.ms,
+    // Matches the height of `<TextInput>`'s field so a label, a well and a
+    // selector stack into one column without an optical step.
+    minHeight: 52,
     borderRadius: layout.inputRadius,
     borderWidth: 1,
-    borderColor: colors.border.default,
-    backgroundColor: colors.background.surface,
+    borderColor: colors.border.light,
+    backgroundColor: colors.background.surfaceSecondary,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   triggerPressed: {
-    backgroundColor: colors.gray[50],
+    backgroundColor: colors.background.surface,
   },
   triggerContent: {
     flex: 1,
-    marginRight: spacing.sm,
   },
-  chevron: {
-    marginLeft: 'auto',
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: colors.overlay.scrim,
-  },
-  sheet: {
-    maxHeight: '65%',
-    minHeight: 200,
-    backgroundColor: colors.background.cream,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingBottom: spacing.lg,
-  },
-  handleBar: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border.default,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  sheetHeader: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border.light,
+  /** The rows own their horizontal padding, so the body gives up its own. */
+  sheetBody: {
+    paddingHorizontal: 0,
   },
   emptyState: {
     paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   listContent: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xxl,
+    paddingBottom: spacing.sm,
   },
   listItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.ms,
     minHeight: MIN_TAP_SIZE,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: layout.buttonRadius,
-    marginTop: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.ms,
   },
   listItemSelected: {
-    backgroundColor: colors.warning.background,
+    backgroundColor: colors.primary.amberWash,
   },
   listItemPressed: {
-    backgroundColor: colors.gray[100],
+    backgroundColor: colors.background.surfaceSecondary,
   },
   listItemContent: {
     flex: 1,
   },
   checkmark: {
-    marginLeft: spacing.sm,
+    marginLeft: 'auto',
   },
 });
 
