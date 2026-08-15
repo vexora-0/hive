@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   StyleSheet,
   View,
 } from 'react-native';
@@ -101,17 +100,6 @@ export default function PhotoDetailScreen() {
         onClose={handleClose}
       />
 
-      {/* Close button (overlays the PhotoViewer's own close button) */}
-      <Pressable
-        onPress={handleClose}
-        style={[styles.closeButton, { top: insets.top + spacing.sm }]}
-        hitSlop={16}
-        accessibilityRole="button"
-        accessibilityLabel="Close photo"
-      >
-        <Ionicons name="close" size={24} color={colors.white} />
-      </Pressable>
-
       {/* Bottom info bar */}
       <Animated.View
         entering={FadeInDown.duration(320).delay(120)}
@@ -166,17 +154,6 @@ const styles = StyleSheet.create({
   errorContainer: {
     flex: 1,
     backgroundColor: colors.background.cream,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeButton: {
-    position: 'absolute',
-    right: spacing.md,
-    zIndex: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: withAlpha(colors.ink[700], 0.75),
     alignItems: 'center',
     justifyContent: 'center',
   },

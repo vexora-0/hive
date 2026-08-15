@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, spacing, withAlpha } from '@/theme';
 import { HiveImage } from './HiveImage';
@@ -55,6 +56,7 @@ const DOUBLE_TAP_SCALE = 2.5;
  * ```
  */
 export function PhotoViewer({ uri, blurhash, onClose }: PhotoViewerProps) {
+  const insets = useSafeAreaInsets();
   // ── Shared values ──────────────────────────────────────────────────
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -145,7 +147,7 @@ export function PhotoViewer({ uri, blurhash, onClose }: PhotoViewerProps) {
       {/* Close button */}
       <Pressable
         onPress={handleClose}
-        style={styles.closeButton}
+        style={[styles.closeButton, { top: insets.top + spacing.sm }]}
         hitSlop={16}
         accessibilityRole="button"
         accessibilityLabel="Close photo"
@@ -183,7 +185,6 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     position: 'absolute',
-    top: spacing.xl + spacing.md,
     right: spacing.md,
     zIndex: 10,
     width: 44,
