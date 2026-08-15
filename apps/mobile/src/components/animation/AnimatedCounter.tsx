@@ -119,6 +119,10 @@ export const AnimatedCounter: React.FC<AnimatedCounterProps> = ({
       importantForAccessibility="no-hide-descendants"
       pointerEvents="none"
       animatedProps={animatedProps}
+      // `size` is an intrinsic-width hint the DOM honours and native ignores.
+      // See the note on `styles.text` — without it the field claims twenty
+      // characters of width and squeezes whatever sits beside it to nothing.
+      {...({ size: 1 } as object)}
       style={[styles.text, style]}
     />
   );
@@ -138,6 +142,22 @@ const styles = StyleSheet.create({
     // Reset default TextInput styling
     borderWidth: 0,
     backgroundColor: 'transparent',
+    /**
+     * A text field sized to its digits, not to a form field's habits.
+     *
+     * The number is painted into a `TextInput` because Reanimated can only
+     * drive `text` from the UI thread — and on react-native-web that is a real
+     * `<input>`, which claims the browser's default intrinsic width of roughly
+     * twenty characters. A single digit at 22px measured **252pt of claimed
+     * width against 13.6pt of actual glyph**, so any label sharing the row was
+     * pushed out: the admin roster rendered "Photographs shared" as "P.".
+     *
+     * `alignSelf: 'flex-start'` stops the field stretching to its container,
+     * and `width: 'auto'` lets the `size={1}` hint above take effect. Native is
+     * unaffected — it never had the phantom width to begin with.
+     */
+    alignSelf: 'flex-start',
+    width: 'auto',
   },
 });
 
