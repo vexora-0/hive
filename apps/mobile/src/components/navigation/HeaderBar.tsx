@@ -1,5 +1,11 @@
-import React, { type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import React, { useCallback, type ReactNode } from 'react';
+import {
+  Pressable,
+  StyleSheet,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -114,22 +120,50 @@ const COMPACT_RISE = 8;
  * const { scrollY, onScroll } = useHeaderScroll();
  *
  * <HeaderBar large title="Moments" eyebrow={eyebrow} scrollY={scrollY} />
- * <MasonryGrid data={photos} onScroll={onScroll} />
+ * <Animated.ScrollView onScroll={onScroll} scrollEventThrottle={16}>…</Animated.ScrollView>
  * ```
  *
  * It exists because the wiring was the reason the collapse shipped on one
  * screen out of thirteen: a shared value plus a hand-written
  * `useAnimatedScrollHandler` in every screen file is three imports and six
- * lines of boilerplate that read like plumbing, so nobody added them. The
- * handler stays on the UI thread — the header never waits on JavaScript to
- * find out where the list is.
+ * lines of boilerplate that read like plumbing, so nobody added them.
+ *
+ * ── Which list you are on decides which handler you get ───────────────
+ *
+ * On an `Animated.ScrollView` this returns Reanimated's own handler and the
+ * header never waits on JavaScript to find out where the list is.
+ *
+ * **On a FlashList it must not.** Reanimated 4's `useAnimatedScrollHandler`
+ * returns an *object* (`{ workletEventHandler }`), not a function. FlashList v2
+ * scrolls RN's `Animated.ScrollView` rather than Reanimated's, so nothing
+ * unwraps that object, and it reaches the caller through
+ * `props.onScroll?.call(props, event)` inside `RecyclerView` — where `.call`
+ * is undefined and the screen throws on the first scroll. `flashList: true`
+ * therefore returns a plain JS handler writing into the same shared value: one
+ * hop through JavaScript per scroll event, which a header collapse absorbs
+ * without a visible lag, and which is the only form FlashList can invoke.
+ *
+ * The previous version of this docblock recommended passing the Reanimated
+ * handler straight to `MasonryGrid`, which is exactly the crash.
  */
-export function useHeaderScroll() {
+export function useHeaderScroll(options?: { flashList?: boolean }) {
   const scrollY = useSharedValue(0);
-  const onScroll = useAnimatedScrollHandler((event) => {
+
+  const reanimatedHandler = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y;
   });
-  return { scrollY, onScroll };
+
+  const jsHandler = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      scrollY.value = event.nativeEvent.contentOffset.y;
+    },
+    [scrollY],
+  );
+
+  return {
+    scrollY,
+    onScroll: options?.flashList ? jsHandler : reanimatedHandler,
+  };
 }
 
 // ---------------------------------------------------------------------------
