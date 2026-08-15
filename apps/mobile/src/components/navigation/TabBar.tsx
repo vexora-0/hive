@@ -270,6 +270,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     height: BAR_HEIGHT,
     borderRadius: radius.xxl,
+    // The bar is a pill, so its corners curve inward to roughly 4px from the
+    // edge at the label's height. Without this the first and last labels are
+    // drawn outside the shape and clip against the curve.
+    paddingHorizontal: spacing.sm,
     backgroundColor: colors.ink[900],
     ...platformShadow(shadows.large),
   },

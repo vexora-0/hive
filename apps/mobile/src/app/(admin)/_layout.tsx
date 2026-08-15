@@ -40,7 +40,10 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Dashboard',
+          // 'Dashboard' is nine characters in a six-tab bar; at phone width it
+          // ellipsized to 'Dashboa…'. The screen is headed 'Overview' anyway,
+          // so the tab does not need to repeat the long form.
+          title: 'Home',
           tabBarIcon: tabIcon('stats-chart-outline', 'stats-chart'),
         }}
       />
