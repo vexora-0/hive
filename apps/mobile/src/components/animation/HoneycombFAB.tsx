@@ -6,6 +6,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   colors,
@@ -91,6 +92,8 @@ function hitSlopFor(extent: number): number {
  *
  *  - **Marigold is the surface, ink is the mark.** See `icon`.
  *  - **The target clears 44dp** at any `size`, via `hitSlop` on the short axis.
+ *  - **It clears the floating tab bar on every device**, safe area included —
+ *    see the arithmetic below. No screen passes its own offset.
  *  - **Press physics come from the theme.** `spring.press` is tuned for exactly
  *    this distance — a scale of 1 → 0.9 — and carries `ReduceMotion.System`, so
  *    the button does the right thing on a device where the setting is on.
@@ -112,6 +115,39 @@ export const HoneycombFAB: React.FC<HoneycombFABProps> = ({
   style,
 }) => {
   const scale = useSharedValue(1);
+  const insets = useSafeAreaInsets();
+
+  /**
+   * How far the button floats above the bottom edge.
+   *
+   * **This is a mirror of `TabBar.tsx`, not a guess — please do not "simplify"
+   * it back to `layout.tabBarClearance`.** That constant was here, and it is
+   * the wrong one: it is a *static* figure for padding the bottom of a
+   * scrolling list, and it stands in for the safe-area inset with a fixed
+   * `spacing.md`. On a phone with a home indicator the inset is 34, so the real
+   * bar footprint is 96 and the FAB sat at 90 — its lower edge 6px behind the
+   * pill. That is the whole defect. Being 6px short is invisible on the last
+   * row of a list you can scroll; it is not invisible under the one control
+   * that never scrolls away.
+   *
+   * The bar is absolutely positioned and reserves no space, so the geometry has
+   * to be reconstructed from its parts. `TabBar.tsx` renders a host at
+   * `bottom: 0` with `paddingBottom: Math.max(insets.bottom, spacing.ms)`, and
+   * a pill of `layout.tabBarHeight` sitting on that padding. So:
+   *
+   *     pill's top edge  = max(insets.bottom, spacing.ms) + tabBarHeight
+   *     this button      = that, + spacing.lg
+   *
+   * Because both sides share the same floor expression, the visible gap is
+   * exactly `spacing.lg` on every device — 24 whether the inset is 0 or 34,
+   * rather than a number that shrinks as the hardware grows. `spacing.lg` is
+   * what `Toast.tsx` already uses to clear the same pill; a floating element
+   * over the tab bar gets a section gap, not a hairline.
+   *
+   * If `TabBar.tsx`'s host padding ever changes, this changes with it.
+   */
+  const liftAboveTabBar =
+    Math.max(insets.bottom, spacing.ms) + layout.tabBarHeight + spacing.lg;
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -139,8 +175,9 @@ export const HoneycombFAB: React.FC<HoneycombFABProps> = ({
       // place this control is ever used.
       style={[
         styles.container,
-        { width: svgWidth, height: svgHeight },
+        { width: svgWidth, height: svgHeight, bottom: liftAboveTabBar },
         animatedStyle,
+        // Last, so a screen without a tab bar can still override the offset.
         style,
       ]}
       // The drawn shape is the smaller of the two: a hexagon inscribed in this
@@ -181,10 +218,14 @@ export const HoneycombFAB: React.FC<HoneycombFABProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    // Clears the floating tab bar, which is absolutely positioned and so
-    // reserves no space of its own.
-    bottom: layout.tabBarClearance - spacing.xs,
-    right: spacing.md,
+    // `bottom` is computed per-render from the safe area — see
+    // `liftAboveTabBar`. It cannot live in a StyleSheet, because the value it
+    // needs is not known until the device is.
+    //
+    // `right` matches `layout.tabBarInset`, which is deliberate: the button's
+    // right edge lands on the same line as the pill's, so the two floating
+    // shapes share one margin instead of nearly sharing one.
+    right: layout.tabBarInset,
     alignItems: 'center',
     justifyContent: 'center',
     // Deliberately no shadow: a shadow follows the view's rectangular border
