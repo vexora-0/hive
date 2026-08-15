@@ -46,6 +46,7 @@ export function useAdminOrders(status?: OrderStatus) {
   const {
     data,
     isLoading,
+    isError,
     isRefetching,
     fetchNextPage,
     hasNextPage,
@@ -88,6 +89,10 @@ export function useAdminOrders(status?: OrderStatus) {
   return {
     orders,
     isLoading,
+    // Additive: the fulfilment queue had no error state at all, and a failed
+    // request rendered as "No orders yet" — which tells an admin the school
+    // has sold nothing when in fact the request failed. Brief §9.4.
+    isError,
     isRefetching,
     fetchNextPage,
     hasNextPage: hasNextPage ?? false,

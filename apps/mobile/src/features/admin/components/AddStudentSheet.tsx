@@ -1,31 +1,30 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { StyleSheet } from 'react-native';
 
-import { colors, spacing, radius } from '@/theme';
-import { Text } from '@/components/ui/Text';
+import { spacing } from '@/theme';
 import { TextInput } from '@/components/ui/TextInput';
 import { Button } from '@/components/ui/Button';
+import { BottomSheet } from '@/components/feedback';
 import type { CreateStudentData } from '@/features/admin/services/adminService';
-import { Modal } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export interface AddStudentSheetProps {
+  /** Whether the sheet is visible. */
   isVisible: boolean;
+  /** The school the child is enrolled at. */
   schoolId: string;
+  /** The class they join. */
   classId: string;
+  /** That class's name — shown, never asked for. */
   className: string;
+  /** Called when the sheet is dismissed. */
   onClose: () => void;
+  /** Called with the child's details when the form is submitted. */
   onSubmit: (data: CreateStudentData) => void;
+  /** Whether submission is in progress. */
   isSubmitting?: boolean;
 }
 
@@ -33,6 +32,19 @@ export interface AddStudentSheetProps {
 // Component
 // ---------------------------------------------------------------------------
 
+/**
+ * `<AddStudentSheet>` — a child joins a class.
+ *
+ * Two fields, one of them optional. The date of birth is worth asking for even
+ * though nothing requires it: it is what lets every screen in the app say "4y
+ * 2m" instead of printing a date, and an age beside a photograph is the single
+ * most-loved detail in this whole category of product.
+ *
+ * Linking parents is deliberately *not* here. A child is created in one breath;
+ * finding the right parent is a search through everyone at the school, and
+ * folding a search into a creation form is how a two-field sheet becomes a
+ * wizard.
+ */
 export function AddStudentSheet({
   isVisible,
   schoolId,
@@ -57,7 +69,7 @@ export function AddStudentSheet({
   const handleSubmit = useCallback(() => {
     const trimmed = fullName.trim();
     if (!trimmed) {
-      setNameError('Student name is required');
+      setNameError('A child needs a name.');
       return;
     }
     setNameError(undefined);
@@ -70,68 +82,47 @@ export function AddStudentSheet({
   }, [fullName, dateOfBirth, schoolId, classId, onSubmit]);
 
   return (
-    <Modal
+    <BottomSheet
       visible={isVisible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
+      title="Add a child"
+      subtitle={`to ${className}`}
+      scroll
+      keyboard
+      footer={
+        <Button
+          fullWidth
+          onPress={handleSubmit}
+          loading={isSubmitting}
+          disabled={!fullName.trim()}
+        >
+          Add child
+        </Button>
+      }
     >
-      <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <Pressable style={styles.backdrop} onPress={onClose}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.handleBar} />
-            <ScrollView
-              style={styles.scrollContent}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <Text variant="h3" style={styles.title}>
-                Add Student
-              </Text>
-              <Text variant="bodySmall" color={colors.text.secondary} style={styles.subtitle}>
-                to {className}
-              </Text>
+      <TextInput
+        label="Name"
+        placeholder="Aarav Sharma"
+        value={fullName}
+        onChangeText={(text) => {
+          setFullName(text);
+          if (nameError) setNameError(undefined);
+        }}
+        error={nameError}
+        autoCapitalize="words"
+        containerStyle={styles.field}
+      />
 
-              <TextInput
-                label="Student Name"
-                placeholder="e.g. Emma Thompson"
-                value={fullName}
-                onChangeText={(text) => {
-                  setFullName(text);
-                  if (nameError) setNameError(undefined);
-                }}
-                error={nameError}
-                autoCapitalize="words"
-                containerStyle={styles.field}
-              />
-
-              <TextInput
-                label="Date of Birth (optional)"
-                placeholder="YYYY-MM-DD"
-                value={dateOfBirth}
-                onChangeText={setDateOfBirth}
-                keyboardType="numbers-and-punctuation"
-                containerStyle={styles.field}
-              />
-
-              <Button
-                variant="primary"
-                size="lg"
-                onPress={handleSubmit}
-                loading={isSubmitting}
-                disabled={!fullName.trim()}
-                style={styles.submitButton}
-              >
-                Add Student
-              </Button>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </KeyboardAvoidingView>
-    </Modal>
+      <TextInput
+        label="Date of birth (optional)"
+        placeholder="2021-06-14"
+        hint="Lets the app say how old they were in a photograph."
+        value={dateOfBirth}
+        onChangeText={setDateOfBirth}
+        keyboardType="numbers-and-punctuation"
+        containerStyle={styles.lastField}
+      />
+    </BottomSheet>
   );
 }
 
@@ -140,45 +131,12 @@ export function AddStudentSheet({
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  keyboardView: {
-    flex: 1,
-  },
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: colors.overlay.scrim,
-  },
-  sheet: {
-    backgroundColor: colors.background.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingBottom: spacing.lg,
-    maxHeight: '85%',
-  },
-  handleBar: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border.default,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  title: {
-    marginBottom: spacing.xs,
-  },
-  subtitle: {
-    marginBottom: spacing.lg,
-  },
   field: {
     marginBottom: spacing.md,
   },
-  submitButton: {
-    marginTop: spacing.md,
-    marginBottom: spacing.md,
+  lastField: {
+    marginBottom: spacing.sm,
   },
 });
+
+export default AddStudentSheet;

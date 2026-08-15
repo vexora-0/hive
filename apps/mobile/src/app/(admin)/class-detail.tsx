@@ -1,31 +1,70 @@
 import React, { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { RefreshControl, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, radius, layout, shadows, platformShadow } from '@/theme';
+import { colors, spacing, radius, layout } from '@/theme';
 import { ScreenContainer } from '@/components/layout/ScreenContainer';
 import { HeaderBar } from '@/components/navigation/HeaderBar';
-import { Text, Button, Avatar } from '@/components/ui';
+import { Text, Card, Button, Avatar, SectionHeader } from '@/components/ui';
+import { HoneycombFAB } from '@/components/animation';
+import {
+  ConfirmDialog,
+  EmptyState,
+  SkeletonShimmer,
+} from '@/components/feedback';
 import { useClassDetail } from '@/features/admin/hooks/useClassDetail';
 import { StudentCard } from '@/features/admin/components/StudentCard';
 import { AssignTeacherSheet } from '@/features/admin/components/AssignTeacherSheet';
 import { AddStudentSheet } from '@/features/admin/components/AddStudentSheet';
 import { ParentListSheet } from '@/features/admin/components/ParentListSheet';
-import { ConfirmDialog, EmptyState } from '@/components/feedback';
 import type { CreateStudentData } from '@/features/admin/services/adminService';
+
+// ---------------------------------------------------------------------------
+// Skeleton — a teacher card and four child rows, at the heights they land at.
+// ---------------------------------------------------------------------------
+
+function ClassSkeleton() {
+  return (
+    <View style={styles.skeleton}>
+      <SkeletonShimmer width="100%" height={72} borderRadius={radius.lg} />
+      <View style={styles.skeletonRows}>
+        {[0, 1, 2, 3].map((i) => (
+          <SkeletonShimmer
+            key={i}
+            width="100%"
+            height={64}
+            borderRadius={radius.lg}
+            index={i + 1}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
+/**
+ * One class: who teaches it, and who is in it.
+ *
+ * The screen is two named regions and one action. Both regions used to be
+ * headed by a bare `<Text variant="eyebrow">`, which is the system's structural
+ * mark used as a heading — `SectionHeader` is the one way to name a region, and
+ * it owns the ramp, the gap and the trailing action so that two screens naming
+ * a region agree.
+ *
+ * The class's year group and academic year used to sit in two marigold-washed
+ * pills at a radius outside the scale, which is marigold used as a tint. They
+ * are facts about the class rather than states, so they belong under its name
+ * in the header, said in one line.
+ *
+ * The one persistent action is adding a child, and it is the app's hexagon
+ * rather than the round amber circle this file used to declare inline.
+ */
 export default function ClassDetailScreen() {
   const { classId: id } = useLocalSearchParams<{ classId: string }>();
   const router = useRouter();
@@ -51,7 +90,7 @@ export default function ClassDetailScreen() {
     id: string;
     name: string;
   } | null>(null);
-  /** Student awaiting removal confirmation. Null when no dialog is open. */
+  /** Child awaiting removal confirmation. Null when no dialog is open. */
   const [studentToRemove, setStudentToRemove] = useState<{
     id: string;
     name: string;
@@ -85,8 +124,8 @@ export default function ClassDetailScreen() {
     [addStudent],
   );
 
-  // Removal is irreversible from the UI, so it asks first. The tap only opens
-  // the dialog; `confirmRemoveStudent` is what actually removes.
+  // Taking a child out of a class detaches them from the teacher who
+  // photographs them, so it asks first. The tap only opens the dialog.
   const handleRemoveStudent = useCallback(
     (studentId: string) => {
       const student = classDetail?.students.find((s) => s.id === studentId);
@@ -117,98 +156,105 @@ export default function ClassDetailScreen() {
     [classDetail],
   );
 
-  // ── Loading state ────────────────────────────────────────────────────
+  // ── Loading ──────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <ScreenContainer edges={['top', 'left', 'right']}>
         <HeaderBar title="Class" showBack onBack={() => router.back()} />
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary.amberDark} />
-        </View>
+        <ClassSkeleton />
       </ScreenContainer>
     );
   }
 
-  // ── Error state ──────────────────────────────────────────────────────
-  // Without this a failed fetch left the spinner above running forever.
+  // ── Error ────────────────────────────────────────────────────────────
+  // Without this a failed fetch left a spinner running for ever.
   if (isError || !classDetail) {
     return (
       <ScreenContainer edges={['top', 'left', 'right']}>
         <HeaderBar title="Class" showBack onBack={() => router.back()} />
-        <View style={styles.centered}>
-          <EmptyState
-            icon="cloud-offline-outline"
-            title="Couldn't load this class"
-            message="Check your connection and try again."
-            action={{ label: 'Try again', onPress: () => refetch() }}
-          />
-        </View>
+        <EmptyState
+          variant="error"
+          title="Couldn't load this class."
+          message="Check your connection and try again."
+          action={{ label: 'Try again', onPress: () => refetch() }}
+        />
       </ScreenContainer>
     );
   }
 
-  // ── Render ───────────────────────────────────────────────────────────
+  // ── Content ──────────────────────────────────────────────────────────
   const students = classDetail.students;
+  const teacher = classDetail.teacher;
+  const subtitle =
+    [classDetail.grade, classDetail.academic_year].filter(Boolean).join(' · ') ||
+    undefined;
+
+  const listHeader = (
+    <View>
+      <SectionHeader
+        size="sm"
+        title="Teacher"
+        action={
+          teacher
+            ? {
+                label: 'Change',
+                onPress: () => setShowTeacherSheet(true),
+                accessibilityHint: 'Chooses a different teacher for this class',
+              }
+            : undefined
+        }
+        style={styles.sectionHeader}
+      />
+
+      {teacher ? (
+        <Card
+          row
+          gap={spacing.ms}
+          elevation="low"
+          onPress={() => setShowTeacherSheet(true)}
+          accessibilityLabel={`${teacher.full_name} teaches this class`}
+          accessibilityHint="Chooses a different teacher"
+          style={styles.teacherCard}
+        >
+          <Avatar name={teacher.full_name} size="md" />
+          <View style={styles.teacherInfo}>
+            <Text variant="bodyBold" numberOfLines={1}>
+              {teacher.full_name}
+            </Text>
+            <Text variant="caption" muted numberOfLines={1}>
+              {teacher.email}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={17} color={colors.text.tertiary} />
+        </Card>
+      ) : (
+        <View style={styles.noTeacher}>
+          <Text variant="bodySmall" muted style={styles.noTeacherLine}>
+            Nobody can upload photographs of this class yet.
+          </Text>
+          <Button variant="outline" onPress={() => setShowTeacherSheet(true)}>
+            Assign a teacher
+          </Button>
+        </View>
+      )}
+
+      <SectionHeader
+        title={students.length === 1 ? '1 child' : `${students.length} children`}
+        style={styles.childrenHeader}
+      />
+    </View>
+  );
 
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
-      <HeaderBar title={classDetail.name} showBack onBack={() => router.back()} />
+      <HeaderBar
+        title={classDetail.name}
+        subtitle={subtitle}
+        showBack
+        onBack={() => router.back()}
+      />
 
       <View style={styles.container}>
-        {/* Class info header */}
-        <View style={styles.header}>
-          {classDetail.grade && (
-            <View style={styles.pill}>
-              <Text variant="bodySmall" color={colors.primary.amberDark}>
-                {classDetail.grade}
-              </Text>
-            </View>
-          )}
-          {classDetail.academic_year && (
-            <View style={styles.pill}>
-              <Text variant="bodySmall" color={colors.text.secondary}>
-                {classDetail.academic_year}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Teacher section */}
-        <View style={styles.section}>
-          <Text variant="eyebrow" color={colors.text.tertiary} style={styles.sectionTitle}>
-            Teacher
-          </Text>
-
-          {classDetail.teacher ? (
-            <Pressable
-              onPress={() => setShowTeacherSheet(true)}
-              style={styles.teacherCard}
-              accessibilityRole="button"
-              accessibilityLabel={`Change the teacher for this class. Currently ${classDetail.teacher.full_name}.`}
-            >
-              <Avatar name={classDetail.teacher.full_name} size="sm" />
-              <View style={styles.teacherInfo}>
-                <Text variant="bodySmallBold">{classDetail.teacher.full_name}</Text>
-                <Text variant="caption" color={colors.text.tertiary}>
-                  {classDetail.teacher.email}
-                </Text>
-              </View>
-              <Ionicons name="pencil-outline" size={17} color={colors.text.tertiary} />
-            </Pressable>
-          ) : (
-            <Button variant="outline" onPress={() => setShowTeacherSheet(true)}>
-              Assign a teacher
-            </Button>
-          )}
-        </View>
-
-        {/* Students section */}
-        <View style={styles.section}>
-          <Text variant="eyebrow" color={colors.text.tertiary} style={styles.sectionTitle}>
-            {students.length} {students.length === 1 ? 'child' : 'children'}
-          </Text>
-        </View>
-
         <FlashList
           data={students}
           renderItem={({ item }) => (
@@ -219,14 +265,17 @@ export default function ClassDetailScreen() {
             />
           )}
           keyExtractor={(item) => item.id}
+          ListHeaderComponent={listHeader}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
+          // First use, and no call to action: the hexagon below is already the
+          // way out, and a second button that does the same thing is the kind
+          // of dead end an empty state is supposed to avoid.
           ListEmptyComponent={
             <EmptyState
               compact
-              icon="person-add-outline"
-              title="No children yet"
-              message="Add the children in this class so their parents can be linked to them."
-              action={{ label: 'Add a child', onPress: () => setShowAddStudent(true) }}
+              variant="first-use"
+              title="No children yet."
+              message="Add the children in this class, then link their parents so they can see the photographs."
             />
           }
           refreshControl={
@@ -241,22 +290,20 @@ export default function ClassDetailScreen() {
           contentContainerStyle={styles.listContent}
         />
 
-        {/* FAB: Add student */}
-        <Pressable
+        <HoneycombFAB
           onPress={() => setShowAddStudent(true)}
-          style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
-          accessibilityRole="button"
           accessibilityLabel="Add a child to this class"
-        >
-          <Ionicons name="person-add" size={22} color={colors.ink[900]} />
-        </Pressable>
+          // Outline, like every other icon in the app: fill is reserved for
+          // the selected state, and a filled glyph here would be the only one.
+          icon={<Ionicons name="person-add-outline" size={22} color={colors.ink[900]} />}
+        />
       </View>
 
-      {/* Bottom sheets */}
+      {/* ── Sheets ────────────────────────────────────────────────── */}
       <AssignTeacherSheet
         isVisible={showTeacherSheet}
         teachers={teachers}
-        currentTeacherId={classDetail.teacher?.id ?? null}
+        currentTeacherId={teacher?.id ?? null}
         onClose={() => setShowTeacherSheet(false)}
         onSelect={handleAssignTeacher}
         isSubmitting={isAssigningTeacher}
@@ -281,8 +328,8 @@ export default function ClassDetailScreen() {
 
       <ConfirmDialog
         visible={!!studentToRemove}
-        title="Remove student"
-        message={`Remove ${studentToRemove?.name ?? 'this student'} from ${classDetail.name}? They will stay enrolled at the school.`}
+        title="Remove this child?"
+        message={`${studentToRemove?.name ?? 'They'} will leave ${classDetail.name} and stop appearing in its photographs. They stay enrolled at the school.`}
         confirmLabel="Remove"
         destructive
         onConfirm={confirmRemoveStudent}
@@ -300,65 +347,40 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+  listContent: {
     paddingHorizontal: layout.screenPaddingHorizontal,
-    paddingBottom: spacing.md,
+    // Clears the floating tab bar and the hexagon above it.
+    paddingBottom: layout.tabBarClearance + 72,
   },
-  pill: {
-    paddingHorizontal: spacing.ms,
-    paddingVertical: spacing.xs + 1,
-    borderRadius: radius.xs,
-    backgroundColor: colors.primary.amberWash,
-  },
-  section: {
-    paddingHorizontal: layout.screenPaddingHorizontal,
-    marginBottom: spacing.lg,
-  },
-  sectionTitle: {
+  sectionHeader: {
     marginBottom: spacing.sm,
   },
   teacherCard: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.ms,
-    padding: spacing.ms,
-    backgroundColor: colors.background.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border.light,
   },
   teacherInfo: {
     flex: 1,
-    gap: 1,
+    gap: spacing.xxs,
   },
-  listContent: {
-    paddingHorizontal: layout.screenPaddingHorizontal,
-    paddingBottom: layout.tabBarClearance + 72,
+  noTeacher: {
+    gap: spacing.sm,
+  },
+  noTeacherLine: {
+    marginBottom: spacing.xxs,
+  },
+  childrenHeader: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.ms,
   },
   separator: {
     height: spacing.sm,
   },
-  fab: {
-    position: 'absolute',
-    right: spacing.md,
-    bottom: layout.tabBarClearance,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary.amber,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...platformShadow(shadows.large),
+  skeleton: {
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    paddingTop: spacing.lg,
   },
-  fabPressed: {
-    backgroundColor: colors.primary.amberDark,
-    transform: [{ scale: 0.94 }],
+  skeletonRows: {
+    marginTop: spacing.xl,
+    gap: spacing.sm,
   },
 });

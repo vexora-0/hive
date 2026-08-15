@@ -1,19 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { StyleSheet } from 'react-native';
 
-import { colors, spacing, radius } from '@/theme';
-import { Text } from '@/components/ui/Text';
+import { spacing } from '@/theme';
 import { TextInput } from '@/components/ui/TextInput';
 import { Button } from '@/components/ui/Button';
+import { BottomSheet } from '@/components/feedback';
 import type { CreateSchoolData } from '@/features/admin/services/adminService';
-import { Modal } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -24,7 +16,7 @@ export interface AddSchoolSheetProps {
   isVisible: boolean;
   /** Called when the sheet is dismissed. */
   onClose: () => void;
-  /** Called with the school data when the form is submitted. */
+  /** Called with the school's details when the form is submitted. */
   onSubmit: (data: CreateSchoolData) => void;
   /** Whether submission is in progress. */
   isSubmitting?: boolean;
@@ -41,9 +33,16 @@ export interface AddSchoolSheetProps {
 // ---------------------------------------------------------------------------
 
 /**
- * `<AddSchoolSheet>` -- a bottom sheet form for creating or editing a school.
+ * `<AddSchoolSheet>` — the three things Hive needs to know about a school.
  *
- * Fields: name (required), address (optional), phone (optional).
+ * Name, address, telephone, and nothing else: term dates, branding, billing
+ * and the rest belong at a desk, and a companion app that asks for them on a
+ * phone is a web form with a handle bar drawn on it.
+ *
+ * The sheet itself is now the app's one `BottomSheet`, which owns the scrim,
+ * the radius, the handle, the safe-area inset, the keyboard inset and the
+ * height ceiling. This file used to declare all six for itself, at an 85%
+ * ceiling that agreed with none of the other thirteen sheets.
  */
 export function AddSchoolSheet({
   isVisible,
@@ -73,7 +72,7 @@ export function AddSchoolSheet({
   const handleSubmit = useCallback(() => {
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setNameError('School name is required');
+      setNameError('A school needs a name.');
       return;
     }
 
@@ -86,74 +85,59 @@ export function AddSchoolSheet({
   }, [name, address, phone, onSubmit]);
 
   return (
-    <Modal
+    <BottomSheet
       visible={isVisible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
+      title={isEditing ? 'Edit this school' : 'Add a school'}
+      subtitle={
+        isEditing
+          ? 'Corrections show everywhere the school is named.'
+          : 'Its classes and children come next.'
+      }
+      scroll
+      keyboard
+      footer={
+        <Button
+          fullWidth
+          onPress={handleSubmit}
+          loading={isSubmitting}
+          disabled={!name.trim()}
+        >
+          {isEditing ? 'Save changes' : 'Add school'}
+        </Button>
+      }
     >
-      <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <Pressable style={styles.backdrop} onPress={onClose}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.handleBar} />
-            <ScrollView
-              style={styles.scrollContent}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <Text variant="h3" style={styles.title}>
-                {isEditing ? 'Edit School' : 'Add School'}
-              </Text>
+      <TextInput
+        label="Name"
+        placeholder="Sunshine Preschool"
+        value={name}
+        onChangeText={(text) => {
+          setName(text);
+          if (nameError) setNameError(undefined);
+        }}
+        error={nameError}
+        autoCapitalize="words"
+        containerStyle={styles.field}
+      />
 
-              <TextInput
-                label="School Name"
-                placeholder="e.g. Sunshine Preschool"
-                value={name}
-                onChangeText={(text) => {
-                  setName(text);
-                  if (nameError) setNameError(undefined);
-                }}
-                error={nameError}
-                autoCapitalize="words"
-                containerStyle={styles.field}
-              />
+      <TextInput
+        label="Address (optional)"
+        placeholder="12 MG Road, Bengaluru"
+        value={address}
+        onChangeText={setAddress}
+        autoCapitalize="words"
+        containerStyle={styles.field}
+      />
 
-              <TextInput
-                label="Address"
-                placeholder="123 Main St, City, State"
-                value={address}
-                onChangeText={setAddress}
-                autoCapitalize="words"
-                containerStyle={styles.field}
-              />
-
-              <TextInput
-                label="Phone"
-                placeholder="(555) 123-4567"
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                containerStyle={styles.field}
-              />
-
-              <Button
-                variant="primary"
-                size="lg"
-                onPress={handleSubmit}
-                loading={isSubmitting}
-                disabled={!name.trim()}
-                style={styles.submitButton}
-              >
-                {isEditing ? 'Save Changes' : 'Create School'}
-              </Button>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </KeyboardAvoidingView>
-    </Modal>
+      <TextInput
+        label="Phone (optional)"
+        placeholder="+91 98765 43210"
+        value={phone}
+        onChangeText={setPhone}
+        keyboardType="phone-pad"
+        containerStyle={styles.lastField}
+      />
+    </BottomSheet>
   );
 }
 
@@ -162,43 +146,11 @@ export function AddSchoolSheet({
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  keyboardView: {
-    flex: 1,
-  },
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: colors.overlay.scrim,
-  },
-  sheet: {
-    backgroundColor: colors.background.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingBottom: spacing.lg,
-    maxHeight: '85%',
-  },
-  handleBar: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border.default,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  title: {
-    marginBottom: spacing.lg,
-  },
   field: {
     marginBottom: spacing.md,
   },
-  submitButton: {
-    marginTop: spacing.md,
-    marginBottom: spacing.md,
+  lastField: {
+    marginBottom: spacing.sm,
   },
 });
 

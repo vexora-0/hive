@@ -1,19 +1,14 @@
 import React, { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { ActivityIndicator, RefreshControl, StyleSheet, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import { colors, spacing, layout, shadows, platformShadow } from '@/theme';
+import { colors, spacing, radius, layout } from '@/theme';
 import { ScreenContainer } from '@/components/layout/ScreenContainer';
 import { HeaderBar } from '@/components/navigation/HeaderBar';
-import { EmptyState } from '@/components/feedback/EmptyState';
+import { EmptyState, SkeletonShimmer } from '@/components/feedback';
+import { HoneycombFAB } from '@/components/animation';
 import { SchoolCard } from '@/features/admin/components/SchoolCard';
 import { AddSchoolSheet } from '@/features/admin/components/AddSchoolSheet';
 import { AddClassSheet } from '@/features/admin/components/AddClassSheet';
@@ -25,18 +20,56 @@ import type {
 } from '@/features/admin/services/adminService';
 
 // ---------------------------------------------------------------------------
+// Skeleton
+//
+// Shaped like `SchoolCard`: a card of the same height and radius, three of
+// them, at the same gap. The delay lives inside `SkeletonShimmer`.
+// ---------------------------------------------------------------------------
+
+function SchoolsSkeleton() {
+  return (
+    <View style={styles.skeletonList}>
+      {[0, 1, 2].map((i) => (
+        <SkeletonShimmer
+          key={i}
+          width="100%"
+          height={148}
+          borderRadius={radius.lg}
+          index={i}
+        />
+      ))}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
 /**
- * Admin schools screen with an infinite-scroll list of school cards, a FAB
- * to add a new school, and an empty state placeholder.
+ * Schools — the roster, from the top.
+ *
+ * A school is an identity object here, not a record: initials on the wash its
+ * name always gets, its address underneath, and one line saying how big it is.
+ * Its classes hang off it, and a class opens onto its teacher and its children.
+ *
+ * Three things this screen did not have and now does:
+ *
+ *  - **An error state.** A failed request rendered as "No schools yet", which
+ *    tells an administrator their organisation is empty when in fact the
+ *    network is down. Brief §9.4.
+ *  - **A skeleton in the shape of the content.** It used to render `null`
+ *    while loading, so the screen was blank and then abruptly full.
+ *  - **The app's own FAB.** The round marigold `Pressable` declared inline here
+ *    was one of two FAB idioms in the app; the hexagon is the other, and now
+ *    the only one.
  */
 export default function SchoolsScreen() {
   const router = useRouter();
   const {
     schools,
     isLoading,
+    isError,
     isRefetching,
     fetchNextPage,
     hasNextPage,
@@ -50,7 +83,7 @@ export default function SchoolsScreen() {
     isCreatingClass,
   } = useAdminSchools();
 
-  // ── Add school / add class sheet state ─────────────────────────────
+  // ── Sheet state ────────────────────────────────────────────────────
   const [addSheetVisible, setAddSheetVisible] = useState(false);
   const [editingSchool, setEditingSchool] = useState<AdminSchool | null>(null);
   const [addClassSchool, setAddClassSchool] = useState<AdminSchool | null>(null);
@@ -144,10 +177,7 @@ export default function SchoolsScreen() {
     [handleEditPress, handleAddClassPress, handleClassPress],
   );
 
-  const renderSeparator = useCallback(
-    () => <View style={styles.separator} />,
-    [],
-  );
+  const renderSeparator = useCallback(() => <View style={styles.separator} />, []);
 
   const renderFooter = useCallback(() => {
     if (!isFetchingNextPage) return null;
@@ -158,20 +188,37 @@ export default function SchoolsScreen() {
     );
   }, [isFetchingNextPage]);
 
+  // The four states. There is no filter on this screen, so "filtered to
+  // nothing" cannot happen and is not offered — the empty state that is
+  // reachable is the first-use one, and it takes no button because the FAB
+  // below is already the way out.
   const renderEmpty = useCallback(() => {
-    if (isLoading) return null;
+    if (isLoading) return <SchoolsSkeleton />;
+
+    if (isError) {
+      return (
+        <EmptyState
+          variant="error"
+          title="Couldn't load the schools."
+          message="Check your connection and try again."
+          action={{ label: 'Try again', onPress: () => refetch() }}
+        />
+      );
+    }
+
     return (
       <EmptyState
-        icon="business-outline"
-        title="No schools yet"
-        message="Add a school, then create its classes and add teachers to them."
+        variant="first-use"
+        illustration="school"
+        title="No schools yet."
+        message="Add the first one, then give it classes and children."
       />
     );
-  }, [isLoading]);
+  }, [isLoading, isError, refetch]);
 
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
-      <HeaderBar large title="Schools" />
+      <HeaderBar large title="Schools" eyebrow="Every site on Hive" />
 
       <View style={styles.container}>
         <FlashList
@@ -195,21 +242,15 @@ export default function SchoolsScreen() {
           contentContainerStyle={styles.listContent}
         />
 
-        {/* FAB */}
-        <Pressable
+        {/* The screen's one persistent primary action. Ink on marigold, 8.08:1
+            — the hexagon is a surface and the mark on it is never marigold. */}
+        <HoneycombFAB
           onPress={handleAddPress}
-          style={({ pressed }) => [
-            styles.fab,
-            pressed && styles.fabPressed,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Add school"
-        >
-          <Ionicons name="add" size={28} color={colors.ink[900]} />
-        </Pressable>
+          accessibilityLabel="Add a school"
+          icon={<Ionicons name="add" size={26} color={colors.ink[900]} />}
+        />
       </View>
 
-      {/* Add school bottom sheet */}
       <AddSchoolSheet
         isVisible={addSheetVisible}
         onClose={handleAddClose}
@@ -217,7 +258,7 @@ export default function SchoolsScreen() {
         isSubmitting={isCreating}
       />
 
-      {/* Edit school bottom sheet — same form, seeded with existing values */}
+      {/* The same form, seeded with what the school already is. */}
       <AddSchoolSheet
         isVisible={editingSchool !== null}
         initialValues={
@@ -234,7 +275,6 @@ export default function SchoolsScreen() {
         isSubmitting={isUpdating}
       />
 
-      {/* Add class sheet */}
       <AddClassSheet
         isVisible={!!addClassSchool}
         schoolName={addClassSchool?.name ?? ''}
@@ -257,8 +297,11 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: layout.screenPaddingHorizontal,
     paddingTop: spacing.sm,
-    // Clears the floating tab bar and the FAB above it.
+    // Clears the floating tab bar and the hexagon above it.
     paddingBottom: layout.tabBarClearance + 72,
+  },
+  skeletonList: {
+    gap: spacing.ms,
   },
   separator: {
     height: spacing.ms,
@@ -266,21 +309,5 @@ const styles = StyleSheet.create({
   footer: {
     paddingVertical: spacing.lg,
     alignItems: 'center',
-  },
-  fab: {
-    position: 'absolute',
-    right: spacing.md,
-    bottom: layout.tabBarClearance,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary.amber,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...platformShadow(shadows.large),
-  },
-  fabPressed: {
-    backgroundColor: colors.primary.amberDark,
-    transform: [{ scale: 0.94 }],
   },
 });

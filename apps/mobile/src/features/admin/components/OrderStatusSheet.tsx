@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, radius, shadows, platformShadow } from '@/theme';
-import { Text } from '@/components/ui';
-import { Modal, ConfirmDialog } from '@/components/feedback';
+import { colors, spacing, radius, MIN_TAP_SIZE } from '@/theme';
+import { Text, Badge, Button, Divider } from '@/components/ui';
+import { BottomSheet, ConfirmDialog } from '@/components/feedback';
 import { formatRupees } from '@/features/orders/constants/products';
 import { ORDER_STATUS } from '@/features/orders/constants/orderStatus';
 import { formatOrderNumber } from '@/features/orders/utils/orderNumber';
@@ -47,14 +47,39 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   cancelled: ORDER_STATUS.cancelled.label,
 };
 
-const STATUS_ICONS: Record<OrderStatus, keyof typeof Ionicons.glyphMap> = {
-  pending: 'time-outline',
-  confirmed: 'checkmark-circle-outline',
-  processing: 'print-outline',
-  shipped: 'cube-outline',
-  delivered: 'gift-outline',
-  cancelled: 'close-circle-outline',
-};
+// ---------------------------------------------------------------------------
+// Reading an order as a person
+//
+// `AdminOrder` carries `parent_id` and no name: the fulfilment endpoint selects
+// eight columns from `orders` and joins nothing, so there is no parent to lead
+// the row with and no way to add one from the presentation layer. The closest
+// human fact the payload holds is the delivery address, whose first line is
+// where the prints are actually going — so that is what a row leads with, and
+// the order number goes where an order number belongs, in the quiet line
+// underneath. Recorded as a data gap rather than papered over.
+// ---------------------------------------------------------------------------
+
+/** The first line of the delivery address — a household, not an identifier. */
+export function orderRecipient(order: AdminOrder): string {
+  const first = order.shipping_address?.split(/[\n,]/)[0]?.trim();
+  return first && first.length > 0 ? first : 'No delivery address';
+}
+
+/** "Placed today", "Placed 3 days ago", "Placed on 12 August". Never a stamp. */
+export function orderPlaced(iso: string): string {
+  const then = new Date(iso);
+  const days = Math.floor((Date.now() - then.getTime()) / 86_400_000);
+
+  if (Number.isNaN(days)) return 'Placed recently';
+  if (days <= 0) return 'Placed today';
+  if (days === 1) return 'Placed yesterday';
+  if (days < 14) return `Placed ${days} days ago`;
+
+  return `Placed on ${then.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'long',
+  })}`;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -73,11 +98,15 @@ export interface OrderStatusSheetProps {
 // ---------------------------------------------------------------------------
 
 /**
- * `<OrderStatusSheet>` — moves one order to its next fulfilment status.
+ * `<OrderStatusSheet>` — moves one order to its next step.
  *
  * Only legal next statuses are offered, so an admin cannot walk an order
- * backwards. Cancelling is confirmed separately: it is the one transition
- * here that a parent cannot undo.
+ * backwards, and the two kinds of "next" are no longer drawn the same. Every
+ * status but one has a single expected step — placed becomes confirmed,
+ * confirmed goes to print — so that step is the sheet's pinned button and the
+ * admin can move a queue with their thumb. Cancelling is the exception: it is
+ * quiet, it sits below a rule, and it is the one transition here that still
+ * asks first, because it is the one a parent cannot undo.
  */
 export function OrderStatusSheet({
   order,
@@ -85,113 +114,116 @@ export function OrderStatusSheet({
   onSelect,
   isUpdating = false,
 }: OrderStatusSheetProps) {
-  const [confirmingCancel, setConfirmingCancel] = React.useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
 
   const options = order ? NEXT_STATUSES[order.status] : [];
+  const advance = options.find((next) => next !== 'cancelled');
+  const canCancel = options.includes('cancelled');
 
-  const handlePress = (next: OrderStatus) => {
-    if (!order) return;
-    if (next === 'cancelled') {
-      setConfirmingCancel(true);
-      return;
-    }
-    onSelect(order, next);
+  const handleAdvance = useCallback(() => {
+    if (!order || !advance) return;
+    onSelect(order, advance);
     onClose();
-  };
+  }, [order, advance, onSelect, onClose]);
 
-  const handleConfirmCancel = () => {
+  const handleConfirmCancel = useCallback(() => {
     setConfirmingCancel(false);
     if (order) onSelect(order, 'cancelled');
     onClose();
-  };
+  }, [order, onSelect, onClose]);
+
+  const status = order ? ORDER_STATUS[order.status] : null;
 
   return (
-    <Modal
+    <BottomSheet
       visible={order !== null}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
+      title={order ? orderRecipient(order) : ''}
+      subtitle={
+        order
+          ? `${formatRupees(order.total_cents)} · ${orderPlaced(order.created_at)} · #${formatOrderNumber(order.id)}`
+          : undefined
+      }
+      footer={
+        advance ? (
+          <Button
+            fullWidth
+            onPress={handleAdvance}
+            loading={isUpdating}
+            accessibilityHint="The parent is told about every step"
+          >
+            {`Mark as ${STATUS_LABELS[advance].toLowerCase()}`}
+          </Button>
+        ) : undefined
+      }
     >
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.handleIndicator} />
-          <View style={styles.content}>
-            {order && (
-              <>
-                <Text variant="h3">Order #{formatOrderNumber(order.id)}</Text>
-                <Text
-                  variant="bodySmall"
-                  color={colors.text.secondary}
-                  style={styles.subtitle}
-                >
-                  {formatRupees(order.total_cents)} · currently{' '}
-                  {STATUS_LABELS[order.status]}
-                </Text>
-
-                {options.length === 0 ? (
-                  <Text
-                    variant="bodySmall"
-                    color={colors.text.tertiary}
-                    style={styles.terminal}
-                  >
-                    This order is {STATUS_LABELS[order.status].toLowerCase()} and
-                    can no longer change.
-                  </Text>
-                ) : (
-                  options.map((next) => (
-                    <Pressable
-                      key={next}
-                      onPress={() => handlePress(next)}
-                      disabled={isUpdating}
-                      style={({ pressed }) => [
-                        styles.actionRow,
-                        pressed && styles.actionRowPressed,
-                        isUpdating && styles.actionRowDisabled,
-                      ]}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Mark as ${STATUS_LABELS[next]}`}
-                    >
-                      <Ionicons
-                        name={STATUS_ICONS[next]}
-                        size={22}
-                        color={
-                          next === 'cancelled'
-                            ? colors.error.main
-                            : colors.text.primary
-                        }
-                        style={styles.actionIcon}
-                      />
-                      <Text
-                        variant="body"
-                        color={
-                          next === 'cancelled'
-                            ? colors.error.main
-                            : colors.text.primary
-                        }
-                      >
-                        Mark as {STATUS_LABELS[next]}
-                      </Text>
-                    </Pressable>
-                  ))
-                )}
-              </>
-            )}
-
-            {/* Nested inside the sheet — a sibling Modal never shows on iOS. */}
-            <ConfirmDialog
-              visible={confirmingCancel}
-              title="Cancel this order?"
-              message="The parent will be notified. This cannot be undone."
-              confirmLabel="Cancel Order"
-              cancelLabel="Keep Order"
-              destructive
-              onConfirm={handleConfirmCancel}
-              onCancel={() => setConfirmingCancel(false)}
-            />
+      {order && status && (
+        <>
+          <View style={styles.currently}>
+            <Text variant="bodySmall" muted>
+              Currently
+            </Text>
+            <Badge variant={status.variant} dot>
+              {status.label}
+            </Badge>
           </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+
+          {order.notes ? (
+            <Text variant="bodySmall" muted style={styles.notes}>
+              “{order.notes}”
+            </Text>
+          ) : null}
+
+          {options.length === 0 && (
+            <Text variant="body" muted style={styles.terminal}>
+              This order is {STATUS_LABELS[order.status].toLowerCase()} and can no
+              longer change.
+            </Text>
+          )}
+
+          {canCancel && (
+            <>
+              <Divider style={styles.rule} />
+
+              <Pressable
+                onPress={() => setConfirmingCancel(true)}
+                disabled={isUpdating}
+                style={({ pressed }) => [
+                  styles.cancelRow,
+                  pressed && styles.cancelRowPressed,
+                  isUpdating && styles.cancelRowDisabled,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel this order"
+                accessibilityHint="The parent is notified. This cannot be undone."
+              >
+                <Ionicons
+                  name="close-circle-outline"
+                  size={20}
+                  color={colors.error.main}
+                />
+                <Text variant="body" color={colors.error.main}>
+                  Cancel this order
+                </Text>
+              </Pressable>
+            </>
+          )}
+        </>
+      )}
+
+      {/* Nested inside the sheet, not a sibling of it — a sibling Modal never
+          appears on iOS. See the note in ParentListSheet. */}
+      <ConfirmDialog
+        visible={confirmingCancel}
+        title="Cancel this order?"
+        message="The parent will be told, and no prints will be made. This cannot be undone."
+        confirmLabel="Cancel order"
+        cancelLabel="Keep it"
+        destructive
+        onConfirm={handleConfirmCancel}
+        onCancel={() => setConfirmingCancel(false)}
+      />
+    </BottomSheet>
   );
 }
 
@@ -200,54 +232,36 @@ export function OrderStatusSheet({
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: colors.overlay.scrim,
+  currently: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingTop: spacing.xs,
   },
-  sheet: {
-    backgroundColor: colors.background.cream,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingBottom: spacing.lg,
-    ...platformShadow(shadows.xlarge),
-  },
-  handleIndicator: {
-    alignSelf: 'center',
-    backgroundColor: colors.border.default,
-    width: 40,
-    height: 4,
-    borderRadius: 2,
+  notes: {
     marginTop: spacing.ms,
-    marginBottom: spacing.sm,
-  },
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  subtitle: {
-    marginTop: spacing.xs,
-    marginBottom: spacing.lg,
   },
   terminal: {
     paddingVertical: spacing.md,
   },
-  actionRow: {
+  rule: {
+    marginVertical: spacing.ms,
+  },
+  cancelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.ms,
+    gap: spacing.ms,
     paddingHorizontal: spacing.ms,
+    minHeight: MIN_TAP_SIZE,
     borderRadius: radius.sm,
-    minHeight: 52,
+    marginBottom: spacing.sm,
   },
-  actionRowPressed: {
-    backgroundColor: colors.background.surfaceSecondary,
+  cancelRowPressed: {
+    backgroundColor: colors.error.background,
   },
-  actionRowDisabled: {
+  cancelRowDisabled: {
     opacity: 0.55,
   },
-  actionIcon: {},
 });
 
 export { STATUS_LABELS, NEXT_STATUSES };

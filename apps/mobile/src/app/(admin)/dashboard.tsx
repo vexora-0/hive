@@ -1,86 +1,78 @@
-import React, { useCallback } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { RefreshControl, StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
 
-import { colors, spacing, radius, layout } from '@/theme';
+import {
+  colors,
+  spacing,
+  radius,
+  layout,
+  duration as motionDuration,
+  tracking,
+} from '@/theme';
 import { ScreenContainer } from '@/components/layout/ScreenContainer';
-import { HeaderBar } from '@/components/navigation/HeaderBar';
-import { SkeletonShimmer } from '@/components/feedback/SkeletonShimmer';
-import { EmptyState } from '@/components/feedback';
-import { Reveal } from '@/components/animation';
-import { StatCard } from '@/features/admin/components/StatCard';
+import { HeaderBar, useHeaderScroll } from '@/components/navigation';
+import { Text, Card, Divider, Button, SectionHeader } from '@/components/ui';
+import { EmptyState, SkeletonShimmer } from '@/components/feedback';
+import { Reveal, AnimatedCounter } from '@/components/animation';
+import { StatRow } from '@/features/admin/components/StatRow';
 import { useAdminDashboard } from '@/features/admin/hooks/useAdminDashboard';
+import { useAdminOrders } from '@/features/admin/hooks/useAdminOrders';
+import { formatRupees } from '@/features/orders/constants/products';
 
 // ---------------------------------------------------------------------------
-// Stat card configuration
+// Today
+//
+// `DashboardStats` is five all-time totals. There is no "photos uploaded
+// today", no "orders pending", no "parents joined this week" — and
+// `activeToday` is not a statistic at all: `adminService.getDashboardStats`
+// hard-codes it to `0` because the endpoint never returned it, so the old
+// dashboard printed "Active today 0" for ever.
+//
+// Rather than dress a total up as a day, today's figure is *derived* from data
+// the app already holds: the fulfilment queue is ordered newest-first, so every
+// order placed today sits at the head of its first page. Counting them there is
+// exact for any preschool that takes fewer than a page of orders in a day, and
+// the one case where it is not — a full page, all of it today — is stated as
+// "20+" rather than guessed at. React Query serves it from the same cache entry
+// the Orders tab uses, so leading with it costs no extra request.
 // ---------------------------------------------------------------------------
 
-const STAT_CARDS = [
-  {
-    key: 'schools',
-    icon: 'business-outline' as const,
-    label: 'Schools',
-    color: colors.text.accent,
-    wash: colors.primary.amberWash,
-    field: 'schools' as const,
-  },
-  {
-    key: 'users',
-    icon: 'people-outline' as const,
-    label: 'People',
-    color: colors.primary.blueDark,
-    wash: colors.primary.blueWash,
-    field: 'users' as const,
-  },
-  {
-    key: 'photos',
-    icon: 'images-outline' as const,
-    label: 'Photos shared',
-    color: colors.primary.mintDark,
-    wash: colors.primary.mintWash,
-    field: 'photos' as const,
-  },
-  {
-    key: 'orders',
-    icon: 'bag-handle-outline' as const,
-    label: 'Orders',
-    color: colors.primary.lavenderDark,
-    wash: colors.primary.lavenderWash,
-    field: 'orders' as const,
-  },
-  {
-    // The API returns this in integer paise, like every other money value.
-    // It used to be printed raw behind a dollar sign, so ₹499 of orders
-    // displayed as "$49900".
-    key: 'revenue',
-    icon: 'cash-outline' as const,
-    label: 'Revenue',
-    color: colors.success.dark,
-    wash: colors.success.background,
-    field: 'revenue' as const,
-    format: 'rupees' as const,
-  },
-  {
-    key: 'activeToday',
-    icon: 'pulse-outline' as const,
-    label: 'Active today',
-    color: colors.primary.roseDark,
-    wash: colors.primary.roseWash,
-    field: 'activeToday' as const,
-  },
-] as const;
+function isToday(iso: string): boolean {
+  const then = new Date(iso);
+  const now = new Date();
+  return (
+    then.getFullYear() === now.getFullYear() &&
+    then.getMonth() === now.getMonth() &&
+    then.getDate() === now.getDate()
+  );
+}
+
+/** Today's date, written the way a person says it. Never a machine stamp. */
+function todayLine(): string {
+  return new Date().toLocaleDateString('en-IN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+}
 
 // ---------------------------------------------------------------------------
-// Skeleton placeholder
+// Skeleton
+//
+// Shaped like what it replaces — one tall card, then a grouped list of three
+// rows — so nothing moves when the numbers land. `SkeletonShimmer` serves the
+// 200ms delay itself, so a warm cache renders straight to content.
 // ---------------------------------------------------------------------------
 
 function DashboardSkeleton() {
   return (
-    <View style={styles.grid}>
-      {Array.from({ length: 6 }).map((_, i) => (
-        <View key={i} style={styles.gridItem}>
-          <SkeletonShimmer width="100%" height={124} borderRadius={radius.lg} index={i} />
-        </View>
-      ))}
+    <View>
+      <SkeletonShimmer width="100%" height={196} borderRadius={radius.lg} />
+      <View style={styles.skeletonGroup}>
+        <SkeletonShimmer width="100%" height={172} borderRadius={radius.lg} index={1} />
+      </View>
     </View>
   );
 }
@@ -90,22 +82,77 @@ function DashboardSkeleton() {
 // ---------------------------------------------------------------------------
 
 /**
- * Admin dashboard screen showing a 2-column grid of stat cards.
+ * The admin overview — a companion, not a console.
  *
- * Features pull-to-refresh and a skeleton loading state on initial load.
+ * What this screen used to be: six numbers in a 2-column grid, each in a tile
+ * of its own hue, none of them leading anywhere, one of them permanently zero.
+ * Nothing on it could be acted on, so an admin read it once and never again.
+ *
+ * What it is now, in order of what an administrator can actually do from a
+ * phone:
+ *
+ *  1. **Today**, and the one queue with work in it. Orders are the only thing
+ *     on this screen that has a next step, so today's count leads and the
+ *     screen's single primary action opens the queue underneath it.
+ *  2. **The roster**, as three quiet rows in one card. Schools and people lead
+ *     somewhere an admin can change something; photographs shared is context,
+ *     so it keeps its number and loses its chevron.
+ *
+ * Deliberately *not* here: anything that belongs at a desk. There is no report
+ * export, no chart, no date-range picker and no per-school breakdown — Linear's
+ * rule that mobile is for away-from-keyboard work, applied by leaving things
+ * out rather than by shrinking them.
  */
 export default function DashboardScreen() {
+  const router = useRouter();
+  const { scrollY, onScroll } = useHeaderScroll();
+
   const { stats, isLoading, isError, isRefetching, refetch } = useAdminDashboard();
+  const {
+    orders,
+    isLoading: isLoadingOrders,
+    isError: isOrdersError,
+    hasNextPage: hasMoreOrders,
+    refetch: refetchOrders,
+  } = useAdminOrders();
+
+  const today = useMemo(() => {
+    const count = orders.filter((order) => isToday(order.created_at)).length;
+    // Only ambiguous when the whole page is today's — otherwise the page holds
+    // every one of them and the count is exact.
+    const capped = hasMoreOrders && count === orders.length && count > 0;
+    return { count, capped };
+  }, [orders, hasMoreOrders]);
 
   const onRefresh = useCallback(() => {
     refetch();
-  }, [refetch]);
+    refetchOrders();
+  }, [refetch, refetchOrders]);
+
+  const openOrders = useCallback(() => {
+    router.push('/(admin)/orders' as never);
+  }, [router]);
+
+  const openSchools = useCallback(() => {
+    router.push('/(admin)/schools' as never);
+  }, [router]);
+
+  const openPeople = useCallback(() => {
+    router.push('/(admin)/users' as never);
+  }, [router]);
 
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
-      <HeaderBar large title="Overview" eyebrow="Across every school" />
+      <HeaderBar
+        large
+        title="Overview"
+        eyebrow="Across every school"
+        scrollY={scrollY}
+      />
 
-      <ScrollView
+      <Animated.ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -118,35 +165,116 @@ export default function DashboardScreen() {
           />
         }
       >
-        {isLoading ? (
+        {isLoading || isLoadingOrders ? (
           <DashboardSkeleton />
-        ) : isError ? (
-          // Falling through to `?? 0` here printed "Schools 0 / Users 0 /
-          // Revenue £0" on a failed request, which reads as real data rather
-          // than a failure to fetch it.
+        ) : isError || isOrdersError ? (
+          // Falling through to `?? 0` printed "Schools 0 · People 0 · ₹0" on a
+          // failed request, which reads as real data rather than as a failure
+          // to fetch it.
+          //
+          // Both queries are in this branch because both feed the headline: if
+          // the queue cannot be fetched, "0 prints ordered" is a claim about a
+          // school day that was never actually asked about.
           <EmptyState
-            icon="cloud-offline-outline"
-            title="Couldn't load statistics"
+            variant="error"
+            title="Couldn't load the overview."
             message="Check your connection and try again."
             action={{ label: 'Try again', onPress: onRefresh }}
           />
         ) : (
-          <View style={styles.grid}>
-            {STAT_CARDS.map((card, index) => (
-              <Reveal key={card.key} index={index} style={styles.gridItem}>
-                <StatCard
-                  icon={card.icon}
-                  label={card.label}
-                  value={stats?.[card.field] ?? 0}
-                  color={card.color}
-                  wash={card.wash}
-                  format={'format' in card ? card.format : undefined}
+          <>
+            {/* ── Today ─────────────────────────────────────────── */}
+            <Reveal>
+              <Card elevation="raised" padding={0} style={styles.todayCard}>
+                <View style={styles.todayBody}>
+                  <Text variant="eyebrow" color={colors.text.tertiary}>
+                    Today
+                  </Text>
+
+                  <View
+                    accessible
+                    accessibilityRole="text"
+                    accessibilityLabel={
+                      today.count === 0
+                        ? 'No prints ordered today'
+                        : `${today.count}${today.capped ? ' or more' : ''} prints ordered today`
+                    }
+                    style={styles.todayFigure}
+                  >
+                    <AnimatedCounter
+                      value={today.count}
+                      suffix={today.capped ? '+' : ''}
+                      duration={motionDuration.slow}
+                      style={styles.todayCounter}
+                    />
+                    <Text variant="h4" style={styles.todayUnit}>
+                      {today.count === 1 ? 'print ordered' : 'prints ordered'}
+                    </Text>
+                  </View>
+
+                  {/* The one editorial line this screen is allowed. */}
+                  <Text variant="editorial" muted style={styles.todayDate}>
+                    {todayLine()}
+                  </Text>
+                </View>
+
+                <Divider inset={spacing.md} />
+
+                <View style={styles.todayFoot}>
+                  <Text variant="bodySmall" muted>
+                    {stats?.orders ?? 0} orders in all, worth{' '}
+                    {formatRupees(stats?.revenue ?? 0)}
+                  </Text>
+
+                  {/* The screen's one persistent primary action. An admin can
+                      read anything on this page; the queue is the only place
+                      they can move something on. */}
+                  <Button
+                    fullWidth
+                    onPress={openOrders}
+                    style={styles.todayAction}
+                    accessibilityHint="Opens the fulfilment queue"
+                  >
+                    Open the queue
+                  </Button>
+                </View>
+              </Card>
+            </Reveal>
+
+            {/* ── The roster ────────────────────────────────────── */}
+            <Reveal index={1} style={styles.rosterHeader}>
+              <SectionHeader title="The roster" />
+            </Reveal>
+
+            <Reveal index={2}>
+              <Card elevation="low" padding={0}>
+                <StatRow
+                  icon="school-outline"
+                  label="Schools"
+                  value={stats?.schools ?? 0}
+                  onPress={openSchools}
+                  accessibilityHint="Opens the list of schools"
                 />
-              </Reveal>
-            ))}
-          </View>
+                <Divider inset={spacing.md} />
+                <StatRow
+                  icon="people-outline"
+                  label="People"
+                  value={stats?.users ?? 0}
+                  caption="Teachers, parents and admins"
+                  onPress={openPeople}
+                  accessibilityHint="Opens the list of people"
+                />
+                <Divider inset={spacing.md} />
+                <StatRow
+                  icon="images-outline"
+                  label="Photographs shared"
+                  value={stats?.photos ?? 0}
+                />
+              </Card>
+            </Reveal>
+          </>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
     </ScreenContainer>
   );
 }
@@ -161,13 +289,43 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: layout.tabBarClearance,
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.ms,
+  skeletonGroup: {
+    marginTop: spacing.lg,
   },
-  gridItem: {
-    flexGrow: 1,
-    flexBasis: '45%',
+  todayCard: {
+    overflow: 'hidden',
+  },
+  todayBody: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+  },
+  todayFigure: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  todayCounter: {
+    fontSize: 40,
+    letterSpacing: tracking.display,
+  },
+  todayUnit: {
+    color: colors.text.secondary,
+  },
+  todayDate: {
+    marginTop: spacing.xs,
+  },
+  todayFoot: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.ms,
+    paddingBottom: spacing.md,
+  },
+  todayAction: {
+    marginTop: spacing.ms,
+  },
+  rosterHeader: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.ms,
   },
 });

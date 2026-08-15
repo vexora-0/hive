@@ -131,6 +131,7 @@ export function useStudentParents(studentId: string | null) {
   const {
     data: parents = [],
     isLoading,
+    isError,
     refetch,
   } = useQuery<StudentParent[]>({
     queryKey: PARENTS_KEY,
@@ -193,6 +194,11 @@ export function useStudentParents(studentId: string | null) {
     parents,
     allParents,
     isLoading,
+    // Additive. Who may see a child's photographs is the one list in Hive that
+    // must never render a failure as "nobody" — an admin reading an empty list
+    // links a parent who is already linked, or assumes a privacy boundary that
+    // was simply not fetched. Brief §9.4.
+    isError,
     isLoadingAllParents,
     refetch,
     mapParent,
