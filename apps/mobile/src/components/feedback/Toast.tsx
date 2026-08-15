@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
@@ -11,7 +12,17 @@ import { MotiView } from 'moti';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, radius, layout, shadows, platformShadow } from '@/theme';
+import {
+  colors,
+  spacing,
+  radius,
+  layout,
+  shadows,
+  platformShadow,
+  duration,
+  easing,
+  useReducedMotion,
+} from '@/theme';
 import { Text } from '@/components/ui';
 
 type ToastVariant = 'success' | 'error' | 'info';
@@ -45,17 +56,25 @@ const ToastInternalContext = createContext<ToastInternal | null>(null);
  * green or red bar reads as an alert banner and pulls the eye off whatever the
  * person was doing; the status belongs in the icon, and the toast belongs in
  * the same material as the tab bar it sits above.
+ *
+ * The glyph differs before the colour does — a tick, a warning, an i — so the
+ * status survives being read in greyscale or by someone who cannot separate the
+ * three hues. Colour is the second channel here, never the only one.
+ *
+ * **Info is peacock, not marigold.** Marigold is the app's single voice and it
+ * is spent on the thing the person is meant to act on. An informational toast
+ * is the least consequential surface in the app; letting it wear the accent
+ * would make the accent mean nothing.
  */
 const VARIANT: Record<
   ToastVariant,
-  { icon: keyof typeof Ionicons.glyphMap; tint: string }
+  { icon: keyof typeof Ionicons.glyphMap; tint: string; dwell: number }
 > = {
-  success: { icon: 'checkmark-circle', tint: colors.success.light },
-  error: { icon: 'alert-circle', tint: colors.error.light },
-  info: { icon: 'information-circle', tint: colors.primary.amberLight },
+  success: { icon: 'checkmark-circle', tint: colors.success.light, dwell: 3000 },
+  // An error has to be read, and often re-read, before it can be acted on.
+  error: { icon: 'alert-circle', tint: colors.error.light, dwell: 5000 },
+  info: { icon: 'information-circle', tint: colors.info.light, dwell: 3000 },
 };
-
-const VISIBLE_MS = 3000;
 
 /**
  * Global toast feedback.
@@ -78,14 +97,26 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   // copy stays hidden, or it would show through the sheet's dimmed backdrop.
   const [outletCount, setOutletCount] = useState(0);
 
+  /** The pending auto-dismiss, cancelled when a newer toast replaces it. */
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    [],
+  );
+
   const show = useCallback((message: string, variant: ToastVariant) => {
     const id = Date.now();
     setToast({ id, message, variant });
-    setTimeout(() => {
+
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
       // Only clear if this toast is still the visible one — a newer toast
       // during the window must not be dismissed early.
       setToast((current) => (current?.id === id ? null : current));
-    }, VISIBLE_MS);
+    }, VARIANT[variant].dwell);
   }, []);
 
   const dismiss = useCallback(() => setToast(null), []);
@@ -152,8 +183,19 @@ interface ToastViewProps {
   onDismiss: () => void;
 }
 
+/**
+ * The slab itself.
+ *
+ * A toast is something the app decided, not something a finger caused, so it
+ * arrives on a timing curve rather than a spring: an unprompted overshoot on
+ * the edge of vision reads as a glitch. It leaves faster than it arrives —
+ * `duration.exit` — because by then the person has already read it. Nothing is
+ * *only* said by the exit, which is what lets Reduce Motion drop it outright.
+ */
 function ToastView({ toast, placement, onDismiss }: ToastViewProps) {
   const insets = useSafeAreaInsets();
+  const reduced = useReducedMotion();
+
   if (!toast) return null;
 
   const offset =
@@ -168,13 +210,23 @@ function ToastView({ toast, placement, onDismiss }: ToastViewProps) {
 
   const variant = VARIANT[toast.variant];
 
+  // Reduce Motion keeps the toast and drops the travel: the message is the
+  // point, the slide is not.
+  const travelY = reduced ? 0 : placement === 'bottom' ? 20 : -20;
+  const restingScale = reduced ? 1 : 0.97;
+
   return (
     <MotiView
       key={toast.id}
-      from={{ opacity: 0, translateY: placement === 'bottom' ? 20 : -20, scale: 0.97 }}
+      from={{ opacity: 0, translateY: travelY, scale: restingScale }}
       animate={{ opacity: 1, translateY: 0, scale: 1 }}
-      exit={{ opacity: 0, translateY: placement === 'bottom' ? 20 : -20, scale: 0.97 }}
-      transition={{ type: 'spring', damping: 22, stiffness: 280, mass: 0.9 }}
+      exit={{ opacity: 0, translateY: travelY, scale: restingScale }}
+      transition={{ type: 'timing', duration: duration.base, easing: easing.standard }}
+      exitTransition={{
+        type: 'timing',
+        duration: duration.exit,
+        easing: easing.accelerate,
+      }}
       style={[styles.container, offset]}
       pointerEvents="box-none"
     >
@@ -182,6 +234,10 @@ function ToastView({ toast, placement, onDismiss }: ToastViewProps) {
         onPress={onDismiss}
         accessibilityRole="alert"
         accessibilityLabel={toast.message}
+        accessibilityHint="Dismisses this message"
+        // Android has no notion of an alert role; a live region is how the
+        // same announcement is made there.
+        accessibilityLiveRegion={toast.variant === 'error' ? 'assertive' : 'polite'}
         style={styles.toast}
       >
         <Ionicons name={variant.icon} size={20} color={variant.tint} />
