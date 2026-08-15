@@ -1,4 +1,4 @@
 export { TabBar } from './TabBar';
 
-export { HeaderBar } from './HeaderBar';
+export { HeaderBar, useHeaderScroll } from './HeaderBar';
 export type { HeaderBarProps, HeaderBarAction } from './HeaderBar';
