@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -45,6 +45,16 @@ const TAB_PAD_BOTTOM = spacing.xs + 2;
 const ICON_LABEL_GAP = 8;
 const PUCK_SIZE = 32;
 /**
+ * How far the icon rises as it takes the puck.
+ *
+ * Small enough to read as weight shifting rather than as an element moving —
+ * and shared with the puck's own offset below, because a puck centred on where
+ * the icon *would have been* leaves 6.5px of marigold above the glyph and
+ * 3.5px below it. That asymmetry is the same defect three separate commits
+ * chased, one step smaller.
+ */
+const FOCUS_RISE = 1.5;
+/**
  * Horizontal padding on the bar itself.
  *
  * The bar is a pill, so its corners curve inward. Without this the first and
@@ -86,6 +96,18 @@ function getVisibleRoutes(routes: TabRoute[]): TabRoute[] {
  * the whole app reading as one flat cream sheet: it gives the page an edge to
  * end at, and it is the only large dark shape in the parent's day.
  *
+ * **The puck is a surface, so what sits on it is ink** — `#181A24` on `#F0A03A`
+ * measures 8.08:1, where marigold as a *label* would measure 2.03:1 and be
+ * unreadable. The bar keeps `ink.900` rather than the viewer's near-neutral
+ * ground: that one is reserved for surrounds that hold a photograph, where a
+ * tinted surround shifts the picture's apparent white balance.
+ *
+ * The puck **animates x only.** Animating its width at the same time is what
+ * clipped the first and last labels, and `spring.snappy` (ζ=0.91, ~220ms) is
+ * tuned to arrive under the destination icon and stop rather than overshoot
+ * and come back — a tab switch happens many times a day and gets a ≤200ms
+ * budget, not a flourish.
+ *
  * The unread count is rendered here rather than through react-navigation's
  * `tabBarBadge`, which this custom bar never draws.
  */
@@ -108,16 +130,26 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   // Tab width is only known after layout, so the puck stays hidden until then
   // rather than flashing at x=0 and sliding into place on first paint.
   const [tabWidth, setTabWidth] = useState(0);
+  const lastTabWidth = useRef(0);
   const puckX = useSharedValue(0);
   const puckReady = useSharedValue(0);
 
   useEffect(() => {
     if (tabWidth <= 0) return;
-    const target =
-      BAR_PAD_H + activeIndex * tabWidth + (tabWidth - PUCK_SIZE) / 2;
+    const target = BAR_PAD_H + activeIndex * tabWidth + (tabWidth - PUCK_SIZE) / 2;
+    const resized = lastTabWidth.current !== tabWidth;
+    lastTabWidth.current = tabWidth;
+
     if (puckReady.value === 0) {
+      // First layout: place it, then fade it in. Opacity is a timing, never a
+      // spring — `withSpring` under ζ<1 clamps at 1.0 and visibly stalls.
       puckX.value = target;
       puckReady.value = withTiming(1, timing(duration.fast));
+    } else if (resized) {
+      // A rotation or a split-screen resize is not a selection change: there
+      // is nothing to follow, so the puck is placed rather than thrown across
+      // a bar that has just changed size underneath it.
+      puckX.value = target;
     } else {
       puckX.value = withSpring(target, spring.snappy);
     }
@@ -147,7 +179,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       pointerEvents="box-none"
       style={[styles.host, { paddingBottom: Math.max(insets.bottom, spacing.ms) }]}
     >
-      <View style={styles.bar} onLayout={onLayout}>
+      <View style={styles.bar} onLayout={onLayout} accessibilityRole="tablist">
         <Animated.View style={[styles.puck, puckStyle]} />
 
         {visibleRoutes.map((route) => {
@@ -165,6 +197,9 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               canPreventDefault: true,
             });
             if (!isFocused && !event.defaultPrevented) {
+              // `onPress` fires at finger-lift, which is where the selection
+              // haptic belongs: it lands with the puck leaving, not while the
+              // finger is still deciding.
               Haptics.selectionAsync();
               navigation.navigate(route.name, route.params);
             }
@@ -222,19 +257,25 @@ function Tab({
   }, [focused, lift]);
 
   // The icon rises a couple of pixels and grows as it takes the puck — small
-  // enough to feel like weight shifting rather than an element resizing.
+  // enough to feel like weight shifting rather than an element resizing. Both
+  // are transforms, which is the only thing a spring may drive.
   const iconStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateY: -lift.value * 1.5 },
+      { translateY: -lift.value * FOCUS_RISE },
       { scale: 1 + lift.value * 0.06 },
     ],
   }));
+
+  // A dot is invisible to a screen reader, so the count is said out loud.
+  const spokenLabel = accessibilityLabel ?? label;
+  const a11yLabel =
+    badgeCount > 0 ? `${spokenLabel}, ${badgeCount} unread` : spokenLabel;
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: focused }}
-      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityLabel={a11yLabel}
       onPress={onPress}
       onLongPress={onLongPress}
       style={styles.tab}
@@ -242,6 +283,9 @@ function Tab({
       <Animated.View style={iconStyle}>
         {icon?.({
           focused,
+          // Ink on the marigold puck (8.08:1); the muted paper tone on the ink
+          // bar (7.63:1). Fill versus line is the icon's own job — hue never
+          // differentiates a tab.
           color: focused ? colors.ink[900] : colors.text.onInkMuted,
           size: ICON_SIZE,
         })}
@@ -292,11 +336,13 @@ const styles = StyleSheet.create({
   },
   puck: {
     position: 'absolute',
-    top: ICON_CENTER_Y - PUCK_SIZE / 2,
+    // Centred on the icon's *lifted* position, because the puck only ever sits
+    // under a focused icon and a focused icon is FOCUS_RISE px higher.
+    top: ICON_CENTER_Y - FOCUS_RISE - PUCK_SIZE / 2,
     left: 0,
     width: PUCK_SIZE,
     height: PUCK_SIZE,
-    borderRadius: PUCK_SIZE / 2,
+    borderRadius: radius.pill,
     backgroundColor: colors.primary.amber,
   },
   tab: {
@@ -325,7 +371,7 @@ const styles = StyleSheet.create({
     minWidth: 17,
     height: 17,
     paddingHorizontal: 4,
-    borderRadius: 9,
+    borderRadius: radius.pill,
     backgroundColor: colors.error.main,
     alignItems: 'center',
     justifyContent: 'center',
