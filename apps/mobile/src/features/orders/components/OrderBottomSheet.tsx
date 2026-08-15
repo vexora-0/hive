@@ -1,13 +1,21 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { MotiView } from 'moti';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { v4 as uuidv4 } from 'uuid';
 
-import { colors, spacing, radius, shadows, platformShadow } from '@/theme';
+import {
+  colors,
+  spacing,
+  radius,
+  shadows,
+  platformShadow,
+  MIN_TAP_SIZE,
+} from '@/theme';
 import { Text, Button, TextInput, Divider } from '@/components/ui';
 import { HiveImage } from '@/components/media';
+import { Reveal } from '@/components/animation';
+import { BottomSheet } from '@/components/feedback';
 import type { ProductType } from '@/types/supabase';
 
 import {
@@ -17,7 +25,6 @@ import {
 } from '../constants/products';
 import { useCreateOrder } from '../hooks/useOrders';
 import { ProductPicker } from './ProductPicker';
-import { Modal } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -34,13 +41,9 @@ export interface OrderBottomSheetProps {
   onClose: () => void;
 }
 
-type Step = 'product' | 'summary' | 'confirm';
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-
 
 /**
  * Reads from the shared catalogue. This used to hold a second, hand-written
@@ -51,23 +54,34 @@ function getProductLabel(type: ProductType): string {
   return PRODUCT_LABELS[type];
 }
 
-/** The three steps, in order, with the name shown while you are on it. */
-const STEPS: { key: Step; label: string }[] = [
-  { key: 'product', label: 'Choose' },
-  { key: 'summary', label: 'Review' },
-  { key: 'confirm', label: 'Confirm' },
-];
-
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 /**
- * `<OrderBottomSheet>` — a 3-step bottom sheet flow for placing an order.
+ * `<OrderBottomSheet>` — ordering a print, on one screen.
  *
- * Step 1: Select a product type via ProductPicker.
- * Step 2: Review order summary with quantity stepper.
- * Step 3: Enter shipping address and confirm the order.
+ * It used to be a three-step wizard: choose, review, confirm, with a named
+ * progress rail across the top. A wizard exists to break up a form with
+ * genuine unknowns in it — but by the time a parent gets here they are
+ * authenticated, and their child, class and school are all already known to the
+ * server. **There was nothing to wizard through.** What the three steps
+ * actually did was hide the price behind two taps and put the delivery address
+ * on a screen the parent reached only after committing.
+ *
+ * So: one screen. The photograph, the catalogue, how many, where it goes, and
+ * the money — in that order, which is the order the questions occur to
+ * somebody. Two things follow from collapsing it:
+ *
+ *  - **The all-in figure is on the button**, in the pinned footer, from the
+ *    moment a product is chosen. It is visible without scrolling and it never
+ *    changes on the next screen, because there is no next screen.
+ *  - **Delivery is stated up front**, under the catalogue, before any choice is
+ *    made. A delivery cost that first appears at checkout is the oldest hostile
+ *    pattern in commerce; Hive's is included, and saying so is free.
+ *
+ * Every hook call, the idempotency key, the server-side pricing and the address
+ * validation are unchanged — this is a change of shape, not of ordering logic.
  */
 export function OrderBottomSheet({
   photoId,
@@ -78,7 +92,6 @@ export function OrderBottomSheet({
   const createOrder = useCreateOrder();
 
   // ── Local state ─────────────────────────────────────────────────────
-  const [step, setStep] = useState<Step>('product');
   const [selectedType, setSelectedType] = useState<ProductType | null>(null);
   const [quantity, setQuantity] = useState(1);
   // Starts empty. This used to pre-fill from `profile.phone`, so every parent
@@ -91,42 +104,21 @@ export function OrderBottomSheet({
   const [orderSuccess, setOrderSuccess] = useState(false);
 
   const handleDismiss = useCallback(() => {
-    setStep('product');
     setSelectedType(null);
     setQuantity(1);
     setNotes('');
     // Cleared with the rest of the per-attempt state: the address itself is
     // kept on purpose (a parent orders to the same address twice), but a
     // "touched" flag left over from a previous sheet would show the required
-    // error on the confirm step of a fresh order the parent has not typed in.
+    // error on a fresh order the parent has not typed in.
     setAddressTouched(false);
     setOrderSuccess(false);
     createOrder.reset();
     onClose();
   }, [onClose, createOrder]);
 
-  // ── Step navigation ────────────────────────────────────────────────
   const handleProductSelect = useCallback((type: ProductType) => {
     setSelectedType(type);
-  }, []);
-
-  const goToSummary = useCallback(() => {
-    if (!selectedType) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setStep('summary');
-  }, [selectedType]);
-
-  const goToConfirm = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setStep('confirm');
-  }, []);
-
-  const goBack = useCallback(() => {
-    setStep((prev) => {
-      if (prev === 'confirm') return 'summary';
-      if (prev === 'summary') return 'product';
-      return prev;
-    });
   }, []);
 
   // ── Quantity stepper ──────────────────────────────────────────────
@@ -156,8 +148,6 @@ export function OrderBottomSheet({
 
     const idempotencyKey = uuidv4();
 
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
     createOrder.mutate(
       {
         items: [
@@ -173,6 +163,11 @@ export function OrderBottomSheet({
       },
       {
         onSuccess: () => {
+          // The haptic lands with the confirmation, not with the tap. A Success
+          // buzz at request time congratulates the parent on an order the
+          // server has not accepted yet — and fires again, wrongly, if it
+          // fails.
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           setOrderSuccess(true);
         },
       },
@@ -182,105 +177,108 @@ export function OrderBottomSheet({
   // ── Computed values ────────────────────────────────────────────────
   const unitPrice = selectedType ? PRODUCT_PRICES_PAISE[selectedType] : 0;
   const totalPrice = unitPrice * quantity;
+  const canPlace = !!selectedType && hasAddress;
 
-  // ── Render helpers ─────────────────────────────────────────────────
-
-  // A named rail rather than three dots: "Review" tells a parent where they
-  // are and what is left, which a row of circles cannot.
-  const renderStepIndicator = () => {
-    const activeIndex = STEPS.findIndex((s) => s.key === step);
-
+  // ── The order placed ──────────────────────────────────────────────
+  if (orderSuccess) {
     return (
-      <View
-        style={styles.stepIndicator}
-        accessibilityRole="progressbar"
-        accessibilityLabel={`Step ${activeIndex + 1} of ${STEPS.length}: ${STEPS[activeIndex]?.label}`}
+      <BottomSheet
+        visible={isVisible}
+        onClose={handleDismiss}
+        // The one place a toast is deliberately swallowed. `useCreateOrder`
+        // raises "Order placed successfully" on the way in, and this panel says
+        // the same thing better and with the figures — a banner over the top of
+        // it is the app congratulating itself twice. Errors keep their outlet
+        // on the form below, where the server's own wording is worth reading.
+        toastOutlet={false}
+        footer={
+          <Button variant="primary" fullWidth onPress={handleDismiss}>
+            Done
+          </Button>
+        }
       >
-        {STEPS.map((s, index) => {
-          const isActive = index === activeIndex;
-          const isDone = index < activeIndex;
-          return (
-            <View key={s.key} style={styles.stepItem}>
-              <View
-                style={[
-                  styles.stepBar,
-                  isDone && styles.stepBarDone,
-                  isActive && styles.stepBarActive,
-                ]}
-              />
-              <Text
-                variant="tiny"
-                color={
-                  isActive
-                    ? colors.text.accent
-                    : isDone
-                      ? colors.text.secondary
-                      : colors.text.tertiary
-                }
-              >
-                {s.label}
-              </Text>
+        <View style={styles.successPanel}>
+          {/* One quiet mark. There used to be confetti here — forty pieces
+              over two and a half seconds, on a screen a parent sees perhaps
+              once a term and a teacher saw every working day. */}
+          <Reveal scale>
+            <View style={styles.checkmark}>
+              <Ionicons name="checkmark" size={34} color={colors.success.main} />
             </View>
-          );
-        })}
-      </View>
+          </Reveal>
+
+          <Reveal index={1}>
+            <Text variant="h2" center style={styles.successTitle}>
+              Order placed.
+            </Text>
+          </Reveal>
+
+          <Reveal index={2}>
+            <Text variant="body" muted center style={styles.successMessage}>
+              {quantity} × {selectedType ? getProductLabel(selectedType) : ''} ·{' '}
+              {formatRupees(totalPrice)}. Your school will confirm it shortly, and
+              you can follow it under Orders.
+            </Text>
+          </Reveal>
+        </View>
+      </BottomSheet>
     );
-  };
+  }
 
-  const renderProductStep = () => (
-    <View style={styles.stepContent}>
-      <Text variant="h3">What would you like?</Text>
-      <Text variant="bodySmall" muted style={styles.subtitle}>
-        Pick one to start. You can order more later.
-      </Text>
-      <ProductPicker selectedType={selectedType} onSelect={handleProductSelect} />
-      <Button
-        variant="primary"
-        size="lg"
-        fullWidth
-        onPress={goToSummary}
-        disabled={!selectedType}
-        style={styles.ctaButton}
-      >
-        Continue
-      </Button>
-    </View>
-  );
-
-  const renderSummaryStep = () => (
-    <View style={styles.stepContent}>
-      <Pressable
-        onPress={goBack}
-        style={styles.backButton}
-        accessibilityRole="button"
-        accessibilityLabel="Back to product choice"
-      >
-        <Ionicons name="chevron-back" size={16} color={colors.text.accent} />
-        <Text variant="bodySmallBold" color={colors.text.accent}>
-          Back
-        </Text>
-      </Pressable>
-
-      <Text variant="h3">Your order</Text>
-
-      {/* The photo is shown mounted, the way it will be printed. */}
-      <View style={styles.summaryRow}>
+  // ── The order ─────────────────────────────────────────────────────
+  return (
+    <BottomSheet
+      visible={isVisible}
+      onClose={handleDismiss}
+      title="Order a print"
+      subtitle="Delivery is included in every price."
+      showClose
+      scroll
+      keyboard
+      footer={
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          onPress={handlePlaceOrder}
+          loading={createOrder.isPending}
+          disabled={!canPlace}
+          accessibilityHint={
+            canPlace
+              ? undefined
+              : 'Choose what you would like and add a delivery address first'
+          }
+        >
+          {selectedType
+            ? `Place order · ${formatRupees(totalPrice)}`
+            : 'Place order'}
+        </Button>
+      }
+    >
+      {/* The photograph being ordered, mounted the way it will be printed. */}
+      <View style={styles.photoRow}>
         <View style={styles.thumbnailMount}>
-          <HiveImage uri={photoUri} style={styles.thumbnail} />
-        </View>
-        <View style={styles.summaryDetails}>
-          <Text variant="bodyBold">
-            {selectedType ? getProductLabel(selectedType) : ''}
-          </Text>
-          <Text variant="bodySmall" muted>
-            {formatRupees(unitPrice)} each
-          </Text>
+          <HiveImage
+            uri={photoUri}
+            recyclingKey={photoId}
+            style={styles.thumbnail}
+            contentFit="cover"
+          />
         </View>
       </View>
 
-      {/* Quantity stepper */}
+      <Text variant="h4" style={styles.question}>
+        What would you like?
+      </Text>
+
+      {/* The sheet's own subtitle carries the delivery line, pinned above the
+          scroll area — so it is stated before any choice is made and stays
+          stated, rather than being repeated here as body copy. */}
+      <ProductPicker selectedType={selectedType} onSelect={handleProductSelect} />
+
+      {/* How many */}
       <View style={styles.quantityRow}>
-        <Text variant="bodyBold">Quantity</Text>
+        <Text variant="bodyBold">How many?</Text>
         <View style={styles.stepper}>
           <Pressable
             onPress={decrementQuantity}
@@ -292,10 +290,14 @@ export function OrderBottomSheet({
             <Ionicons
               name="remove"
               size={19}
-              color={quantity <= 1 ? colors.gray[400] : colors.text.primary}
+              color={quantity <= 1 ? colors.gray[500] : colors.text.primary}
             />
           </Pressable>
-          <Text variant="bodyBold" style={styles.quantityText}>
+          <Text
+            variant="bodyBold"
+            style={styles.quantityText}
+            accessibilityLabel={`Quantity ${quantity}`}
+          >
             {quantity}
           </Text>
           <Pressable
@@ -309,113 +311,50 @@ export function OrderBottomSheet({
         </View>
       </View>
 
-      {/* Total */}
-      <View style={styles.totalRow}>
-        <Text variant="bodyBold">Total</Text>
-        <MotiView
-          key={totalPrice}
-          from={{ scale: 0.94, opacity: 0.6 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', damping: 13, stiffness: 240 }}
-        >
-          <Text variant="priceLarge">{formatRupees(totalPrice)}</Text>
-        </MotiView>
-      </View>
+      {/* Where it goes */}
+      <TextInput
+        label="Delivery address"
+        placeholder="Flat, street, area, city, PIN"
+        value={shippingAddress}
+        onChangeText={setShippingAddress}
+        // The only thing that used to set `addressTouched` was the submit
+        // handler — and the button is disabled while the address is empty, so
+        // the handler could never run in the one case the message exists for.
+        // Marking it touched on blur is what makes the explanation appear, and
+        // blur means it never fires at a parent who has not reached the field.
+        onBlur={() => setAddressTouched(true)}
+        error={
+          addressTouched && !hasAddress
+            ? 'We need an address to send the prints to.'
+            : undefined
+        }
+        multiline
+        containerStyle={styles.input}
+      />
 
-      <Button
-        variant="primary"
-        size="lg"
-        fullWidth
-        onPress={goToConfirm}
-        style={styles.ctaButton}
-      >
-        Continue
-      </Button>
-    </View>
-  );
+      <TextInput
+        label="Notes for the school"
+        placeholder="Anything they should know? (optional)"
+        value={notes}
+        onChangeText={setNotes}
+        multiline
+        containerStyle={styles.input}
+      />
 
-  const renderConfirmStep = () => {
-    // Success state
-    if (orderSuccess) {
-      return (
-        <View style={styles.successContainer}>
-          <MotiView
-            from={{ scale: 0.6, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', damping: 12, stiffness: 200 }}
-            style={styles.checkmarkCircle}
-          >
-            <Ionicons name="checkmark" size={38} color={colors.success.dark} />
-          </MotiView>
-          <Text variant="h2" center style={styles.successTitle}>
-            Order placed
-          </Text>
-          <Text variant="body" muted center style={styles.successMessage}>
-            {formatRupees(totalPrice)} · {quantity} ×{' '}
-            {selectedType ? getProductLabel(selectedType) : ''}. Your school will
-            confirm it shortly, and you can follow it under Orders.
-          </Text>
-          <Button variant="primary" size="md" fullWidth onPress={handleDismiss}>
-            Done
-          </Button>
-        </View>
-      );
-    }
-
-    return (
-      <View style={styles.stepContent}>
-        <Pressable
-          onPress={goBack}
-          style={styles.backButton}
-          accessibilityRole="button"
-          accessibilityLabel="Back to the order summary"
-        >
-          <Ionicons name="chevron-back" size={16} color={colors.text.accent} />
-          <Text variant="bodySmallBold" color={colors.text.accent}>
-            Back
-          </Text>
-        </Pressable>
-
-        <Text variant="h3">Where should it go?</Text>
-
-        <TextInput
-          label="Delivery address"
-          placeholder="Flat, street, area, city, PIN"
-          value={shippingAddress}
-          onChangeText={setShippingAddress}
-          // The only thing that used to set `addressTouched` was the submit
-          // handler — and "Place Order" is disabled while the address is
-          // empty, so the handler could never run in the one case the message
-          // exists for. The error was unreachable: a parent who left the field
-          // blank got a greyed-out button and no stated reason. Marking it
-          // touched on blur is what makes the explanation appear, and blur
-          // means it never fires at a parent who has not reached the field.
-          onBlur={() => setAddressTouched(true)}
-          error={
-            addressTouched && !hasAddress
-              ? 'We need an address to send the prints to.'
-              : undefined
-          }
-          multiline
-          containerStyle={styles.input}
-        />
-
-        <TextInput
-          label="Notes for the school"
-          placeholder="Anything they should know? (optional)"
-          value={notes}
-          onChangeText={setNotes}
-          multiline
-          containerStyle={styles.input}
-        />
-
-        {/* Order recap */}
-        <View style={styles.recapCard}>
+      {/* The money, in full, before the button is ever pressed. */}
+      {selectedType && (
+        <View style={styles.recap}>
           <View style={styles.recapRow}>
             <Text variant="bodySmall" muted>
-              {selectedType ? getProductLabel(selectedType) : ''} × {quantity}
+              {getProductLabel(selectedType)} × {quantity}
             </Text>
-            <Text variant="bodySmallBold">{formatRupees(totalPrice)}</Text>
+            <Text variant="bodySmall">{formatRupees(totalPrice)}</Text>
+          </View>
+          <View style={styles.recapRow}>
+            <Text variant="bodySmall" muted>
+              Delivery
+            </Text>
+            <Text variant="bodySmall">Included</Text>
           </View>
           <Divider style={styles.divider} />
           <View style={styles.recapRow}>
@@ -423,58 +362,19 @@ export function OrderBottomSheet({
             <Text variant="price">{formatRupees(totalPrice)}</Text>
           </View>
         </View>
+      )}
 
-        {createOrder.isError && (
-          <View style={styles.errorBox}>
-            <Ionicons name="alert-circle" size={17} color={colors.error.dark} />
-            <Text variant="bodySmall" color={colors.error.dark} style={styles.errorText}>
-              We couldn't place the order. Check your connection and try again.
-            </Text>
-          </View>
-        )}
+      {createOrder.isError && (
+        <View style={styles.errorBox} accessibilityLiveRegion="polite">
+          <Ionicons name="alert-circle-outline" size={17} color={colors.error.main} />
+          <Text variant="bodySmall" color={colors.error.main} style={styles.errorText}>
+            We couldn&apos;t place the order. Check your connection and try again.
+          </Text>
+        </View>
+      )}
 
-        <Button
-          variant="primary"
-          size="lg"
-          fullWidth
-          onPress={handlePlaceOrder}
-          loading={createOrder.isPending}
-          disabled={!hasAddress}
-          style={styles.ctaButton}
-        >
-          {`Place order · ${formatRupees(totalPrice)}`}
-        </Button>
-      </View>
-    );
-  };
-
-  // ── Main render ───────────────────────────────────────────────────
-  return (
-    <Modal
-      visible={isVisible}
-      transparent
-      animationType="slide"
-      onRequestClose={handleDismiss}
-    >
-      <Pressable style={styles.backdrop} onPress={handleDismiss}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.handleIndicatorBar} />
-          {!orderSuccess && renderStepIndicator()}
-          {/* Scrollable: the confirm step's two multiline fields plus the
-              keyboard exceed the sheet's 88% ceiling on a small phone, and
-              without this the Place order button is unreachable. */}
-          <ScrollView
-            contentContainerStyle={styles.container}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {step === 'product' && renderProductStep()}
-            {step === 'summary' && renderSummaryStep()}
-            {step === 'confirm' && renderConfirmStep()}
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
+      <View style={styles.bodyFoot} />
+    </BottomSheet>
   );
 }
 
@@ -483,80 +383,10 @@ export function OrderBottomSheet({
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: colors.overlay.scrim,
-  },
-  sheet: {
-    maxHeight: '88%',
-    backgroundColor: colors.background.cream,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    ...platformShadow(shadows.xlarge),
-  },
-  container: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  handleIndicatorBar: {
-    alignSelf: 'center',
-    backgroundColor: colors.border.default,
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    marginTop: spacing.ms,
+  // ── The photograph ──
+  photoRow: {
+    alignItems: 'flex-start',
     marginBottom: spacing.md,
-  },
-
-  // Step indicator
-  stepIndicator: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-  },
-  stepItem: {
-    flex: 1,
-    gap: spacing.sm,
-  },
-  stepBar: {
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: colors.border.light,
-  },
-  stepBarDone: {
-    backgroundColor: colors.primary.amberLight,
-  },
-  stepBarActive: {
-    backgroundColor: colors.primary.amber,
-  },
-
-  // Step content
-  stepContent: {},
-  subtitle: {
-    marginTop: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  ctaButton: {
-    marginTop: spacing.lg,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xxs,
-    marginLeft: -spacing.xs,
-    marginBottom: spacing.sm,
-    alignSelf: 'flex-start',
-    minHeight: 36,
-  },
-
-  // Summary step
-  summaryRow: {
-    flexDirection: 'row',
-    marginTop: spacing.md,
-    gap: spacing.md,
-    alignItems: 'center',
   },
   thumbnailMount: {
     padding: spacing.xs + 2,
@@ -565,21 +395,24 @@ const styles = StyleSheet.create({
     ...platformShadow(shadows.small),
   },
   thumbnail: {
-    width: 76,
-    height: 76,
+    width: 84,
+    height: 84,
     borderRadius: radius.print,
   },
-  summaryDetails: {
-    flex: 1,
-    gap: spacing.xs,
+
+  // ── The catalogue ──
+  question: {
+    marginBottom: spacing.ms,
   },
+
+  // ── Quantity ──
   quantityRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: spacing.lg,
     paddingTop: spacing.md,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border.light,
   },
   stepper: {
@@ -591,9 +424,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.surfaceSecondary,
   },
   stepperButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: MIN_TAP_SIZE,
+    height: MIN_TAP_SIZE,
+    borderRadius: radius.pill,
     backgroundColor: colors.background.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -605,23 +438,16 @@ const styles = StyleSheet.create({
     minWidth: 28,
     textAlign: 'center',
   },
-  totalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
-  },
 
-  // Confirm step
+  // ── Address and notes ──
   input: {
     marginTop: spacing.md,
   },
-  recapCard: {
+
+  // ── The money ──
+  recap: {
     marginTop: spacing.lg,
-    backgroundColor: colors.background.surface,
+    backgroundColor: colors.background.surfaceSecondary,
     borderRadius: radius.lg,
     padding: spacing.md,
     gap: spacing.sm,
@@ -632,30 +458,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   divider: {
-    marginVertical: spacing.xs,
+    marginVertical: spacing.xxs,
   },
+
   errorBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm,
     marginTop: spacing.md,
     padding: spacing.ms,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     backgroundColor: colors.error.background,
   },
   errorText: {
     flex: 1,
   },
 
-  // Success state
-  successContainer: {
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
+  /** Keeps the last field clear of the pinned footer while scrolling. */
+  bodyFoot: {
+    height: spacing.lg,
   },
-  checkmarkCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+
+  // ── The order placed ──
+  successPanel: {
+    alignItems: 'center',
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  checkmark: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.pill,
     backgroundColor: colors.success.background,
     alignItems: 'center',
     justifyContent: 'center',
@@ -665,7 +498,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   successMessage: {
-    marginBottom: spacing.xl,
     maxWidth: 320,
   },
 });
