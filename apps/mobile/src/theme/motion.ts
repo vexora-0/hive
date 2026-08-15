@@ -18,7 +18,28 @@
  *    config below carries `reduceMotion: ReduceMotion.System`, so an animation
  *    built from these values already does the right thing on a device where
  *    the setting is on. Use `useReducedMotion()` for the cases config cannot
- *    cover — autoplaying loops, parallax, confetti.
+ *    cover — autoplaying loops, parallax.
+ *  - **Springs move things; timings colour them.** `withSpring` on `opacity` or
+ *    a colour clamps at 1.0 whenever ζ < 1 and visibly stalls at the end of the
+ *    run. That is a bug class, not a style preference — use `withTiming` for
+ *    anything that is not a transform.
+ *
+ * ── The vocabulary is damping ratio (ζ) ──────────────────────────────
+ *
+ * ζ = damping / (2 × √(stiffness × mass)). It is the only figure that carries
+ * between Material's published tokens, Reanimated's `{duration, dampingRatio}`
+ * form and a conversation with a designer, so every spring below is documented
+ * by its ratio and its settling time rather than by three raw numbers.
+ *
+ *  - **ζ 0.85–1.0** — settles once, no visible wobble.
+ *  - **ζ 0.7–0.85** — one faint overshoot. **This is the house register.**
+ *  - **ζ ≤ 0.6** — a toy. Forbidden on anything that travels further than a
+ *    press, where the overshoot reads as imprecision rather than as life.
+ *
+ * **Ceiling: 400ms for anything the user waits through. 500ms is a failure.**
+ * Budget by frequency — a tab switch or a photo tap happens many times a day
+ * and gets ≤200ms; placing an order happens weekly and earns one crafted
+ * 300–400ms moment.
  */
 
 import {
@@ -32,35 +53,60 @@ import {
 // ── Springs ──────────────────────────────────────────────────────────
 
 export const spring = {
-  /** Press feedback — fast, no overshoot. The finger is still on the glass. */
+  /**
+   * Press feedback. **ζ = 0.57, ~270ms, 11.5% overshoot.**
+   *
+   * That ratio is below the house floor and the comment here used to claim "no
+   * overshoot", which was simply wrong. It is kept because at the distance a
+   * press actually travels — a scale of 1 → 0.96 — 5% of 4% is invisible, and
+   * the low ratio is what makes it feel immediate under the finger. **Do not
+   * reuse it for anything that moves further**, where the same config is
+   * visibly springy.
+   */
   press: {
     damping: 18,
     stiffness: 420,
     mass: 0.6,
     reduceMotion: ReduceMotion.System,
   },
-  /** The default for anything moving into place. */
+  /** The default for anything moving into place. **ζ = 0.74, ~380ms.** */
   gentle: {
-    damping: 20,
-    stiffness: 180,
+    damping: 21,
+    stiffness: 200,
     mass: 1,
     reduceMotion: ReduceMotion.System,
   },
-  /** Selection changes — tab pills, segmented controls, chips. */
+  /**
+   * Selection changes — the tab puck, segmented controls, chips.
+   * **ζ = 0.91, ~220ms.**
+   *
+   * Was ζ = 0.69. At one tab-width of travel that overshoot read as the puck
+   * missing its mark and coming back, which is what three separate alignment
+   * fixes were chasing. It now arrives under the destination icon and stops.
+   * Animate **x only** — animating width at the same time is what clipped the
+   * first and last labels.
+   */
   snappy: {
-    damping: 22,
+    damping: 29,
     stiffness: 320,
     mass: 0.8,
     reduceMotion: ReduceMotion.System,
   },
-  /** Reserved for celebration: a total updating, an order landing. */
+  /**
+   * The one place a little life is allowed: a total updating, an order landing.
+   * **ζ = 0.65, ~380ms.**
+   *
+   * Was ζ = 0.39 with 26% overshoot and a 655ms settle — toy physics, and past
+   * the point where a delay stops reading as character and starts reading as
+   * lag.
+   */
   bouncy: {
-    damping: 11,
-    stiffness: 220,
+    damping: 19,
+    stiffness: 236,
     mass: 0.9,
     reduceMotion: ReduceMotion.System,
   },
-  /** Sheets and large panels — heavy, settles without a wobble. */
+  /** Sheets and large panels — heavy, settles without a wobble. **ζ = 0.87, ~290ms.** */
   sheet: {
     damping: 28,
     stiffness: 260,
@@ -78,9 +124,26 @@ export const duration = {
   fast: 180,
   /** 260ms — the default. */
   base: 260,
-  /** 420ms — entrances, screen-level reveals. */
-  slow: 420,
-  /** 650ms — the one deliberate moment on a screen. */
+  /** 380ms — entrances, screen-level reveals. Inside the 400ms ceiling. */
+  slow: 380,
+  /**
+   * 200ms — **the exit.**
+   *
+   * Exits used to inherit entrance timings, which is why dismissing anything
+   * felt sticky: leaving should be quicker than arriving, because the user has
+   * already decided. Pair with `easing.accelerate`.
+   *
+   * Never carry meaning in an exit — Reduce Motion *omits* exit animations
+   * rather than shortening them, so anything only an exit communicates is
+   * invisible to the users who most need it stated.
+   */
+  exit: 200,
+  /**
+   * 650ms — the one deliberate moment.
+   *
+   * **Off the user's path only**: an ambient flourish they are not waiting on.
+   * Never an entrance, a transition, or anything between a tap and its result.
+   */
   deliberate: 650,
 } as const;
 
@@ -101,6 +164,20 @@ export const easing = {
 export function timing(
   ms: number = duration.base,
   curve = easing.standard,
+): WithTimingConfig {
+  return { duration: ms, easing: curve, reduceMotion: ReduceMotion.System };
+}
+
+/**
+ * The matching exit — quicker than the entrance, and accelerating out.
+ *
+ * ```ts
+ * opacity.value = withTiming(0, exitTiming());
+ * ```
+ */
+export function exitTiming(
+  ms: number = duration.exit,
+  curve = easing.accelerate,
 ): WithTimingConfig {
   return { duration: ms, easing: curve, reduceMotion: ReduceMotion.System };
 }
@@ -160,6 +237,7 @@ export const motion = {
   duration,
   easing,
   timing,
+  exitTiming,
   stagger,
   pressScale,
   travel,

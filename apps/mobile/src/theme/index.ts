@@ -27,6 +27,7 @@ export {
   fontFamily,
   fontSize,
   lineHeight,
+  tracking,
   textStyles,
   getTextStyle,
 } from './typography';
@@ -50,6 +51,7 @@ export {
   duration,
   easing,
   timing,
+  exitTiming,
   stagger,
   pressScale,
   travel,
@@ -82,7 +84,14 @@ import {
   withAlpha,
 } from './colors';
 import { spacing, radius, grid, layout } from './spacing';
-import { textStyles, getTextStyle, fontFamily, fontSize, lineHeight } from './typography';
+import {
+  textStyles,
+  getTextStyle,
+  fontFamily,
+  fontSize,
+  lineHeight,
+  tracking,
+} from './typography';
 import { shadows, platformShadow } from './shadows';
 import { motion } from './motion';
 import * as constants from './constants';
@@ -100,6 +109,7 @@ export const theme = {
   fontFamily,
   fontSize,
   lineHeight,
+  tracking,
   textStyles,
   getTextStyle,
   shadows,
