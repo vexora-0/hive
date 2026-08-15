@@ -2,7 +2,6 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors } from '@/theme';
 import { RoleGate } from '@/features/auth/components/RoleGate';
 import { TabBar } from '@/components/navigation';
 
@@ -24,18 +23,21 @@ function tabIcon(
 // ---------------------------------------------------------------------------
 
 /**
- * Admin tab layout — 6 tabs: Dashboard, Users, Schools, Orders, Alerts, Profile.
+ * Admin tab layout — six tabs: Home, Users, Schools, Orders, Alerts, Profile.
+ *
+ * The tint options that used to sit in `screenOptions` are gone rather than
+ * corrected. `TabBar` paints its own two states — ink on the marigold puck at
+ * 8.08:1, the muted paper tone on the ink bar at 7.63:1 — so the values here
+ * were never read; the active one was `primary.amber`, which measures 2.03:1
+ * and cannot legally colour an icon that has to be read. A dead prop naming a
+ * forbidden colour is a trap for whoever wires the next tab group.
  */
 export default function AdminLayout() {
   return (
     <RoleGate allow={['admin']}>
     <Tabs
       tabBar={(props) => <TabBar {...props} />}
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary.amber,
-        tabBarInactiveTintColor: colors.text.tertiary,
-      }}
+      screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen
         name="dashboard"

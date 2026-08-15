@@ -45,6 +45,7 @@ export function useAdminSchools() {
   const {
     data,
     isLoading,
+    isError,
     isRefetching,
     fetchNextPage,
     hasNextPage,
@@ -121,6 +122,10 @@ export function useAdminSchools() {
   return {
     schools,
     isLoading,
+    // Additive: the schools screen had no error state at all, and a failed
+    // request rendered as "No schools yet" — an empty list dressed over a
+    // failure. See docs/design/UI-REVAMP-BRIEF.md §9.4.
+    isError,
     isRefetching,
     fetchNextPage,
     hasNextPage: hasNextPage ?? false,

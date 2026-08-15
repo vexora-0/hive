@@ -7,9 +7,17 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, layout, ANIMATION_DURATION } from '@/theme';
+import {
+  colors,
+  spacing,
+  radius,
+  duration,
+  timing,
+  MIN_TAP_SIZE,
+} from '@/theme';
 import { Text } from '@/components/ui/Text';
-import { Card } from '@/components/ui/Card';
+import { Card, Divider } from '@/components/ui/Card';
+import { Avatar } from '@/components/ui/Avatar';
 import type { AdminSchool } from '@/features/admin/services/adminService';
 
 // ---------------------------------------------------------------------------
@@ -17,14 +25,37 @@ import type { AdminSchool } from '@/features/admin/services/adminService';
 // ---------------------------------------------------------------------------
 
 export interface SchoolCardProps {
-  /** The school data to display. */
+  /** The school this card is about. */
   school: AdminSchool;
   /** Called when the card header is pressed. Used to edit the school. */
   onPress?: (school: AdminSchool) => void;
-  /** Called when "Add class" is pressed. */
+  /** Called when "Add a class" is pressed. */
   onAddClass?: (school: AdminSchool) => void;
-  /** Called when a class item is pressed. */
+  /** Called when a class is pressed. */
   onClassPress?: (classId: string) => void;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function plural(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/**
+ * The school's size as one sentence rather than three pills.
+ *
+ * Three bordered pills, each with its own icon and its own count, is a
+ * dashboard widget standing in for a line of prose. The line says the same
+ * thing, reads in one pass, and leaves the card with one visual idea in it.
+ */
+function sizeLine(counts: AdminSchool['_count']): string {
+  return [
+    plural(counts.classes, 'class', 'classes'),
+    plural(counts.students, 'child', 'children'),
+    plural(counts.teachers, 'teacher', 'teachers'),
+  ].join(' · ');
 }
 
 // ---------------------------------------------------------------------------
@@ -32,23 +63,37 @@ export interface SchoolCardProps {
 // ---------------------------------------------------------------------------
 
 /**
- * `<SchoolCard>` -- a card showing school details with an expandable section
- * that reveals the class list.
+ * `<SchoolCard>` — one school, and the classes inside it.
  *
- * ```tsx
- * <SchoolCard school={school} onPress={navigateToSchool} />
- * ```
+ * The card leads with the school as an identity object: its initials on the
+ * wash its name always gets, the same device a person's row uses, so a list of
+ * schools and a list of people are recognisably the same app. Underneath, one
+ * quiet line of prose says how big it is.
+ *
+ * What went: three tinted stat pills at `borderRadius: 8`, an "Add class"
+ * button on a hand-mixed `amber + '15'` fill, and a 22pt icon circle on
+ * `amber + '1A'`. All three were marigold used as a *tint* — the one thing the
+ * palette says it must never be — and two of them sat at radii outside the
+ * locked scale.
  */
-export function SchoolCard({ school, onPress, onAddClass, onClassPress }: SchoolCardProps) {
+export function SchoolCard({
+  school,
+  onPress,
+  onAddClass,
+  onClassPress,
+}: SchoolCardProps) {
   const [expanded, setExpanded] = useState(false);
   const rotation = useSharedValue(0);
 
   const toggleExpand = useCallback(() => {
-    setExpanded((prev) => !prev);
-    rotation.value = withTiming(expanded ? 0 : 1, {
-      duration: ANIMATION_DURATION,
+    setExpanded((prev) => {
+      // Springs move things, timings colour them — but a rotation is a
+      // transform, and this one is small enough that a curve reads cleaner
+      // than a settle.
+      rotation.value = withTiming(prev ? 0 : 1, timing(duration.fast));
+      return !prev;
     });
-  }, [expanded, rotation]);
+  }, [rotation]);
 
   const chevronStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value * 180}deg` }],
@@ -58,155 +103,123 @@ export function SchoolCard({ school, onPress, onAddClass, onClassPress }: School
     onPress?.(school);
   }, [onPress, school]);
 
+  const classCount = school.classes.length;
+
   return (
-    <Card style={styles.card}>
-      {/* Header */}
+    <Card elevation="low" padding={0}>
+      {/* ── The school ───────────────────────────────────────────── */}
       <Pressable
         onPress={handlePress}
-        style={styles.header}
-        accessibilityRole="button"
-        accessibilityLabel={onPress ? `Edit ${school.name}` : school.name}
+        disabled={!onPress}
+        style={({ pressed }) => [styles.header, pressed && styles.headerPressed]}
+        accessibilityRole={onPress ? 'button' : undefined}
+        accessibilityLabel={school.name}
+        accessibilityHint={onPress ? 'Edits this school' : undefined}
       >
-        <View style={styles.iconCircle}>
-          <Ionicons name="school" size={22} color={colors.text.accent} />
-        </View>
+        <Avatar name={school.name} size="md" />
 
         <View style={styles.headerInfo}>
           <Text variant="bodyBold" numberOfLines={1}>
             {school.name}
           </Text>
+
           {school.address && (
-            <Text
-              variant="bodySmall"
-              color={colors.text.secondary}
-              numberOfLines={1}
-            >
+            <Text variant="bodySmall" muted numberOfLines={1}>
               {school.address}
             </Text>
           )}
+
+          <Text variant="caption" color={colors.text.tertiary} numberOfLines={1}>
+            {sizeLine(school._count)}
+          </Text>
         </View>
 
         {/* Only shown when the card is actually editable — otherwise the
             header is not pressable and a pencil would be a lie. */}
         {onPress && (
-          <Ionicons
-            name="create-outline"
-            size={18}
-            color={colors.text.tertiary}
-          />
+          <Ionicons name="create-outline" size={18} color={colors.text.tertiary} />
         )}
       </Pressable>
 
-      {/* Stats row */}
-      <View style={styles.statsRow}>
-        <StatPill
-          icon="layers-outline"
-          value={school._count.classes}
-          label="Classes"
-        />
-        <StatPill
-          icon="people-outline"
-          value={school._count.students}
-          label="Students"
-        />
-        <StatPill
-          icon="school-outline"
-          value={school._count.teachers}
-          label="Teachers"
-        />
-      </View>
+      <Divider inset={spacing.md} />
 
-      {/* Add class button */}
-      <Pressable
-        onPress={() => onAddClass?.(school)}
-        style={styles.addClassButton}
-        accessibilityRole="button"
-        accessibilityLabel="Add class to this school"
-      >
-        <Ionicons name="add-circle-outline" size={18} color={colors.text.accent} />
-        <Text variant="bodySmallBold" color={colors.text.accent}>
-          Add class
-        </Text>
-      </Pressable>
-
-      {/* Expandable toggle */}
-      {school.classes.length > 0 && (
-        <>
+      {/* ── Its classes ──────────────────────────────────────────── */}
+      <View style={styles.actions}>
+        {classCount > 0 ? (
           <Pressable
             onPress={toggleExpand}
-            style={styles.expandToggle}
+            style={styles.action}
             accessibilityRole="button"
-            accessibilityLabel={expanded ? 'Collapse class list' : 'Expand class list'}
+            accessibilityState={{ expanded }}
+            accessibilityLabel={
+              expanded
+                ? 'Hide the class list'
+                : `Show ${plural(classCount, 'class', 'classes')}`
+            }
           >
             <Text variant="bodySmallBold" color={colors.text.accent}>
-              {expanded ? 'Hide classes' : `View ${school.classes.length} classes`}
+              {expanded ? 'Hide classes' : `${plural(classCount, 'class', 'classes')}`}
             </Text>
             <Animated.View style={chevronStyle}>
-              <Ionicons
-                name="chevron-down"
-                size={18}
-                color={colors.text.accent}
-              />
+              <Ionicons name="chevron-down" size={17} color={colors.text.accent} />
             </Animated.View>
           </Pressable>
+        ) : (
+          <View style={styles.action}>
+            <Text variant="bodySmall" muted>
+              No classes yet
+            </Text>
+          </View>
+        )}
 
-          {expanded && (
-            <View style={styles.classList}>
-              {school.classes.map((cls) => (
-                <Pressable
-                  key={cls.id}
-                  style={styles.classItem}
-                  onPress={() => onClassPress?.(cls.id)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open ${cls.name} class`}
-                >
-                  <Ionicons
-                    name="book-outline"
-                    size={16}
-                    color={colors.text.tertiary}
-                  />
-                  <Text variant="bodySmall" color={colors.text.secondary} style={{ flex: 1 }}>
-                    {cls.name}
-                    {cls.grade ? ` (${cls.grade})` : ''}
+        <Pressable
+          onPress={() => onAddClass?.(school)}
+          style={styles.action}
+          accessibilityRole="button"
+          accessibilityLabel={`Add a class to ${school.name}`}
+        >
+          <Ionicons name="add" size={18} color={colors.text.accent} />
+          <Text variant="bodySmallBold" color={colors.text.accent}>
+            Add a class
+          </Text>
+        </Pressable>
+      </View>
+
+      {expanded && classCount > 0 && (
+        <View style={styles.classList}>
+          {school.classes.map((cls) => (
+            <Pressable
+              key={cls.id}
+              style={({ pressed }) => [
+                styles.classItem,
+                pressed && styles.classItemPressed,
+              ]}
+              onPress={() => onClassPress?.(cls.id)}
+              accessibilityRole="button"
+              accessibilityLabel={cls.grade ? `${cls.name}, ${cls.grade}` : cls.name}
+              accessibilityHint="Opens the class, its teacher and its children"
+            >
+              <View style={styles.classText}>
+                <Text variant="bodySmall" numberOfLines={1}>
+                  {cls.name}
+                </Text>
+                {cls.grade && (
+                  <Text variant="caption" color={colors.text.tertiary} numberOfLines={1}>
+                    {cls.grade}
                   </Text>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={16}
-                    color={colors.text.tertiary}
-                  />
-                </Pressable>
-              ))}
-            </View>
-          )}
-        </>
+                )}
+              </View>
+
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={colors.text.tertiary}
+              />
+            </Pressable>
+          ))}
+        </View>
       )}
     </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// StatPill sub-component
-// ---------------------------------------------------------------------------
-
-function StatPill({
-  icon,
-  value,
-  label,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  value: number;
-  label: string;
-}) {
-  return (
-    <View style={styles.statPill}>
-      <Ionicons name={icon} size={14} color={colors.text.tertiary} />
-      <Text variant="captionBold" color={colors.text.primary}>
-        {value}
-      </Text>
-      <Text variant="caption" color={colors.text.tertiary}>
-        {label}
-      </Text>
-    </View>
   );
 }
 
@@ -215,73 +228,50 @@ function StatPill({
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  card: {
-    padding: spacing.md,
-    borderRadius: layout.cardRadius,
-    backgroundColor: colors.background.surface,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
+    gap: spacing.ms,
+    padding: spacing.md,
   },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primary.amber + '1A',
-    alignItems: 'center',
-    justifyContent: 'center',
+  headerPressed: {
+    backgroundColor: colors.background.surfaceSecondary,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
   },
   headerInfo: {
     flex: 1,
-    gap: 2,
+    gap: spacing.xxs,
   },
-  statsRow: {
+  actions: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
   },
-  statPill: {
-    flex: 1,
+  action: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    backgroundColor: colors.background.surfaceSecondary,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    borderRadius: 8,
-  },
-  addClassButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.xs,
-    borderRadius: 8,
-    backgroundColor: colors.primary.amber + '15',
-  },
-  expandToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border.light,
+    minHeight: MIN_TAP_SIZE,
   },
   classList: {
-    gap: spacing.xs,
-    paddingTop: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.sm,
   },
   classItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
+    minHeight: MIN_TAP_SIZE,
+    borderRadius: radius.sm,
+  },
+  classItemPressed: {
+    backgroundColor: colors.background.surfaceSecondary,
+  },
+  classText: {
+    flex: 1,
   },
 });
 
