@@ -67,10 +67,6 @@ export interface UseUploadReturn {
   isUploading: boolean;
   /** Whether all images have completed. */
   isComplete: boolean;
-  /** Whether confetti should be shown (true once all complete). */
-  showConfetti: boolean;
-  /** Dismiss confetti. */
-  dismissConfetti: () => void;
   /** Reset the entire upload pipeline. */
   resetUpload: () => void;
 }
@@ -171,11 +167,16 @@ export function normaliseContentType(
  *   idle -> hashing -> requesting-url -> uploading -> saving -> tagging -> complete
  *
  * Errors at any step transition the image to 'error' with a message.
- * The hook tracks overall progress and triggers confetti on completion.
+ *
+ * **Finishing a batch is near-silent**: one Success haptic once every image has
+ * landed, and nothing else. This hook used to raise a flag for a particle
+ * overlay that ran for two and a half seconds on every completed batch — on a
+ * surface a teacher works through every day, which is exactly the frequency at
+ * which a reward becomes a delay. The overlay was deleted; its flag and the
+ * dismiss callback beside it went with it, having no reader left in the app.
  */
 export function useUpload(): UseUploadReturn {
   const [images, setImages] = useState<UploadImage[]>([]);
-  const [showConfetti, setShowConfetti] = useState(false);
   const toast = useToast();
 
   // Ref to track if upload is in progress (avoid stale closures)
@@ -367,7 +368,6 @@ export function useUpload(): UseUploadReturn {
       if (pending.length === 0) return;
 
       isUploadingRef.current = true;
-      setShowConfetti(false);
 
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -402,11 +402,11 @@ export function useUpload(): UseUploadReturn {
 
       isUploadingRef.current = false;
 
-      // Check if all images completed
+      // One Success haptic per batch, at the point the last photo lands —
+      // never one per photo. Twenty taps on the wrist is not celebration.
       setImages((current) => {
         const allComplete = current.every((img) => img.state === 'complete');
         if (allComplete && current.length > 0) {
-          setShowConfetti(true);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
         return current;
@@ -435,11 +435,12 @@ export function useUpload(): UseUploadReturn {
 
       await processImage(resetImage, classId, studentIds);
 
-      // Check completion after retry
+      // The same per-batch haptic: a retry that lands the last outstanding
+      // photo has finished the batch, so it earns the one Success the batch is
+      // allowed. A retry that leaves others failing gets nothing.
       setImages((current) => {
         const allComplete = current.every((img) => img.state === 'complete');
         if (allComplete && current.length > 0) {
-          setShowConfetti(true);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
         return current;
@@ -448,17 +449,10 @@ export function useUpload(): UseUploadReturn {
     [images, processImage, updateImage],
   );
 
-  // ── Dismiss confetti ────────────────────────────────────────────────
-
-  const dismissConfetti = useCallback(() => {
-    setShowConfetti(false);
-  }, []);
-
   // ── Reset ───────────────────────────────────────────────────────────
 
   const resetUpload = useCallback(() => {
     setImages([]);
-    setShowConfetti(false);
     isUploadingRef.current = false;
   }, []);
 
@@ -493,8 +487,6 @@ export function useUpload(): UseUploadReturn {
     overallProgress,
     isUploading,
     isComplete,
-    showConfetti,
-    dismissConfetti,
     resetUpload,
   };
 }
