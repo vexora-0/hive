@@ -72,10 +72,19 @@ function joinedLine(iso: string): string | null {
  * switch" is exactly what makes an app look like the 2015 school-admin console
  * it is trying not to be, so all three now share one neutral wash and the word
  * does the work.
+ *
+ * **The role stamp sits on the name's line, inside the text column.** It used
+ * to be a sibling of the whole column, centred against three lines of text and
+ * taking its width off every one of them: the email had 193pt to live in, which
+ * is less than the demo data's own addresses need, so rows read
+ * "parent.rajesh@bloom.dem…" — an address cut mid-domain, which is worse than
+ * no address at all. The stamp belongs to the name anyway. Moving it there
+ * gives the email the column's full 257pt and its own line, with the school and
+ * the joined date demoted to the caption underneath.
  */
 export function UserListItem({ user, schoolName, onPress }: UserListItemProps) {
   const joined = joinedLine(user.created_at);
-  const secondary = schoolName ? `${user.email} · ${schoolName}` : user.email;
+  const meta = [schoolName, joined].filter(Boolean).join(' · ');
 
   return (
     <Pressable
@@ -88,22 +97,26 @@ export function UserListItem({ user, schoolName, onPress }: UserListItemProps) {
       <Avatar uri={user.avatar_url} name={user.full_name} size="md" />
 
       <View style={styles.info}>
-        <Text variant="bodyBold" numberOfLines={1}>
-          {user.full_name}
-        </Text>
+        <View style={styles.nameRow}>
+          {/* `flex: 1` so a long name truncates rather than shouldering the
+              stamp off the row. */}
+          <Text variant="bodyBold" numberOfLines={1} style={styles.name}>
+            {user.full_name}
+          </Text>
+
+          <Badge variant="neutral">{ROLE_LABEL[user.role]}</Badge>
+        </View>
 
         <Text variant="bodySmall" muted numberOfLines={1}>
-          {secondary}
+          {user.email}
         </Text>
 
-        {joined && (
+        {meta.length > 0 && (
           <Text variant="caption" color={colors.text.tertiary} numberOfLines={1}>
-            {joined}
+            {meta}
           </Text>
         )}
       </View>
-
-      <Badge variant="neutral">{ROLE_LABEL[user.role]}</Badge>
 
       <Ionicons
         name="chevron-forward"
@@ -132,7 +145,17 @@ const styles = StyleSheet.create({
   },
   info: {
     flex: 1,
+    minWidth: 0,
     gap: spacing.xxs,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  name: {
+    flex: 1,
+    minWidth: 0,
   },
 });
 

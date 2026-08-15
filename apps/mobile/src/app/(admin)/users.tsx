@@ -1,11 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { ActivityIndicator, RefreshControl, StyleSheet, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -30,10 +24,20 @@ import type { UserRole } from '@/types/supabase';
 // Four labelled pills, which is the cap. Icon-only filters and a fifth pill
 // both fail for the same reason: the strip stops being readable at a glance,
 // which is the only thing a filter strip has to be.
+//
+// **All four have to be visible at rest.** The strip used to be a horizontal
+// scroller, so at 390pt the fourth pill was sliced down the middle and read
+// "Adm…" — and a word cut in half is the loudest possible signal that a screen
+// is broken, whether or not it scrolls. Measured at 390: the four pills wanted
+// 453pt against 390 available. "Everyone" became "All" — the word the brief
+// gives the same idea on the parent feed's child switcher, and 47pt narrower —
+// and the pills take the denser `ms` inset a four-up strip needs, 8pt narrower
+// each. That lands the strip at 372pt, inside 390 with room to spare. The
+// screen's own eyebrow already says whom the list is of.
 // ---------------------------------------------------------------------------
 
 const ROLE_FILTERS: Array<{ label: string; value: UserRole | undefined }> = [
-  { label: 'Everyone', value: undefined },
+  { label: 'All', value: undefined },
   { label: 'Teachers', value: 'teacher' },
   { label: 'Parents', value: 'parent' },
   { label: 'Admins', value: 'admin' },
@@ -42,20 +46,22 @@ const ROLE_FILTERS: Array<{ label: string; value: UserRole | undefined }> = [
 // ---------------------------------------------------------------------------
 // Skeleton
 //
-// Shaped like `UserListItem` — a 44pt circle, a name, a line of secondary ink
-// — at the same row height, so the list does not reflow when the people land.
-// The 200ms delay is served inside `SkeletonShimmer`.
+// Shaped like `UserListItem` — a 44pt circle, then the three lines the row
+// actually has: a name, an email, and the school it belongs to. At the row's
+// own height, so the list does not reflow when the people land. The 200ms delay
+// is served inside `SkeletonShimmer`.
 // ---------------------------------------------------------------------------
 
 function PeopleSkeleton() {
   return (
     <View>
-      {Array.from({ length: 7 }).map((_, i) => (
+      {Array.from({ length: 6 }).map((_, i) => (
         <View key={i} style={styles.skeletonRow}>
           <SkeletonShimmer width={44} height={44} borderRadius={radius.pill} index={i} />
           <View style={styles.skeletonText}>
             <SkeletonShimmer width="55%" height={15} borderRadius={radius.xs} index={i} />
-            <SkeletonShimmer width="78%" height={12} borderRadius={radius.xs} index={i} />
+            <SkeletonShimmer width="78%" height={13} borderRadius={radius.xs} index={i} />
+            <SkeletonShimmer width="42%" height={11} borderRadius={radius.xs} index={i} />
           </View>
         </View>
       ))}
@@ -247,25 +253,22 @@ export default function UsersScreen() {
           />
         </View>
 
-        {/* react-native-web gives a ScrollView flex: 1, so without the style
-            below the chip row stretches down the page and pushes the list to
-            the bottom. Native sizes it to content. */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll}
-          contentContainerStyle={styles.filterRow}
-        >
+        {/* A wrapping row, not a scroller: there are exactly four filters and
+            there will never be a fifth, so nothing here needs to be reachable
+            by dragging. At a larger text size the last pill drops to a second
+            line, which is legible; sliced in half, it was not. */}
+        <View style={styles.filterRow}>
           {ROLE_FILTERS.map((filter) => (
             <Chip
               key={filter.label}
               selected={roleFilter === filter.value}
               onPress={() => setRoleFilter(filter.value)}
+              style={styles.filterChip}
             >
               {filter.label}
             </Chip>
           ))}
-        </ScrollView>
+        </View>
 
         <FlashList
           data={users}
@@ -314,15 +317,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: layout.screenPaddingHorizontal,
     paddingBottom: spacing.ms,
   },
-  filterScroll: {
-    flexGrow: 0,
-    flexShrink: 0,
-  },
   filterRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     paddingHorizontal: layout.screenPaddingHorizontal,
     paddingBottom: spacing.md,
+  },
+  /** Four abreast at 390pt needs the denser inset — see the note on
+   *  `ROLE_FILTERS`. A pill on its own keeps the component's `md`. */
+  filterChip: {
+    paddingHorizontal: spacing.ms,
   },
   listContent: {
     paddingBottom: layout.tabBarClearance,
@@ -342,7 +347,9 @@ const styles = StyleSheet.create({
     gap: spacing.ms,
     paddingHorizontal: layout.screenPaddingHorizontal,
     paddingVertical: spacing.ms,
-    minHeight: 60,
+    // 93 = the real row: a 27pt name line, a 21pt email, a 17pt caption, their
+    // 2pt gaps and 12pt of padding top and bottom.
+    minHeight: 93,
   },
   skeletonText: {
     flex: 1,
