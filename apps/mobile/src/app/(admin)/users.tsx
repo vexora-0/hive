@@ -155,6 +155,7 @@ export default function UsersScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.filterScroll}
           contentContainerStyle={styles.filterRow}
         >
           {ROLE_FILTERS.map((filter) => (
@@ -245,6 +246,13 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     // TextInput component handles its own width
+  },
+  // react-native-web gives a ScrollView flex: 1, so without this the chip row
+  // stretches down the page and pushes the list to the bottom of the screen.
+  // Native sizes it to content, which is why this only showed up in a browser.
+  filterScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
   },
   filterRow: {
     flexDirection: 'row',

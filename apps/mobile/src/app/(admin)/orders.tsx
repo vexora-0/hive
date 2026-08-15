@@ -152,6 +152,7 @@ export default function OrdersScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.filterScroll}
           contentContainerStyle={styles.filterRow}
         >
           {STATUS_FILTERS.map((filter) => (
@@ -228,6 +229,13 @@ export default function OrdersScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  // react-native-web gives a ScrollView flex: 1, so without this the chip row
+  // stretches down the page and pushes the list to the bottom of the screen.
+  // Native sizes it to content, which is why this only showed up in a browser.
+  filterScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
   },
   filterRow: {
     flexDirection: 'row',
