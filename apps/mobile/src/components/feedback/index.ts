@@ -12,5 +12,7 @@ export type { ErrorBoundaryProps } from './ErrorBoundary';
 export { ToastProvider, useToast, ToastOutlet } from './Toast';
 export { Modal } from './Modal';
 export type { ModalProps } from './Modal';
+export { BottomSheet } from './BottomSheet';
+export type { BottomSheetProps } from './BottomSheet';
 export { ConfirmDialog } from './ConfirmDialog';
 export type { ConfirmDialogProps } from './ConfirmDialog';
