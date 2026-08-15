@@ -170,11 +170,23 @@ Verified: no duplicate IDs in a parent's feed.
 `/health` returns **503** with `"status": "degraded"` and
 `"checks": {"database": "error"}`. Verified by stopping Supabase mid-run.
 
-**Volunteer the gap:** `/health` checks the database but **not Redis**. With
-Redis stopped, `POST /orders` hangs — the idempotency middleware talks to Redis
-before the handler runs, and a request stayed open past two minutes. So the
-health check would report `ok` while ordering is dead. That is a known,
-documented defect, not something we discovered in the viva.
+**Volunteer the war story:** this used to be much worse for Redis. With Redis
+stopped, `POST /orders` did not fail — it hung, past two minutes. The
+idempotency middleware runs before the handler and already caught Redis
+failures, but the failure never arrived: `maxRetriesPerRequest: null`, left
+behind by the queue we removed, combined with the client's offline queue to make
+a command that retried forever and never settled. An entirely optional
+dependency could take out the most important flow in the product.
+
+Commands now fail after two retries with the offline queue disabled, so the
+middleware's existing catch fires and ordering degrades to "not deduplicated"
+instead of "not working". Measured with Redis stopped: **485 ms**, not a hang.
+
+`/health` now reports `"cache"` alongside `"database"`, but **deliberately does
+not let Redis change the status code** — losing the idempotency cache degrades
+deduplication rather than availability, so the instance should stay in rotation.
+The residual limitation, if pressed: an orchestrator probing only the status
+code will not drain an instance whose Redis is down.
 
 Naming this unprompted is worth more than being caught by it.
 
@@ -184,7 +196,7 @@ Naming this unprompted is worth more than being caught by it.
 
 ### "Four people. What did *you* do?"
 
-Data layer — schema, migrations, validation, seed data. 70 of 367 commits.
+Data layer — schema, migrations, validation, seed data. 72 of 376 commits.
 
 Lead with the two where diagnosis was the work:
 

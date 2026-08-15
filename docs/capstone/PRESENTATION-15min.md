@@ -274,9 +274,7 @@ confirmed they detect the regressions they target.
 2. **Run the k6 suite** against that deployment
 3. **iOS and Android builds** — keychain sessions, image picker, deep links
 4. **Make the CI test step blocking** (three repository secrets)
-5. **Redis health check and timeout** — a known defect: with Redis stopped, order
-   submission blocks while `/health` still reports healthy
-6. Payments · push notifications · photograph search · retention policy
+5. Payments · push notifications · photograph search · retention policy
 
 **Close on:** *"What is not proven is anything requiring a deployment, and I have
 been specific about which items those are."* Then stop and take questions.

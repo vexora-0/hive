@@ -764,155 +764,6 @@ Phase 2 begins with a full codebase audit, then addresses the items above in dep
 
 ---
 
-# Phase 2
-
-# Week 17 — Authorization & Access Control
-
-**Dates:** 24 May 2026 – 30 May 2026
-**Commits:** 12 — Nagachaitanya 12
-**Covers:** Plan 01 (Steps 1, 3, 5) and Plan 04, worked across Weeks 14–17
-
-## Phase objective
-
-Close the four IDOR findings in the API, stop the app rendering screens the signed-in user has no right to see, and wire up the notification centre that Phase 1 left unimported.
-
-## Individual contributions
-
-**Nagachaitanya** did all twelve commits in this window. Weeks 14 to 17 were scheduled as four people working in parallel on Plans 00, 02, 03 and 04; in practice only Plan 01's authorization and notification items and Plan 04 were started. Plan 00 (Bhargav), Plan 02 (Srujan) and Plan 03 (Ruthwik) have not begun, so the mobile package still fails `tsc --noEmit` with the same 22 errors it carried out of Phase 1, and photo storage is still local disk served without authentication.
-
-The commit split above is not a four-way split, and this report does not present it as one.
-
-## Important technical implementation
-
-The root cause of all four IDORs is one architectural fact: the backend queries exclusively through `supabaseAdmin`, built with `SUPABASE_SERVICE_KEY`, and the service-role key is exempt from row level security by design. The 505-line policy set in migration `00011` therefore never sees an API request — it protects only the four places the mobile app talks to Supabase directly. Every endpoint has to re-implement authorization by hand, and in four places it did not.
-
-`feed.service.getPhotoDetails` accepted no user ID at all and filtered only on `status='ready'`, so any parent iterating photo UUIDs could retrieve any photo in the system together with its full tagged-student list — a cross-school child roster. It now requires that one of the caller's own children is tagged in the photo, and returns 404 rather than 403 on refusal: a 403 confirms the photo exists, which is itself a leak when IDs are enumerable. It also returns only the caller's own children in `taggedStudentIds`, because authorization is not binary — a parent entitled to the photo is still not entitled to know who else is in it.
-
-`assertSchoolAccess` in `middleware/roleGuard.ts` and `assertPhotoOwnership` in `photo.service.ts` are the two new guards. Both allow platform admins through explicitly, which matters because admins carry `school_id = null` and a plain equality check would lock them out of everything.
-
-On the client, `RoleGate` wraps each group's navigator. `app/index.tsx` already redirected by role, but it is only consulted when entering through the root, and `hive://` is a registered scheme — so `hive://(admin)/dashboard` mounted the admin console for a parent. The component's doc comment states that it is a UX control and not a security control, so that nobody later mistakes it for the boundary.
-
-## Issues and challenges
-
-**Nothing could be run.** The repository has no `.env`, only `.env.example`, so the backend cannot boot, the app cannot start, and no Supabase call can be made. Plan 04's Verification section is eight curl checks across two accounts at different schools plus six device checks, and not one of them has been executed. The fixes are reviewed code, not observed behaviour, and the Done-when boxes have been left unticked to say so.
-
-Verification was therefore static: `pnpm typecheck`, `pnpm lint`, and a per-commit diff of the mobile typecheck output against the 22-error baseline captured before any change. That baseline held identical after every mobile commit, with no error in `RoleGate.tsx`, any `_layout.tsx`, or any `notifications.tsx`.
-
-Plan 04 is documented as depending on Plan 03, which has not started. The overlap is `getPhotoDetails`, which both plans edit. The authorization block sits above the URL construction and does not touch it, so Plan 03 can swap `/uploads/...` for signed Storage URLs without conflict.
-
-One decision was left open by the plan and had to be made: whether tagging a student requires being the photo's uploader or merely a teacher at the same school. Uploader, matching `/file` and `/confirm`, so a single guard covers all three routes.
-
-## Testing and validation
-
-No automated tests exist yet — Plan 08 has not started. Static checks only:
-
-- `pnpm --filter @hive/backend typecheck` — clean after every commit
-- `pnpm lint` — 8 problems, down from 9; all remaining are pre-existing and none are in code touched this week
-- `pnpm --filter @hive/mobile typecheck` — 22 errors, byte-identical to the pre-work baseline
-- `grep -rn "school_admin" packages apps supabase` — no matches
-
-## Relevant commits
-
-```
-feat(notifications): wire notification centre into all three role screens
-refactor(rbac): remove unsupported school_admin role across API and app
-security(admin): sanitise user search to prevent PostgREST filter injection
-security(feed): enforce parent ownership on the photo detail endpoint
-security(feed): return only the requesting parent's tagged children
-security(schools): scope class and student listings to the caller's school
-security(photos): scope class photo listing to the caller's school
-security(photos): verify photo ownership on file upload, confirm and tag
-feat(auth): add RoleGate component for route-level access control
-security(app): guard parent, teacher and admin route groups by role
-refactor(app): remove unused auth state reads from the root layout
-docs(plans): record plan 01 and 04 deviations and update the tracker
-```
-
-## End state
-
-G-03, G-04, G-05, G-08, G-09, G-16 and G-17 are addressed in code and unverified in practice. No screen in the app reads "Coming Soon". Checkpoint CP-2 is not met: it also requires an order to be placeable (Plan 02) and photos in private storage with thumbnails (Plan 03), neither of which has been started.
-
-## Next week
-
-Plan 08's backend test harness — Vitest and Supertest, with a guard that refuses to run against the demo database. Writing the auth and RBAC tests is the only way the authorization work above stops being unverified, and T-6 and T-7 exist precisely to catch a regression of this week's two worst findings.
-
----
-
-# Week 21 — Test Harness & Observability
-
-**Dates:** 21 June 2026 – 27 June 2026
-**Commits:** 8 — Nagachaitanya 8
-**Covers:** Plan 08 (harness, auth tests, error tests) and Plan 09 Step 3, worked across Weeks 18–21
-
-## Phase objective
-
-Give the project a test runner it never had, cover the authentication and error paths, and make production failures visible without shipping children's data to a third party.
-
-## Individual contributions
-
-**Nagachaitanya** did all eight commits. Plans 02, 03, 05, 06 and 07 remain unstarted, so the schedule's W18–W21 split across four people did not happen; the other three test files in Plan 08 (photos, feed, orders, admin) belong to Ruthwik and Srujan and are not written.
-
-## Important technical implementation
-
-The harness is Vitest plus Supertest against a real Supabase project. The piece worth describing is the guard in `tests/setup.ts`: the suite deletes every row in every domain table and deletes the auth users it creates, so it refuses to start unless `.env.test` exists, and refuses outright if `SUPABASE_URL` contains the demo project ref. That ref is hard-coded rather than read from configuration — a guard that reads the value it is guarding against is not a guard.
-
-`createTestUser` signs the user in for real and returns the Supabase-issued access token. A hand-built JWT would defeat the point: the tests exist to prove `authenticate` verifies tokens against Supabase and reads role and school from the `profiles` row, which is the only thing standing between the API and an unauthenticated caller, since `supabaseAdmin` bypasses RLS.
-
-T-4 asserts 403 and specifically *not* 401 for a wrong-role caller, because `lib/api.ts` signs the user out on any 401 — a `roleGuard` returning 401 would present as a mysterious logout rather than an error. T-34 throws an error whose message embeds a database password and asserts the response body contains neither it nor the connection string under `NODE_ENV=production`, then asserts the opposite outside production so both sides of the branch are exercised.
-
-On observability, Sentry is off unless a DSN is set. `beforeSend` walks the entire event — request, extra, contexts, exception values, stack frame variables, breadcrumbs — redacting sensitive keys and regex-matching bearer tokens, JWTs, email addresses and storage URLs. `http`/`fetch` breadcrumbs are dropped wholesale because they record full request URLs, and on mobile `attachScreenshot` and `attachViewHierarchy` are disabled: a screenshot of this app is, by definition, a photograph of a child.
-
-Backend initialisation had to move into `config/instrument.ts`, imported first for its side effect. A bare `initSentry()` placed between import statements does not run first — imports are hoisted, so it would execute after every module in the file had already loaded, including the ones Sentry patches.
-
-Reporting hooks into `errorHandler` instead of `Sentry.setupExpressErrorHandler`, so only unexpected errors are sent. `AppError` is excluded on purpose: a 403 on a cross-school request is the authorization layer working as designed, and reporting those would bury genuine failures.
-
-## Issues and challenges
-
-**The 36-test suite has never been run.** There is no `.env.test` and no test Supabase project, so `pnpm test` cannot reach a database. Twelve of the thirty-six tests are written; none have executed. Plan 08's sabotage exercise — reverting each fix and confirming the matching test fails — has not been done either, and until it is, there is no evidence these tests test anything.
-
-Two things *were* executed, and both passed:
-
-- **The database guard**, in both branches. With no `.env.test` the suite refuses with a message naming the file to create; with `SUPABASE_URL` pointed at the demo project ref it refuses with an explicit warning that it would wipe the demo data.
-- **The Sentry scrubber**, against a synthetic event carrying a JWT, two email addresses, a client IP, a signed storage URL, an `/uploads` URL, a password field and a hostname. None survived; a user-agent string and a student's first name did, confirming it redacts rather than blanks.
-
-One bug was found and fixed while writing this: `.env.example` ships `SENTRY_DSN=` with no value, which dotenv turns into an empty string, and an empty string fails `z.string().url()`. Anyone following the setup instructions would have hit a startup validation failure. The schema now preprocesses empty to undefined.
-
-Incidentally, `require('sharp')` loads on this machine — the check CLAUDE.md flags as the gate on Plan 03's synchronous-thumbnail approach. The fixture JPEG was generated with it.
-
-## Testing and validation
-
-- `pnpm --filter @hive/backend typecheck` — clean, now covering `tests/` through a second `tsconfig.test.json` pass
-- `pnpm lint` — 8 problems, unchanged and all pre-existing
-- `pnpm --filter @hive/mobile typecheck` — 22 errors, still identical to the Plan 00 baseline
-- Test-database guard — executed, refuses correctly in both branches
-- Sentry `beforeSend` — executed, no sensitive value survived
-- `pnpm test` — **not run.** No test project exists.
-
-## Relevant commits
-
-```
-test(setup): add Vitest and Supertest harness with test database guard
-test(helpers): add fixtures and factory helpers for test data
-test(auth): cover authentication and role-based access control
-test(errors): cover validation and error handler behaviour
-ci: add test task to the turbo pipeline
-security(obs): stop logging client IPs and raw error objects on auth failures
-feat(obs): integrate Sentry with PII scrubbing on backend and mobile
-docs(report): add week 21 progress report
-```
-
-## End state
-
-A working test harness with 12 of Plan 08's 36 tests written and none executed. Error reporting wired on both apps, scrubbed and verified in isolation, but never confirmed end to end against a live Sentry project. Checkpoint CP-4 (36 tests green, CI on every PR) is not met — CI is Ruthwik's Plan 09 Step 5 and does not exist yet.
-
-## Next week
-
-Plan 10's security document and the auth sequence diagram. The threat model, the three authorization layers and the remediation table are all things this stream now has real material for.
-
----
-
-*Hive · Ruthwik, Bhargav, Srujan, Nagachaitanya*
-
 # Phase 2 — Completion & Hardening
 
 **Period:** Week 14 onwards · 3 May 2026 –
@@ -1221,6 +1072,78 @@ for everything remaining.
 
 ---
 
+# Weeks 14–17 — Authorization & Access Control (Nagachaitanya)
+
+**Dates:** 3 – 30 May 2026 (reported at the end of Week 17)
+**Commits:** 12 — Nagachaitanya 12
+**Covers:** Plan 01 (Steps 1, 3, 5) and Plan 04, worked across Weeks 14–17
+
+## Phase objective
+
+Close the four IDOR findings in the API, stop the app rendering screens the signed-in user has no right to see, and wire up the notification centre that Phase 1 left unimported.
+
+## Individual contributions
+
+**Nagachaitanya** did all twelve commits in this window. Weeks 14 to 17 were scheduled as four people working in parallel on Plans 00, 02, 03 and 04; in practice only Plan 01's authorization and notification items and Plan 04 were started. Plan 00 (Bhargav), Plan 02 (Srujan) and Plan 03 (Ruthwik) have not begun, so the mobile package still fails `tsc --noEmit` with the same 22 errors it carried out of Phase 1, and photo storage is still local disk served without authentication.
+
+The commit split above is not a four-way split, and this report does not present it as one.
+
+## Important technical implementation
+
+The root cause of all four IDORs is one architectural fact: the backend queries exclusively through `supabaseAdmin`, built with `SUPABASE_SERVICE_KEY`, and the service-role key is exempt from row level security by design. The 505-line policy set in migration `00011` therefore never sees an API request — it protects only the four places the mobile app talks to Supabase directly. Every endpoint has to re-implement authorization by hand, and in four places it did not.
+
+`feed.service.getPhotoDetails` accepted no user ID at all and filtered only on `status='ready'`, so any parent iterating photo UUIDs could retrieve any photo in the system together with its full tagged-student list — a cross-school child roster. It now requires that one of the caller's own children is tagged in the photo, and returns 404 rather than 403 on refusal: a 403 confirms the photo exists, which is itself a leak when IDs are enumerable. It also returns only the caller's own children in `taggedStudentIds`, because authorization is not binary — a parent entitled to the photo is still not entitled to know who else is in it.
+
+`assertSchoolAccess` in `middleware/roleGuard.ts` and `assertPhotoOwnership` in `photo.service.ts` are the two new guards. Both allow platform admins through explicitly, which matters because admins carry `school_id = null` and a plain equality check would lock them out of everything.
+
+On the client, `RoleGate` wraps each group's navigator. `app/index.tsx` already redirected by role, but it is only consulted when entering through the root, and `hive://` is a registered scheme — so `hive://(admin)/dashboard` mounted the admin console for a parent. The component's doc comment states that it is a UX control and not a security control, so that nobody later mistakes it for the boundary.
+
+## Issues and challenges
+
+**Nothing could be run.** The repository has no `.env`, only `.env.example`, so the backend cannot boot, the app cannot start, and no Supabase call can be made. Plan 04's Verification section is eight curl checks across two accounts at different schools plus six device checks, and not one of them has been executed. The fixes are reviewed code, not observed behaviour, and the Done-when boxes have been left unticked to say so.
+
+Verification was therefore static: `pnpm typecheck`, `pnpm lint`, and a per-commit diff of the mobile typecheck output against the 22-error baseline captured before any change. That baseline held identical after every mobile commit, with no error in `RoleGate.tsx`, any `_layout.tsx`, or any `notifications.tsx`.
+
+Plan 04 is documented as depending on Plan 03, which has not started. The overlap is `getPhotoDetails`, which both plans edit. The authorization block sits above the URL construction and does not touch it, so Plan 03 can swap `/uploads/...` for signed Storage URLs without conflict.
+
+One decision was left open by the plan and had to be made: whether tagging a student requires being the photo's uploader or merely a teacher at the same school. Uploader, matching `/file` and `/confirm`, so a single guard covers all three routes.
+
+## Testing and validation
+
+No automated tests exist yet — Plan 08 has not started. Static checks only:
+
+- `pnpm --filter @hive/backend typecheck` — clean after every commit
+- `pnpm lint` — 8 problems, down from 9; all remaining are pre-existing and none are in code touched this week
+- `pnpm --filter @hive/mobile typecheck` — 22 errors, byte-identical to the pre-work baseline
+- `grep -rn "school_admin" packages apps supabase` — no matches
+
+## Relevant commits
+
+```
+feat(notifications): wire notification centre into all three role screens
+refactor(rbac): remove unsupported school_admin role across API and app
+security(admin): sanitise user search to prevent PostgREST filter injection
+security(feed): enforce parent ownership on the photo detail endpoint
+security(feed): return only the requesting parent's tagged children
+security(schools): scope class and student listings to the caller's school
+security(photos): scope class photo listing to the caller's school
+security(photos): verify photo ownership on file upload, confirm and tag
+feat(auth): add RoleGate component for route-level access control
+security(app): guard parent, teacher and admin route groups by role
+refactor(app): remove unused auth state reads from the root layout
+docs(plans): record plan 01 and 04 deviations and update the tracker
+```
+
+## End state
+
+G-03, G-04, G-05, G-08, G-09, G-16 and G-17 are addressed in code and unverified in practice. No screen in the app reads "Coming Soon". Checkpoint CP-2 is not met: it also requires an order to be placeable (Plan 02) and photos in private storage with thumbnails (Plan 03), neither of which has been started.
+
+## Next week
+
+Plan 08's backend test harness — Vitest and Supertest, with a guard that refuses to run against the demo database. Writing the auth and RBAC tests is the only way the authorization work above stops being unverified, and T-6 and T-7 exist precisely to catch a regression of this week's two worst findings.
+
+---
+
 # Week 18 — API Consistency & Architecture Documentation
 
 **Dates:** 31 May – 6 June 2026 · **Commits:** 4 — Ruthwik 4
@@ -1365,6 +1288,79 @@ silently reported zero regardless of the data.
 
 ## Next week
 Authorization.
+
+---
+
+# Weeks 18–21 — Test Harness & Observability (Nagachaitanya)
+
+**Dates:** 31 May – 27 June 2026 (reported at the end of Week 21)
+**Commits:** 8 — Nagachaitanya 8
+**Covers:** Plan 08 (harness, auth tests, error tests) and Plan 09 Step 3, worked across Weeks 18–21
+
+## Phase objective
+
+Give the project a test runner it never had, cover the authentication and error paths, and make production failures visible without shipping children's data to a third party.
+
+## Individual contributions
+
+**Nagachaitanya** did all eight commits. Plans 02, 03, 05, 06 and 07 remain unstarted, so the schedule's W18–W21 split across four people did not happen; the other three test files in Plan 08 (photos, feed, orders, admin) belong to Ruthwik and Srujan and are not written.
+
+## Important technical implementation
+
+The harness is Vitest plus Supertest against a real Supabase project. The piece worth describing is the guard in `tests/setup.ts`: the suite deletes every row in every domain table and deletes the auth users it creates, so it refuses to start unless `.env.test` exists, and refuses outright if `SUPABASE_URL` contains the demo project ref. That ref is hard-coded rather than read from configuration — a guard that reads the value it is guarding against is not a guard.
+
+`createTestUser` signs the user in for real and returns the Supabase-issued access token. A hand-built JWT would defeat the point: the tests exist to prove `authenticate` verifies tokens against Supabase and reads role and school from the `profiles` row, which is the only thing standing between the API and an unauthenticated caller, since `supabaseAdmin` bypasses RLS.
+
+T-4 asserts 403 and specifically *not* 401 for a wrong-role caller, because `lib/api.ts` signs the user out on any 401 — a `roleGuard` returning 401 would present as a mysterious logout rather than an error. T-34 throws an error whose message embeds a database password and asserts the response body contains neither it nor the connection string under `NODE_ENV=production`, then asserts the opposite outside production so both sides of the branch are exercised.
+
+On observability, Sentry is off unless a DSN is set. `beforeSend` walks the entire event — request, extra, contexts, exception values, stack frame variables, breadcrumbs — redacting sensitive keys and regex-matching bearer tokens, JWTs, email addresses and storage URLs. `http`/`fetch` breadcrumbs are dropped wholesale because they record full request URLs, and on mobile `attachScreenshot` and `attachViewHierarchy` are disabled: a screenshot of this app is, by definition, a photograph of a child.
+
+Backend initialisation had to move into `config/instrument.ts`, imported first for its side effect. A bare `initSentry()` placed between import statements does not run first — imports are hoisted, so it would execute after every module in the file had already loaded, including the ones Sentry patches.
+
+Reporting hooks into `errorHandler` instead of `Sentry.setupExpressErrorHandler`, so only unexpected errors are sent. `AppError` is excluded on purpose: a 403 on a cross-school request is the authorization layer working as designed, and reporting those would bury genuine failures.
+
+## Issues and challenges
+
+**The 36-test suite has never been run.** There is no `.env.test` and no test Supabase project, so `pnpm test` cannot reach a database. Twelve of the thirty-six tests are written; none have executed. Plan 08's sabotage exercise — reverting each fix and confirming the matching test fails — has not been done either, and until it is, there is no evidence these tests test anything.
+
+Two things *were* executed, and both passed:
+
+- **The database guard**, in both branches. With no `.env.test` the suite refuses with a message naming the file to create; with `SUPABASE_URL` pointed at the demo project ref it refuses with an explicit warning that it would wipe the demo data.
+- **The Sentry scrubber**, against a synthetic event carrying a JWT, two email addresses, a client IP, a signed storage URL, an `/uploads` URL, a password field and a hostname. None survived; a user-agent string and a student's first name did, confirming it redacts rather than blanks.
+
+One bug was found and fixed while writing this: `.env.example` ships `SENTRY_DSN=` with no value, which dotenv turns into an empty string, and an empty string fails `z.string().url()`. Anyone following the setup instructions would have hit a startup validation failure. The schema now preprocesses empty to undefined.
+
+Incidentally, `require('sharp')` loads on this machine — the check CLAUDE.md flags as the gate on Plan 03's synchronous-thumbnail approach. The fixture JPEG was generated with it.
+
+## Testing and validation
+
+- `pnpm --filter @hive/backend typecheck` — clean, now covering `tests/` through a second `tsconfig.test.json` pass
+- `pnpm lint` — 8 problems, unchanged and all pre-existing
+- `pnpm --filter @hive/mobile typecheck` — 22 errors, still identical to the Plan 00 baseline
+- Test-database guard — executed, refuses correctly in both branches
+- Sentry `beforeSend` — executed, no sensitive value survived
+- `pnpm test` — **not run.** No test project exists.
+
+## Relevant commits
+
+```
+test(setup): add Vitest and Supertest harness with test database guard
+test(helpers): add fixtures and factory helpers for test data
+test(auth): cover authentication and role-based access control
+test(errors): cover validation and error handler behaviour
+ci: add test task to the turbo pipeline
+security(obs): stop logging client IPs and raw error objects on auth failures
+feat(obs): integrate Sentry with PII scrubbing on backend and mobile
+docs(report): add week 21 progress report
+```
+
+## End state
+
+A working test harness with 12 of Plan 08's 36 tests written and none executed. Error reporting wired on both apps, scrubbed and verified in isolation, but never confirmed end to end against a live Sentry project. Checkpoint CP-4 (36 tests green, CI on every PR) is not met — CI is Ruthwik's Plan 09 Step 5 and does not exist yet.
+
+## Next week
+
+Plan 10's security document and the auth sequence diagram. The threat model, the three authorization layers and the remediation table are all things this stream now has real material for.
 
 ---
 
