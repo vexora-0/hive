@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { type StyleProp, type ViewStyle } from 'react-native';
 
 import Animated, {
@@ -20,6 +20,9 @@ export interface RevealProps {
   /**
    * Position in a staggered group. Item 0 arrives first; the delay is capped
    * so the tail of a long list does not queue up behind the head.
+   *
+   * **Read once, on the first render.** A later `index` is ignored on purpose —
+   * see the note on recycling below.
    */
   index?: number;
   /** Extra delay before this element's own stagger, in ms. */
@@ -46,6 +49,16 @@ export interface RevealProps {
  *
  * Under Reduce Motion the element is simply there — no fade, no travel.
  *
+ * **It choreographs the first screenful, once, and then never again.** That is
+ * the whole reason the refs below exist. FlashList does not mount a component
+ * per row: it keeps a pool of cells and hands a recycled one new props as you
+ * scroll, so the same `<Reveal>` instance is reused for row 3, then row 19,
+ * then row 42. Re-running the entrance on each of those makes rows visibly
+ * re-animate under the finger mid-scroll, and re-reading `index` makes the
+ * delay jump about with it. Once an instance has played, it stays played and
+ * whatever is recycled into it is simply on screen — which is what a list
+ * already in motion should look like.
+ *
  * ```tsx
  * {photos.map((p, i) => (
  *   <Reveal key={p.id} index={i}>
@@ -67,16 +80,28 @@ export function Reveal({
   const progress = useSharedValue(reduced ? 1 : 0);
   const opacity = useSharedValue(reduced ? 1 : 0);
 
+  /** Flips on the first run and stays on for the life of the instance. */
+  const played = useRef(false);
+  /** The stagger position this instance was born with, not its current one. */
+  const firstIndex = useRef(index);
+  const firstDelay = useRef(delay);
+
   useEffect(() => {
+    if (played.current) return;
+    played.current = true;
+
     if (reduced) {
       progress.value = 1;
       opacity.value = 1;
       return;
     }
-    const wait = delay + stagger(index);
+
+    // Springs move things, timings colour them: `withSpring` on opacity clamps
+    // at 1.0 whenever ζ < 1 and stalls at the end of the run.
+    const wait = firstDelay.current + stagger(firstIndex.current);
     progress.value = withDelay(wait, withSpring(1, spring.gentle));
     opacity.value = withDelay(wait, withTiming(1, timing(duration.slow)));
-  }, [reduced, delay, index, progress, opacity]);
+  }, [reduced, progress, opacity]);
 
   const animatedStyle = useAnimatedStyle(() => {
     const offset = (1 - progress.value) * distance;

@@ -12,7 +12,6 @@ import { ScreenContainer } from '@/components/layout';
 import { HeaderBar } from '@/components/navigation';
 import { ClassSelector, type ClassItem } from '@/components/forms/ClassSelector';
 import { StudentTagger } from '@/components/forms/StudentTagger';
-import { ConfettiOverlay } from '@/components/animation';
 
 import { useClasses } from '@/features/teacher/hooks/useClasses';
 import { useUpload, type PickedAsset } from '@/features/teacher/hooks/useUpload';
@@ -33,7 +32,9 @@ import type { StudentItem } from '@/components/forms/StudentTagger';
  * 3. Select class and tag students (ClassSelector + StudentTagger)
  * 4. Upload -- starts the upload pipeline with progress display
  *
- * On completion: confetti overlay + "Upload More" button.
+ * On completion: a checkmark, a count of what was shared, and "Share more".
+ * Deliberately quiet — a teacher runs this flow every working day, and an
+ * effect that fires that often stops being a reward and becomes a delay.
  */
 export default function UploadScreen() {
   const queryClient = useQueryClient();
@@ -103,8 +104,6 @@ export default function UploadScreen() {
     overallProgress,
     isUploading,
     isComplete,
-    showConfetti,
-    dismissConfetti,
     resetUpload,
   } = useUpload();
 
@@ -179,10 +178,9 @@ export default function UploadScreen() {
 
   // ── Upload More ─────────────────────────────────────────────────────
   const handleUploadMore = useCallback(() => {
-    dismissConfetti();
     resetUpload();
     setSelectedStudentIds([]);
-  }, [dismissConfetti, resetUpload]);
+  }, [resetUpload]);
 
   // ── Computed state ──────────────────────────────────────────────────
   const hasImages = images.length > 0;
@@ -373,9 +371,6 @@ export default function UploadScreen() {
         isVisible={showTagger}
         onClose={() => setShowTagger(false)}
       />
-
-      {/* Confetti overlay */}
-      <ConfettiOverlay trigger={showConfetti} />
     </ScreenContainer>
   );
 }

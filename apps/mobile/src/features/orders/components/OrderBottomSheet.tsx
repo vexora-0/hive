@@ -8,7 +8,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { colors, spacing, radius, shadows, platformShadow } from '@/theme';
 import { Text, Button, TextInput, Divider } from '@/components/ui';
 import { HiveImage } from '@/components/media';
-import { ConfettiOverlay } from '@/components/animation';
 import type { ProductType } from '@/types/supabase';
 
 import {
@@ -340,7 +339,6 @@ export function OrderBottomSheet({
     if (orderSuccess) {
       return (
         <View style={styles.successContainer}>
-          <ConfettiOverlay trigger={orderSuccess} />
           <MotiView
             from={{ scale: 0.6, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
