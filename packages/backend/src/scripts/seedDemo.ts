@@ -83,16 +83,51 @@ const USERS: DemoUser[] = [
   { key: 'vikram', email: 'parent.vikram@stars.demo', name: 'Vikram Nair', role: 'parent', schoolId: SCHOOL.stars },
 ];
 
+/**
+ * A date of birth that leaves the child exactly `months` old **today**.
+ *
+ * Ages are seeded relative to the run rather than as fixed birthdays because
+ * every other timestamp here is relative too — photos take the database's
+ * `now()` — and the photo detail prints the child's age *at the time of the
+ * photograph*. A hardcoded 2023 birthday reads as "3y 2m" this year and "5y 2m"
+ * two years from now, by which point the demo roster has quietly aged out of
+ * preschool. Pinning the age instead keeps the fixture true whenever it is run.
+ *
+ * The day of the month is clamped to 28 so month-length overflow cannot roll a
+ * 31st into the following month, and so that `ageAt`'s borrow rule
+ * (`taken.getDate() < born.getDate()`) never fires and shaves a month off.
+ *
+ * **Local components throughout, and formatted by hand.** `ageAt` compares
+ * `getDate()`/`getMonth()`, which are local, so deriving the day from
+ * `getUTCDate()` disagrees with it for the 5.5 hours each night that IST is
+ * ahead of the UTC date — enough to lose a month at a month boundary. And
+ * `toISOString()` cannot be used to format the result either: it converts back
+ * to UTC, so a local-midnight date reports as the previous day east of
+ * Greenwich.
+ */
+function bornMonthsAgo(months: number): string {
+  const now = new Date();
+  const day = Math.min(now.getDate(), 28);
+  const born = new Date(now.getFullYear(), now.getMonth() - months, day);
+  const month = String(born.getMonth() + 1).padStart(2, '0');
+  return `${born.getFullYear()}-${month}-${String(born.getDate()).padStart(2, '0')}`;
+}
+
+// Ages spread across the preschool range, and deliberately unequal within a
+// sibling pair — Aarav/Diya and Arjun/Myra share a parent, and the age line is
+// the fastest way to tell whose photograph you are looking at. Arjun lands on a
+// whole 60 months on purpose: `ageAt` drops the month part at an exact year, so
+// one child exercises the "5y" branch rather than "5y 0m".
 const STUDENTS = [
-  { id: 'e0000000-0000-4000-8000-000000000001', name: 'Aarav Kumar', classId: CLASS.bloomA, schoolId: SCHOOL.bloom, parents: ['rajesh'] },
-  { id: 'e0000000-0000-4000-8000-000000000002', name: 'Diya Kumar', classId: CLASS.bloomA, schoolId: SCHOOL.bloom, parents: ['rajesh'] },
-  { id: 'e0000000-0000-4000-8000-000000000003', name: 'Ishaan Menon', classId: CLASS.bloomA, schoolId: SCHOOL.bloom, parents: ['lakshmi'] },
-  { id: 'e0000000-0000-4000-8000-000000000004', name: 'Kiara Sharma', classId: CLASS.bloomB, schoolId: SCHOOL.bloom, parents: ['anita', 'lakshmi'] },
-  { id: 'e0000000-0000-4000-8000-000000000005', name: 'Reyansh Gupta', classId: CLASS.bloomB, schoolId: SCHOOL.bloom, parents: ['anita'] },
-  { id: 'e0000000-0000-4000-8000-000000000006', name: 'Saanvi Patel', classId: CLASS.bloomB, schoolId: SCHOOL.bloom, parents: [] },
-  { id: 'e0000000-0000-4000-8000-000000000007', name: 'Arjun Nair', classId: CLASS.starsA, schoolId: SCHOOL.stars, parents: ['vikram'] },
-  { id: 'e0000000-0000-4000-8000-000000000008', name: 'Myra Nair', classId: CLASS.starsA, schoolId: SCHOOL.stars, parents: ['vikram'] },
-  { id: 'e0000000-0000-4000-8000-000000000009', name: 'Vivaan Rao', classId: CLASS.starsB, schoolId: SCHOOL.stars, parents: [] },
+  { id: 'e0000000-0000-4000-8000-000000000001', name: 'Aarav Kumar', dobMonths: 38, classId: CLASS.bloomA, schoolId: SCHOOL.bloom, parents: ['rajesh'] },
+  { id: 'e0000000-0000-4000-8000-000000000002', name: 'Diya Kumar', dobMonths: 29, classId: CLASS.bloomA, schoolId: SCHOOL.bloom, parents: ['rajesh'] },
+  { id: 'e0000000-0000-4000-8000-000000000003', name: 'Ishaan Menon', dobMonths: 43, classId: CLASS.bloomA, schoolId: SCHOOL.bloom, parents: ['lakshmi'] },
+  { id: 'e0000000-0000-4000-8000-000000000004', name: 'Kiara Sharma', dobMonths: 49, classId: CLASS.bloomB, schoolId: SCHOOL.bloom, parents: ['anita', 'lakshmi'] },
+  { id: 'e0000000-0000-4000-8000-000000000005', name: 'Reyansh Gupta', dobMonths: 53, classId: CLASS.bloomB, schoolId: SCHOOL.bloom, parents: ['anita'] },
+  { id: 'e0000000-0000-4000-8000-000000000006', name: 'Saanvi Patel', dobMonths: 47, classId: CLASS.bloomB, schoolId: SCHOOL.bloom, parents: [] },
+  { id: 'e0000000-0000-4000-8000-000000000007', name: 'Arjun Nair', dobMonths: 60, classId: CLASS.starsA, schoolId: SCHOOL.stars, parents: ['vikram'] },
+  { id: 'e0000000-0000-4000-8000-000000000008', name: 'Myra Nair', dobMonths: 33, classId: CLASS.starsA, schoolId: SCHOOL.stars, parents: ['vikram'] },
+  { id: 'e0000000-0000-4000-8000-000000000009', name: 'Vivaan Rao', dobMonths: 56, classId: CLASS.starsB, schoolId: SCHOOL.stars, parents: [] },
 ];
 
 const log = (msg: string) => console.log(`  ${msg}`);
@@ -344,7 +379,17 @@ async function main(): Promise<void> {
 
   log('Students and parent links...');
   await supabase.from('students').upsert(
-    STUDENTS.map((s) => ({ id: s.id, school_id: s.schoolId, class_id: s.classId, full_name: s.name })),
+    STUDENTS.map((s) => ({
+      id: s.id,
+      school_id: s.schoolId,
+      class_id: s.classId,
+      full_name: s.name,
+      // Without this the photo detail's age line degrades to just the name:
+      // `ageAt` correctly returns null rather than inventing an age, so the
+      // feature the research rated highest for parents was invisible against
+      // demo data even though the code behind it was right.
+      date_of_birth: bornMonthsAgo(s.dobMonths),
+    })),
   );
   for (const s of STUDENTS) {
     for (const p of s.parents) {
