@@ -74,18 +74,29 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable
-        style={styles.backdropHost}
-        onPress={confirmLoading ? undefined : onCancel}
-        accessibilityRole="button"
-        accessibilityLabel="Dismiss"
-      >
+      <View style={styles.backdropHost}>
         <Animated.View
           entering={FadeIn.duration(duration.fast).reduceMotion(ReduceMotion.System)}
           style={styles.backdrop}
         />
 
-        {/* Stops a tap inside the card dismissing it. */}
+        {/*
+          The dismiss target is a sibling of the card, never its ancestor.
+
+          Wrapping the card in a labelled Pressable is the obvious way to write
+          "tap outside to close" and it puts Cancel and Confirm inside a
+          button — invalid on web, and on native a screen reader announces the
+          whole dialog as one "Dismiss" button before it ever reaches the two
+          controls that matter. Hidden from assistive technology, which has the
+          Cancel button and the back gesture for the same purpose.
+        */}
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={confirmLoading ? undefined : onCancel}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        />
+
         <Animated.View
           entering={ZoomIn.springify()
             .damping(spring.sheet.damping)
@@ -93,11 +104,7 @@ export function ConfirmDialog({
             .mass(spring.sheet.mass)
             .reduceMotion(ReduceMotion.System)}
         >
-          <Pressable
-            style={styles.card}
-            onPress={(e) => e.stopPropagation()}
-            accessibilityViewIsModal
-          >
+          <View style={styles.card} accessibilityViewIsModal>
             <Text variant="h3" accessibilityRole="header" style={styles.title}>
               {title}
             </Text>
@@ -122,9 +129,9 @@ export function ConfirmDialog({
                 {confirmLabel}
               </Button>
             </View>
-          </Pressable>
+          </View>
         </Animated.View>
-      </Pressable>
+      </View>
     </Modal>
   );
 }

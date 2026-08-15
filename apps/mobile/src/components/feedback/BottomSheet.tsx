@@ -150,14 +150,15 @@ export function BottomSheet({
   );
 
   const sheet = (
-    <Pressable
+    // A plain View: with the backdrop as a sibling rather than an ancestor,
+    // a tap on the sheet has nothing to bubble into, so there is nothing to
+    // swallow — and one fewer pressable wrapped around everything.
+    <View
       style={[
         styles.sheet,
         { maxHeight },
         height === 'full' && { height: maxHeight },
       ]}
-      // Swallows taps that land on the sheet so they do not reach the backdrop.
-      onPress={(e) => e.stopPropagation()}
       accessibilityViewIsModal
     >
       <View style={styles.handle} />
@@ -222,7 +223,7 @@ export function BottomSheet({
 
       {/* Without a footer the sheet still owes the home indicator its space. */}
       {!footer && <View style={{ height: Math.max(insets.bottom, spacing.md) }} />}
-    </Pressable>
+    </View>
   );
 
   return (
@@ -243,14 +244,31 @@ export function BottomSheet({
         <View style={styles.scrim} />
       </Animated.View>
 
+      {/*
+        The backdrop is a sibling of the sheet, not its parent.
+
+        It began as a wrapper, which is the obvious way to write it and is
+        wrong: the sheet rendered *inside* the dismiss target, so every control
+        in the sheet was a button nested inside a button. On web that is
+        invalid HTML; on native a screen reader announces the whole sheet as
+        one enormous "Close" button and the rows inside stop being reachable as
+        themselves.
+
+        As a sibling it can be hidden from assistive technology without taking
+        the sheet with it — a screen reader user dismisses with the close
+        button or the back gesture, and never has to find an unlabelled region
+        of screen to tap.
+      */}
       <Pressable
-        style={styles.backdrop}
+        style={StyleSheet.absoluteFill}
         onPress={onClose}
-        accessibilityRole="button"
-        accessibilityLabel="Close"
-      >
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      />
+
+      <View style={styles.backdrop} pointerEvents="box-none">
         {keyboard ? <KeyboardAvoid>{sheet}</KeyboardAvoid> : sheet}
-      </Pressable>
+      </View>
     </Modal>
   );
 }
