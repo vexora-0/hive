@@ -11,7 +11,9 @@ import { FlashList } from '@shopify/flash-list';
 import { colors, spacing, radius, layout, MIN_TAP_SIZE } from '@/theme';
 import { ScreenContainer } from '@/components/layout/ScreenContainer';
 import { HeaderBar } from '@/components/navigation/HeaderBar';
-import { Text, Badge, Chip, Avatar } from '@/components/ui';
+import { Ionicons } from '@expo/vector-icons';
+
+import { Text, Badge, Chip } from '@/components/ui';
 import { EmptyState, SkeletonShimmer } from '@/components/feedback';
 import { formatRupees } from '@/features/orders/constants/products';
 import { ORDER_STATUS } from '@/features/orders/constants/orderStatus';
@@ -67,7 +69,23 @@ function OrderRow({
       accessibilityLabel={`${recipient}, ${formatRupees(order.total_cents)}, ${status.label}, ${orderPlaced(order.created_at).toLowerCase()}`}
       accessibilityHint="Opens this order's next step"
     >
-      <Avatar name={recipient} size="md" />
+      {/*
+        A parcel, not a portrait.
+
+        Every other admin list leads with the person it is about, and this one
+        should too — but `AdminOrder` carries `parent_id` and no name, so the
+        only human-readable field on the row is the shipping address. Feeding
+        that to `<Avatar>` asked it to make initials out of a house number, and
+        it dutifully produced "9R" for "9 Indiranagar 100ft Road": a person's
+        monogram standing in for a street. A neutral parcel mark is honest
+        about what this row actually identifies.
+
+        When the endpoint returns the parent's name, put the avatar back and
+        lead with them — that is the shape the rest of the console follows.
+      */}
+      <View style={styles.parcel}>
+        <Ionicons name="cube-outline" size={20} color={colors.text.secondary} />
+      </View>
 
       <View style={styles.rowMain}>
         <Text variant="bodyBold" numberOfLines={1}>
@@ -307,6 +325,15 @@ const styles = StyleSheet.create({
     minHeight: MIN_TAP_SIZE + spacing.md,
   },
   rowPressed: {
+    backgroundColor: colors.background.surfaceSecondary,
+  },
+  /** Same 44pt footprint an Avatar would take, so the rows stay in register. */
+  parcel: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.background.surfaceSecondary,
   },
   rowMain: {
