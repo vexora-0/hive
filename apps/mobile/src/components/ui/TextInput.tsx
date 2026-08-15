@@ -13,7 +13,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSequence,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -23,7 +22,6 @@ import {
   radius,
   fontFamily,
   fontSize,
-  spring,
   duration,
   timing,
   MIN_TAP_SIZE,
@@ -53,10 +51,20 @@ export interface TextInputProps extends Omit<RNTextInputProps, 'style'> {
 
 // ---------------------------------------------------------------------------
 // Animation
+//
+// Four steps of half `duration.instant` — 240ms in total, well inside the
+// 400ms ceiling, and short enough that it reads as the field flinching rather
+// than as a wobble. The step is derived from the theme rather than typed in, so
+// the shake retunes with everything else if the scale ever moves.
+//
+// Each leg goes through `timing()` so it carries `ReduceMotion.System`: with
+// the setting on, every leg lands on its final value at once and the shake
+// becomes the no-op it should be. The error is never *only* the shake — the
+// message below the field says it in words.
 // ---------------------------------------------------------------------------
 
 const SHAKE_DISTANCE = 7;
-const SHAKE_DURATION = 55;
+const SHAKE_STEP = duration.instant / 2;
 
 // ---------------------------------------------------------------------------
 // Component
@@ -69,6 +77,19 @@ const SHAKE_DURATION = 55;
  * sunk paper tone with no border, and focus raises it to white and draws the
  * marigold ring. That reads as writing *into* the page instead of filling in a
  * form, and it means an unfocused form is quiet — no grid of empty rectangles.
+ *
+ * Three measured corrections live in here:
+ *
+ *  1. **The focus ring is drawn in `amberDark`, not marigold.** `#F0A03A` is
+ *     2.14:1 on white — below the 3:1 a state indicator needs to be seen at
+ *     all. `#9C5A10` measures 5.41:1 and still reads as marigold with the soft
+ *     `amberLight` halo behind it.
+ *  2. **The placeholder is `text.secondary`.** `text.tertiary` is the floor on
+ *     paper (4.64:1) but only 4.22:1 on the *sunk* tone the well uses at rest,
+ *     so it failed exactly where placeholders live. `#4F5468` measures 6.45:1
+ *     there, and input text at 14.90:1 still reads as filled-in against it.
+ *  3. **Focus and error are `withTiming`, never `withSpring`.** They drive a
+ *     colour and an opacity; a spring on either clamps at 1.0 and stalls.
  *
  * ```tsx
  * <TextInput
@@ -101,7 +122,7 @@ export const TextInput = forwardRef<RNTextInput, TextInputProps>(function TextIn
 
   const handleFocus = useCallback(
     (e: Parameters<NonNullable<RNTextInputProps['onFocus']>>[0]) => {
-      focusAnim.value = withSpring(1, spring.snappy);
+      focusAnim.value = withTiming(1, timing(duration.fast));
       onFocusProp?.(e);
     },
     [focusAnim, onFocusProp],
@@ -109,7 +130,7 @@ export const TextInput = forwardRef<RNTextInput, TextInputProps>(function TextIn
 
   const handleBlur = useCallback(
     (e: Parameters<NonNullable<RNTextInputProps['onBlur']>>[0]) => {
-      focusAnim.value = withSpring(0, spring.snappy);
+      focusAnim.value = withTiming(0, timing(duration.fast));
       onBlurProp?.(e);
     },
     [focusAnim, onBlurProp],
@@ -123,10 +144,10 @@ export const TextInput = forwardRef<RNTextInput, TextInputProps>(function TextIn
   useEffect(() => {
     if (error && error !== prevErrorRef.current) {
       shakeX.value = withSequence(
-        withTiming(SHAKE_DISTANCE, { duration: SHAKE_DURATION }),
-        withTiming(-SHAKE_DISTANCE, { duration: SHAKE_DURATION }),
-        withTiming(SHAKE_DISTANCE * 0.6, { duration: SHAKE_DURATION }),
-        withTiming(0, { duration: SHAKE_DURATION }),
+        withTiming(SHAKE_DISTANCE, timing(SHAKE_STEP)),
+        withTiming(-SHAKE_DISTANCE, timing(SHAKE_STEP)),
+        withTiming(SHAKE_DISTANCE * 0.6, timing(SHAKE_STEP)),
+        withTiming(0, timing(SHAKE_STEP)),
       );
     }
     errorAnim.value = withTiming(error ? 1 : 0, timing(duration.fast));
@@ -155,7 +176,7 @@ export const TextInput = forwardRef<RNTextInput, TextInputProps>(function TextIn
           interpolateColor(
             focus,
             [0, 1],
-            [colors.border.light, colors.primary.amber],
+            [colors.border.light, colors.primary.amberDark],
           ),
           colors.error.main,
         ],
@@ -164,7 +185,8 @@ export const TextInput = forwardRef<RNTextInput, TextInputProps>(function TextIn
   });
 
   // The focus ring is a separate expanding halo so the field itself never
-  // changes size — a border that grows from 1px to 2px shifts the text.
+  // changes size — a border that grows from 1px to 2px shifts the text. The
+  // halo is decoration; the border above is what carries the state.
   const ringAnimatedStyle = useAnimatedStyle(() => ({
     opacity: Math.max(focusAnim.value, errorAnim.value) * 0.9,
     transform: [{ scale: 1 + (1 - Math.max(focusAnim.value, errorAnim.value)) * 0.02 }],
@@ -178,13 +200,22 @@ export const TextInput = forwardRef<RNTextInput, TextInputProps>(function TextIn
     ),
   }));
 
+  // The error belongs in the accessible name, not only in a red line below the
+  // field: a screen-reader user tabbing back to a field has no other way to
+  // learn why it was rejected. Callers may still override it through `rest`.
+  const accessibleName = label
+    ? hasError
+      ? `${label}, error: ${error}`
+      : label
+    : undefined;
+
   // ── Render ─────────────────────────────────────────────────────────
   return (
     <Animated.View style={[styles.container, wrapperAnimatedStyle, containerStyle]}>
       {label && (
         <Text
           variant="label"
-          color={hasError ? colors.error.dark : colors.text.secondary}
+          color={hasError ? colors.error.main : colors.text.secondary}
           style={styles.label}
         >
           {label}
@@ -202,11 +233,16 @@ export const TextInput = forwardRef<RNTextInput, TextInputProps>(function TextIn
 
           <RNTextInput
             ref={ref}
-            placeholderTextColor={colors.text.tertiary}
+            placeholderTextColor={colors.text.secondary}
+            // The selection tint stays marigold because ink on marigold is
+            // 8.08:1 — selected text has to stay readable. Android's caret gets
+            // the readable form, where a 2:1 hairline would vanish.
             selectionColor={colors.primary.amber}
+            cursorColor={colors.primary.amberDark}
             onFocus={handleFocus}
             onBlur={handleBlur}
-            accessibilityLabel={label}
+            accessibilityLabel={accessibleName}
+            accessibilityHint={hint}
             style={[styles.input, inputStyle] as StyleProp<RNTextStyle>}
             {...rest}
           />
@@ -216,7 +252,7 @@ export const TextInput = forwardRef<RNTextInput, TextInputProps>(function TextIn
       </View>
 
       {hasError ? (
-        <Text variant="caption" color={colors.error.dark} style={styles.helper}>
+        <Text variant="caption" color={colors.error.main} style={styles.helper}>
           {error}
         </Text>
       ) : hint ? (
