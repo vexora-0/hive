@@ -44,6 +44,14 @@ const TAB_PAD_BOTTOM = spacing.xs + 2;
  */
 const ICON_LABEL_GAP = 8;
 const PUCK_SIZE = 32;
+/**
+ * Horizontal padding on the bar itself.
+ *
+ * The bar is a pill, so its corners curve inward. Without this the first and
+ * last tabs are drawn against the curve. The puck maths below has to account
+ * for it too — see `onLayout`.
+ */
+const BAR_PAD_H = spacing.sm;
 
 /**
  * Where the icon's centre lands inside the bar.
@@ -105,7 +113,8 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
   useEffect(() => {
     if (tabWidth <= 0) return;
-    const target = activeIndex * tabWidth + (tabWidth - PUCK_SIZE) / 2;
+    const target =
+      BAR_PAD_H + activeIndex * tabWidth + (tabWidth - PUCK_SIZE) / 2;
     if (puckReady.value === 0) {
       puckX.value = target;
       puckReady.value = withTiming(1, timing(duration.fast));
@@ -116,8 +125,12 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
   const onLayout = useCallback(
     (event: { nativeEvent: { layout: { width: number } } }) => {
-      const width = event.nativeEvent.layout.width;
-      setTabWidth(tabCount > 0 ? width / tabCount : 0);
+      // layout.width is the bar's full width, padding included, but the tabs
+      // share only the space inside that padding. Dividing the full width put
+      // the puck ~7px left of the icon it sits behind, which on the first tab
+      // pushed it onto the pill's rounded corner.
+      const content = event.nativeEvent.layout.width - BAR_PAD_H * 2;
+      setTabWidth(tabCount > 0 ? content / tabCount : 0);
     },
     [tabCount],
   );
@@ -273,7 +286,7 @@ const styles = StyleSheet.create({
     // The bar is a pill, so its corners curve inward to roughly 4px from the
     // edge at the label's height. Without this the first and last labels are
     // drawn outside the shape and clip against the curve.
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: BAR_PAD_H,
     backgroundColor: colors.ink[900],
     ...platformShadow(shadows.large),
   },
