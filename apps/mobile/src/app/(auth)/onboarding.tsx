@@ -9,7 +9,17 @@ import { MotiView } from 'moti';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 
-import { colors, spacing, layout } from '@/theme';
+import {
+  colors,
+  spacing,
+  radius,
+  layout,
+  spring,
+  duration,
+  easing,
+  useReducedMotion,
+  MIN_TAP_SIZE,
+} from '@/theme';
 import { Text, Button } from '@/components/ui';
 import { SafeArea } from '@/components/layout';
 import { EmptyState } from '@/components/feedback';
@@ -33,13 +43,50 @@ const SWIPE_THRESHOLD = 60;
 /** How fast a flick has to be to turn the page regardless of distance. */
 const FLICK_VELOCITY = 400;
 
-/** The page turn. Heavy enough to read as one object moving, not a cut. */
+/**
+ * The page turn, and the dots that track it.
+ *
+ * **Every number comes out of `theme/motion.ts`.** Moti takes raw
+ * `damping`/`stiffness`/`mass` rather than a Reanimated config object, so the
+ * fields are spread across by hand — but they are spread, not retyped, and the
+ * `reduceMotion` flag those configs carry is replaced by the explicit branch
+ * below, since Moti does not read it.
+ *
+ * A full page of travel is a large panel moving, so it takes `spring.sheet`
+ * (ζ 0.87, ~290ms): heavy, arrives once, no wobble. The dots are a selection
+ * indicator and take `spring.snappy` (ζ 0.91, ~220ms) — **on width only.** The
+ * colour crossfades on a timing curve instead, because a spring driving a
+ * colour clamps at 1.0 below ζ 1 and visibly stalls at the end of its run.
+ * That is a bug class, not a preference, and it was in here.
+ */
 const PAGE_TRANSITION = {
   type: 'spring',
-  damping: 22,
-  stiffness: 180,
-  mass: 1,
+  damping: spring.sheet.damping,
+  stiffness: spring.sheet.stiffness,
+  mass: spring.sheet.mass,
 } as const;
+
+const DOT_TRANSITION = {
+  width: {
+    type: 'spring',
+    damping: spring.snappy.damping,
+    stiffness: spring.snappy.stiffness,
+    mass: spring.snappy.mass,
+  },
+  backgroundColor: {
+    type: 'timing',
+    duration: duration.fast,
+    easing: easing.standard,
+  },
+} as const;
+
+/**
+ * What both of the above collapse to when the device asks for less motion.
+ *
+ * Zero is the absence of an animation, not a duration somebody chose: the page
+ * and the dots are simply where they belong.
+ */
+const STILL = { type: 'timing', duration: 0 } as const;
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -62,6 +109,9 @@ export default function OnboardingScreen() {
   // Read from the hook rather than a module-level `Dimensions.get`: that value
   // is captured once at import and is wrong after a rotation or a resize.
   const { width } = useWindowDimensions();
+  // Moti drives its own loop and does not read Reanimated's `reduceMotion`
+  // flag, so every transition on this screen is branched by hand.
+  const reduced = useReducedMotion();
 
   const [activeIndex, setActiveIndex] = useState(0);
   // Slides whose entrance has played. The first is in from the start, and a
@@ -143,9 +193,9 @@ export default function OnboardingScreen() {
       <SafeArea style={styles.root}>
         <View style={styles.lookupError}>
           <EmptyState
-            icon="cloud-offline-outline"
-            title="Couldn't load your account"
-            message="Check your connection and try again."
+            variant="error"
+            title="We couldn't load your account."
+            message="Check your connection and try again — your account is fine, we just can't reach it."
             action={{
               label: 'Try again',
               onPress: () => {
@@ -183,7 +233,7 @@ export default function OnboardingScreen() {
               flex row shrinks children past their stated width. */}
           <MotiView
             animate={{ translateX: -activeIndex * width }}
-            transition={PAGE_TRANSITION}
+            transition={reduced ? STILL : PAGE_TRANSITION}
             style={[styles.row, { width: slides.length * width }]}
           >
             {slides.map((slide, index) => (
@@ -204,6 +254,10 @@ export default function OnboardingScreen() {
           accessibilityRole="progressbar"
           accessibilityLabel={`Slide ${activeIndex + 1} of ${slides.length}`}
         >
+          {/* The current page is drawn in the **readable** marigold. `#F0A03A`
+              is 2.03:1 on paper: as the mark saying which of three pages you
+              are on, it has to be read, and at that ratio it simply is not.
+              `text.accent` is 5.12:1 and still unmistakably marigold. */}
           {slides.map((slide, index) => (
             <MotiView
               key={slide.id}
@@ -211,10 +265,10 @@ export default function OnboardingScreen() {
                 width: index === activeIndex ? DOT_ACTIVE_WIDTH : DOT_SIZE,
                 backgroundColor:
                   index === activeIndex
-                    ? colors.primary.amber
-                    : colors.border.default,
+                    ? colors.text.accent
+                    : colors.border.dark,
               }}
-              transition={{ type: 'spring', damping: 20, stiffness: 260 }}
+              transition={reduced ? STILL : DOT_TRANSITION}
               style={styles.dot}
             />
           ))}
@@ -248,7 +302,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.ms,
   },
   skip: {
-    minHeight: 44,
+    minHeight: MIN_TAP_SIZE,
     justifyContent: 'center',
     paddingHorizontal: spacing.ms,
   },
@@ -274,6 +328,8 @@ const styles = StyleSheet.create({
   },
   dot: {
     height: DOT_SIZE,
-    borderRadius: DOT_SIZE / 2,
+    // From the scale rather than `DOT_SIZE / 2`: a 3.5 nobody can find is how
+    // a screen ends up with a sixth radius value.
+    borderRadius: radius.pill,
   },
 });

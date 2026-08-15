@@ -55,6 +55,11 @@ function useNotificationsList() {
   return {
     notifications,
     isLoading: query.isLoading,
+    // Forwarded so the screen can tell "nothing has happened yet" from "the
+    // request failed". Without it a dropped connection rendered the caught-up
+    // empty state, which tells a parent their inbox is clear when we simply
+    // could not reach the server.
+    isError: query.isError,
     isFetchingNextPage: query.isFetchingNextPage,
     fetchNextPage: query.fetchNextPage,
     hasNextPage: query.hasNextPage,
@@ -255,6 +260,7 @@ export function useNotifications() {
     // List
     notifications: list.notifications,
     isLoading: list.isLoading,
+    isError: list.isError,
     isFetchingNextPage: list.isFetchingNextPage,
     fetchNextPage: list.fetchNextPage,
     hasNextPage: list.hasNextPage,

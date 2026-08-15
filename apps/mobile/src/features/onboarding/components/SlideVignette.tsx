@@ -3,7 +3,17 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { MotiView } from 'moti';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, radius, shadows, platformShadow } from '@/theme';
+import {
+  colors,
+  spacing,
+  radius,
+  shadows,
+  platformShadow,
+  spring,
+  travel,
+  STAGGER_STEP,
+  useReducedMotion,
+} from '@/theme';
 import { Text } from '@/components/ui';
 import { MiniMount } from './MiniMount';
 import type { VignetteKind } from '../data/slides';
@@ -20,11 +30,48 @@ export interface SlideVignetteProps {
   width: number;
 }
 
+// ---------------------------------------------------------------------------
+// Timing
+//
+// All of it derived from `STAGGER_STEP` and `travel`, so the intro carousel
+// arrives on the same beat as every list in the app rather than on three
+// numbers somebody once liked.
+// ---------------------------------------------------------------------------
+
+/** Before the first piece moves, in ms. */
+const PIECE_BASE = STAGGER_STEP;
+
 /** How long each piece waits behind the one before it, in ms. */
-const PIECE_STEP = 90;
+const PIECE_STEP = STAGGER_STEP * 2;
+
+/** The highest `order` any composition below hands to a `<Piece>`. */
+const MAX_PIECE_ORDER = 2;
+
+/**
+ * When the last piece of the illustration starts moving, in ms.
+ *
+ * Published because `<OnboardingSlide>` starts its caption here: the picture
+ * and its words are one choreography, not two staggered groups racing each
+ * other, and the caption should follow this file rather than restate it.
+ */
+export const VIGNETTE_SETTLED_AT = PIECE_BASE + MAX_PIECE_ORDER * PIECE_STEP;
 
 /** How far an arriving piece travels, in px. */
-const PIECE_RISE = 22;
+const PIECE_RISE = travel.section;
+
+/**
+ * What every transition here collapses to under Reduce Motion.
+ *
+ * Zero is the absence of an animation rather than a duration somebody picked:
+ * the piece is simply in place. Spelled out as a named constant because a bare
+ * `{ duration: 0 }` inline is indistinguishable at a glance from the inline
+ * magic numbers the motion system exists to stop.
+ *
+ * Exported so the caption alongside these pieces shares one definition. Moti
+ * runs its own loop and never reads Reanimated's `ReduceMotion.System` flag, so
+ * every animated surface in this feature has to make the same explicit choice.
+ */
+export const NO_MOTION = { type: 'timing', duration: 0 } as const;
 
 /** How far back the other families' photos sit on the privacy slide. */
 const DIMMED = 0.45;
@@ -61,18 +108,26 @@ function stageUnit(width: number): number {
 /**
  * One element of a composition, rising and fading into place on its own slice
  * of the slide's progress.
+ *
+ * The spring is `spring.gentle` (ζ 0.74) rather than the `{ damping: 17,
+ * stiffness: 170, mass: 0.9 }` it used to carry — ζ 0.69, under the 0.7 house
+ * floor, on a piece travelling 24px and scaling at the same time. Moti does not
+ * read Reanimated's `reduceMotion` flag, so the branch is explicit: with the
+ * setting on, every piece is simply in place from the start.
  */
 function Piece({
   active,
   order,
   /** Ceiling on the piece's opacity once it has arrived. */
   dim = 1,
+  reduced,
   style,
   children,
 }: {
   active: boolean;
   order: number;
   dim?: number;
+  reduced: boolean;
   style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
 }) {
@@ -80,16 +135,20 @@ function Piece({
     <MotiView
       animate={{
         opacity: active ? dim : 0,
-        translateY: active ? 0 : PIECE_RISE,
-        scale: active ? 1 : 0.94,
+        translateY: active || reduced ? 0 : PIECE_RISE,
+        scale: active || reduced ? 1 : 0.94,
       }}
-      transition={{
-        type: 'spring',
-        damping: 17,
-        stiffness: 170,
-        mass: 0.9,
-        delay: active ? 90 + order * PIECE_STEP : 0,
-      }}
+      transition={
+        reduced
+          ? NO_MOTION
+          : {
+              type: 'spring',
+              damping: spring.gentle.damping,
+              stiffness: spring.gentle.stiffness,
+              mass: spring.gentle.mass,
+              delay: active ? PIECE_BASE + order * PIECE_STEP : 0,
+            }
+      }
       style={[styles.abs, style]}
     >
       {children}
@@ -125,13 +184,19 @@ interface VignetteProps {
 // ---------------------------------------------------------------------------
 
 function FeedVignette({ active, width }: VignetteProps) {
+  const reduced = useReducedMotion();
   const unit = stageUnit(width);
   const big = unit * 0.44;
   const small = unit * 0.34;
 
   return (
     <View style={[styles.stage, { width: unit, height: unit * 0.78 }]}>
-      <Piece active={active} order={0} style={{ left: 0, top: unit * 0.1 }}>
+      <Piece
+        active={active}
+        order={0}
+        reduced={reduced}
+        style={{ left: 0, top: unit * 0.1 }}
+      >
         <MiniMount
           id="feed-a"
           width={small}
@@ -142,7 +207,12 @@ function FeedVignette({ active, width }: VignetteProps) {
         />
       </Piece>
 
-      <Piece active={active} order={2} style={{ right: 0, top: 0 }}>
+      <Piece
+        active={active}
+        order={2}
+        reduced={reduced}
+        style={{ right: 0, top: 0 }}
+      >
         <MiniMount
           id="feed-c"
           width={small}
@@ -155,7 +225,12 @@ function FeedVignette({ active, width }: VignetteProps) {
 
       {/* On top, and the only one captioned — the two behind are there for
           rhythm, and three captions at this size is just noise. */}
-      <Piece active={active} order={1} style={{ left: unit * 0.2, bottom: 0 }}>
+      <Piece
+        active={active}
+        order={1}
+        reduced={reduced}
+        style={{ left: unit * 0.2, bottom: 0 }}
+      >
         <MiniMount
           id="feed-b"
           width={big}
@@ -176,6 +251,7 @@ function FeedVignette({ active, width }: VignetteProps) {
 // ---------------------------------------------------------------------------
 
 function PrivateVignette({ active, width }: VignetteProps) {
+  const reduced = useReducedMotion();
   const unit = stageUnit(width);
   const main = unit * 0.42;
   const other = unit * 0.28;
@@ -187,6 +263,7 @@ function PrivateVignette({ active, width }: VignetteProps) {
         active={active}
         order={0}
         dim={DIMMED}
+        reduced={reduced}
         style={{ left: 0, top: unit * 0.08 }}
       >
         <MiniMount
@@ -203,6 +280,7 @@ function PrivateVignette({ active, width }: VignetteProps) {
         active={active}
         order={0}
         dim={DIMMED}
+        reduced={reduced}
         style={{ right: 0, top: unit * 0.04 }}
       >
         <MiniMount
@@ -215,7 +293,12 @@ function PrivateVignette({ active, width }: VignetteProps) {
         />
       </Piece>
 
-      <Piece active={active} order={1} style={{ left: unit * 0.29, top: 0 }}>
+      <Piece
+        active={active}
+        order={1}
+        reduced={reduced}
+        style={{ left: unit * 0.29, top: 0 }}
+      >
         <MiniMount
           id="priv-b"
           width={main}
@@ -226,12 +309,28 @@ function PrivateVignette({ active, width }: VignetteProps) {
         />
       </Piece>
 
-      {/* The claim, stamped across the one print that is yours. */}
-      <Piece active={active} order={2} style={styles.chipSlot}>
+      {/* The claim, stamped across the one print that is yours.
+
+          The padlock used to be drawn in `primary.amberLight`. Checked: it sits
+          on `ink[900]`, where #FBD9A4 measures 12.84:1 and is perfectly legal —
+          the 1.35:1 failure that colour is known for only happens on paper. It
+          is `text.onInk` now anyway, because a second near-white tone beside a
+          `text.onInk` label was a colour distinction carrying no information,
+          and the glyph is the outline cut like every other icon in the app. */}
+      <Piece
+        active={active}
+        order={2}
+        reduced={reduced}
+        style={styles.chipSlot}
+      >
         <View style={styles.inkChip}>
-          <Ionicons name="lock-closed" size={12} color={colors.primary.amberLight} />
+          <Ionicons
+            name="lock-closed-outline"
+            size={13}
+            color={colors.text.onInk}
+          />
           <Text variant="captionBold" onInk>
-            Only Aarav's family
+            Only Aarav&apos;s family
           </Text>
         </View>
       </Piece>
@@ -244,13 +343,19 @@ function PrivateVignette({ active, width }: VignetteProps) {
 // ---------------------------------------------------------------------------
 
 function PrintsVignette({ active, width }: VignetteProps) {
+  const reduced = useReducedMotion();
   const unit = stageUnit(width);
   const main = unit * 0.44;
 
   return (
     <View style={[styles.stage, { width: unit, height: unit * 0.78 }]}>
       {/* The rest of the order, stacked behind. */}
-      <Piece active={active} order={0} style={{ left: unit * 0.16, top: 0 }}>
+      <Piece
+        active={active}
+        order={0}
+        reduced={reduced}
+        style={{ left: unit * 0.16, top: 0 }}
+      >
         <MiniMount
           id="print-back"
           width={main * 0.88}
@@ -261,7 +366,12 @@ function PrintsVignette({ active, width }: VignetteProps) {
         />
       </Piece>
 
-      <Piece active={active} order={1} style={{ left: unit * 0.04, top: unit * 0.12 }}>
+      <Piece
+        active={active}
+        order={1}
+        reduced={reduced}
+        style={{ left: unit * 0.04, top: unit * 0.12 }}
+      >
         <MiniMount
           id="print-front"
           width={main}
@@ -274,7 +384,12 @@ function PrintsVignette({ active, width }: VignetteProps) {
       </Piece>
 
       {/* A price tag, in the currency the parent actually pays in. */}
-      <Piece active={active} order={2} style={{ right: 0, bottom: unit * 0.1 }}>
+      <Piece
+        active={active}
+        order={2}
+        reduced={reduced}
+        style={{ right: 0, bottom: unit * 0.1 }}
+      >
         <View style={styles.priceTag}>
           <Text variant="price" color={colors.ink[900]}>
             ₹30
@@ -319,7 +434,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.ms,
-    borderRadius: radius.sm,
+    // The mount's own corner, not the input scale's. It keeps this slide to
+    // four radii — print, mount, button, pill — and a paper tag pinned to a
+    // stack of prints should be cut like the prints.
+    borderRadius: radius.mount,
     backgroundColor: colors.primary.amber,
     ...platformShadow(shadows.medium),
   },

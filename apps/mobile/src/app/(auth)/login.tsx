@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, layout, MIN_TAP_SIZE } from '@/theme';
+import { colors, spacing, radius, layout, MIN_TAP_SIZE } from '@/theme';
 import {
   Text,
   Button,
@@ -172,22 +172,28 @@ export default function LoginScreen() {
   }, [email, password, signInAs, isPasswordMode, validateEmail, sendOTP, router]);
 
   // ── Role options ────────────────────────────────────────────────────
+  //
+  // Three segments, which is the cap, and three **outline** glyphs. Fill is
+  // reserved across the app for a selected state, and `SegmentOption.icon`
+  // receives only the resolved colour — it cannot tell whether it is the
+  // selected one — so a filled glyph here would mark all three as active at
+  // once. The thumb behind the label already says which is chosen.
   const roleOptions = useMemo<SegmentOption<SignInRole>[]>(
     () => [
       {
         value: 'parent',
         label: 'Parent',
-        icon: (color) => <Ionicons name="heart" size={15} color={color} />,
+        icon: (color) => <Ionicons name="heart-outline" size={15} color={color} />,
       },
       {
         value: 'teacher',
         label: 'Teacher',
-        icon: (color) => <Ionicons name="school" size={15} color={color} />,
+        icon: (color) => <Ionicons name="school-outline" size={15} color={color} />,
       },
       {
         value: 'admin',
         label: 'Admin',
-        icon: (color) => <Ionicons name="shield" size={15} color={color} />,
+        icon: (color) => <Ionicons name="shield-outline" size={15} color={color} />,
       },
     ],
     [],
@@ -210,22 +216,38 @@ export default function LoginScreen() {
           <HiveMark size={54} style={styles.mark} />
         </Reveal>
 
+        {/* Sentence case with a full stop — the house voice for a headline. */}
         <Reveal index={1}>
           <Text variant="h1" style={styles.heading}>
-            {isAdmin ? 'Administrator sign-in' : 'Welcome to Hive'}
+            {isAdmin ? 'Administrator sign-in.' : 'Welcome to Hive.'}
           </Text>
         </Reveal>
 
+        {/* The one editorial line the screen is allowed — Fraunces italic, and
+            only for a parent or a teacher. The admin door stays in the sans:
+            an administrator opening this screen is at work, and a warm serif
+            promise about their child would be addressed to the wrong person. */}
         <Reveal index={2}>
-          <Text variant="body" muted style={styles.subtitle}>
-            {isAdmin
-              ? 'Manage schools, classes and people.'
-              : "Your child's week at school, kept private."}
-          </Text>
+          {isAdmin ? (
+            <Text variant="body" muted style={styles.subtitle}>
+              Manage schools, classes and people.
+            </Text>
+          ) : (
+            <Text
+              variant="editorial"
+              color={colors.text.secondary}
+              style={styles.subtitle}
+            >
+              Your child&apos;s week at school, kept private.
+            </Text>
+          )}
         </Reveal>
 
         <Reveal index={3} style={styles.block}>
-          <Text variant="eyebrow" color={colors.text.tertiary} style={styles.eyebrow}>
+          {/* A form label, not a region name — so it is set in sentence case
+              rather than as a spaced capital eyebrow. "I AM A" shouted at
+              somebody who has just opened the app. */}
+          <Text variant="label" color={colors.text.secondary} style={styles.fieldLabel}>
             I am a
           </Text>
           <SegmentedControl
@@ -306,10 +328,20 @@ export default function LoginScreen() {
           </Pressable>
         )}
 
+        {/* Announced on arrival. A sign-in failure that only appears is a
+            failure a screen-reader user has to go hunting for. */}
         {serverError && (
-          <View style={styles.errorBox}>
-            <Ionicons name="alert-circle" size={17} color={colors.error.dark} />
-            <Text variant="bodySmall" color={colors.error.dark} style={styles.errorText}>
+          <View
+            style={styles.errorBox}
+            accessibilityLiveRegion="polite"
+            accessibilityRole="alert"
+          >
+            <Ionicons
+              name="alert-circle-outline"
+              size={17}
+              color={colors.error.main}
+            />
+            <Text variant="bodySmall" color={colors.error.main} style={styles.errorText}>
               {serverError}
             </Text>
           </View>
@@ -378,7 +410,7 @@ const styles = StyleSheet.create({
   block: {
     marginBottom: spacing.md,
   },
-  eyebrow: {
+  fieldLabel: {
     marginBottom: spacing.sm,
   },
   switchMethod: {
@@ -395,7 +427,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.ms,
     marginBottom: spacing.md,
-    borderRadius: 14,
+    // Was a literal 14 — the same number `radius.sm` holds, but a number the
+    // scale cannot move. Every corner on this screen now comes from the scale.
+    borderRadius: radius.sm,
     backgroundColor: colors.error.background,
   },
   errorText: {

@@ -1,76 +1,56 @@
-import React from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import React, { useCallback } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing } from '@/theme';
-import { Text, Button } from '@/components/ui';
+import { colors } from '@/theme';
 import { SafeArea } from '@/components/layout';
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const BEE_SIZE = Dimensions.get('window').width * 0.45;
+import { EmptyState } from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
 /**
- * 404 — Not Found screen.
+ * 404 — the route does not exist.
  *
- * Displayed when the user navigates to a route that does not exist.
- * Shows a playful bee-themed message and a button to return home.
+ * Two things were wrong with this screen and both were admitted in the code.
+ *
+ * The hero was **a placeholder**: a flat circle 45% of the screen wide, filled
+ * with `primary.amberLight`, with a compass glyph scaled up to half its width
+ * sitting in the middle. A 24-grid icon rendered at ~85pt draws a 7pt stroke,
+ * which is a blob, and a 170pt disc of the palette's lightest marigold is the
+ * single loudest shape the app would ever have put on paper — on the one screen
+ * that exists to say quietly that something went wrong. It is now
+ * `<OpenWindow>` from the spot-illustration set: one ink line on the 120 grid
+ * at 2.5, the same hand as the icons, chosen because the drawing says *the view
+ * is still there, we just cannot reach it from here*, which is exactly what a
+ * missing route means.
+ *
+ * And the copy was written for a child — "Oops! Page not found", "This bee got
+ * lost!" — when nobody using Hive is one. A parent who has just tapped a stale
+ * link wants to know whether their photographs are all right. So the message
+ * says so, in a sentence an adult would say out loud.
+ *
+ * The whole screen is now `<EmptyState variant="error">`, which brings the
+ * drawing, the entrance, the live region a screen reader needs, and the rule
+ * that an error state always carries a way out.
  */
 export default function NotFoundScreen() {
   const router = useRouter();
 
-  const handleGoHome = () => {
+  const handleGoHome = useCallback(() => {
     router.replace('/');
-  };
+  }, [router]);
 
   return (
     <SafeArea>
       <View style={styles.container}>
-        {/* Themed icon rather than the 🐝 emoji, which renders differently on
-            each platform and cannot take a brand colour. Not the Lottie either:
-            `assets/lottie/bee.json` is a stub — a single filled ellipse that
-            rotates, with no bee in it. */}
-        <View style={styles.beeContainer}>
-          <View style={styles.beePlaceholder}>
-            <Ionicons
-              name="compass-outline"
-              size={BEE_SIZE * 0.5}
-              color={colors.primary.amberDark}
-            />
-          </View>
-        </View>
-
-        {/* Heading */}
-        <Text variant="h2" center style={styles.heading}>
-          Oops! Page not found
-        </Text>
-
-        {/* Subtitle */}
-        <Text
-          variant="body"
-          color={colors.text.secondary}
-          center
-          style={styles.subtitle}
-        >
-          This bee got lost!
-        </Text>
-
-        {/* Go Home button */}
-        <Button
-          variant="primary"
-          size="lg"
-          onPress={handleGoHome}
-          style={styles.button}
-        >
-          Go Home
-        </Button>
+        <EmptyState
+          variant="error"
+          title="We can't find that page."
+          message="The link may be out of date, or the screen may have moved. Everything of yours is right where you left it."
+          action={{ label: 'Back to Hive', onPress: handleGoHome }}
+        />
       </View>
     </SafeArea>
   );
@@ -83,33 +63,6 @@ export default function NotFoundScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
     backgroundColor: colors.background.cream,
-  },
-  beeContainer: {
-    width: BEE_SIZE,
-    height: BEE_SIZE,
-    marginBottom: spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  beePlaceholder: {
-    width: BEE_SIZE,
-    height: BEE_SIZE,
-    borderRadius: BEE_SIZE / 2,
-    backgroundColor: colors.primary.amberLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heading: {
-    marginBottom: spacing.sm,
-  },
-  subtitle: {
-    marginBottom: spacing.xl,
-  },
-  button: {
-    width: '80%',
   },
 });
