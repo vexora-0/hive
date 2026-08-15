@@ -135,7 +135,11 @@ export function MasonryGrid<T>({
         ) : undefined
       }
       ListHeaderComponent={ListHeaderComponent}
-      ListEmptyComponent={ListEmptyComponent}
+      ListEmptyComponent={
+        ListEmptyComponent ? (
+          <EmptyHost>{renderEmpty(ListEmptyComponent)}</EmptyHost>
+        ) : undefined
+      }
       ListFooterComponent={ListFooterComponent}
       onScroll={onScroll}
       scrollEventThrottle={16}
@@ -150,6 +154,31 @@ export function MasonryGrid<T>({
 
 function Separator() {
   return <View style={styles.rowGap} />;
+}
+
+/**
+ * Gives the empty state a height to fill.
+ *
+ * `EmptyState` centres itself with `flex: 1`, which needs a parent with a
+ * height to divide. FlashList drops `ListEmptyComponent` straight into the
+ * scroll content, where there is no free space to take a share of, so the flex
+ * basis resolves to zero: the state mounts, lays out at no height, and is
+ * simply never seen. The screen looks blank rather than looking empty — and an
+ * error state that renders nothing is indistinguishable from a feed that
+ * genuinely has no photos, which is the one confusion this app cannot afford.
+ *
+ * A minimum height is enough. It is not a screenful, so a short state does not
+ * strand its retry button below the fold on a small phone.
+ */
+function EmptyHost({ children }: { children: React.ReactNode }) {
+  return <View style={styles.emptyHost}>{children}</View>;
+}
+
+/** Accepts the component-or-element shape `ListEmptyComponent` allows. */
+function renderEmpty(
+  Empty: React.ComponentType | React.ReactElement,
+): React.ReactNode {
+  return React.isValidElement(Empty) ? Empty : <Empty />;
 }
 
 // ---------------------------------------------------------------------------
@@ -176,6 +205,11 @@ const styles = StyleSheet.create({
   },
   rowGap: {
     height: spacing.ms,
+  },
+  /** See `EmptyHost` — FlashList gives the empty state no height of its own. */
+  emptyHost: {
+    minHeight: 420,
+    justifyContent: 'center',
   },
 });
 
