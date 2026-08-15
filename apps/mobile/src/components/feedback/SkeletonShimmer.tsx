@@ -7,6 +7,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import Animated, {
+  ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -133,9 +134,21 @@ export function SkeletonShimmer({
 
   useEffect(() => {
     // Springs move things, timings colour them — this is opacity, so it is a
-    // timing. `timing()` carries ReduceMotion.System, which finishes the fade
-    // instantly on a device that asks for it while leaving the delay intact.
-    appear.value = withDelay(delay, withTiming(1, timing(duration.fast)));
+    // timing, and `timing()` carries ReduceMotion.System so the fade finishes
+    // instantly on a device that asks for it.
+    //
+    // **The delay itself is exempt.** `withDelay` honours the same flag and
+    // drops the wait entirely when Reduce Motion is on (`delay.ts`: it starts
+    // the next animation once `now - startTime >= delayMs || reduceMotion`) —
+    // which would hand the grey flash straight back to the people who asked for
+    // less motion, not more. The wait is not an animation: it is the app
+    // deciding a 90ms request does not deserve a placeholder, and that judgment
+    // holds however the device is configured.
+    appear.value = withDelay(
+      delay,
+      withTiming(1, timing(duration.fast)),
+      ReduceMotion.Never,
+    );
 
     const announce = setTimeout(() => setAnnounced(true), delay);
     return () => clearTimeout(announce);

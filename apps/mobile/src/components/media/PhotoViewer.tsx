@@ -226,6 +226,31 @@ export function PhotoViewer({
     onClose?.();
   }, [onClose]);
 
+  /**
+   * The safety net under the dismissal.
+   *
+   * The animation's completion callback is what normally closes the screen. If
+   * it ever fails to arrive the viewer would be left showing an empty ground
+   * with the photograph thrown off the bottom of it, and no way back — so the
+   * dismissal also arms a timer. `handleClose` is idempotent; whichever gets
+   * there first wins.
+   */
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const armClose = useCallback(() => {
+    if (closeTimer.current) return;
+    closeTimer.current = setTimeout(
+      handleClose,
+      duration.exit + duration.instant,
+    );
+  }, [handleClose]);
+
+  useEffect(
+    () => () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    },
+    [],
+  );
+
   // ── Paging ─────────────────────────────────────────────────────────
   const resetZoom = useCallback(() => {
     scale.value = 1;
@@ -270,10 +295,14 @@ export function PhotoViewer({
   );
 
   // Re-seats the track when the window changes size — a rotation, a foldable,
-  // a web browser being dragged. Deliberately keyed on the width alone: on a
-  // page turn the spring is already driving `pageX`, and re-running this would
-  // cut it short mid-flight.
+  // a browser being dragged. Guarded by the last width rather than left to the
+  // dependency array, which cannot tell a resize from a mount: `pageX` is
+  // already correct on mount, and on a page turn a spring is driving it, so an
+  // unguarded write here would cut that spring short.
+  const lastWidth = useRef(pageWidth);
   useEffect(() => {
+    if (lastWidth.current === pageWidth) return;
+    lastWidth.current = pageWidth;
     pageX.value = -pageIndex.value * pageWidth;
   }, [pageWidth, pageX, pageIndex]);
 
@@ -447,7 +476,7 @@ export function PhotoViewer({
           // Leaving is quicker than arriving. `exitTiming()` carries
           // ReduceMotion.System, so on a device that asks for less motion the
           // photograph simply goes and the callback still fires.
-          dragX.value = withTiming(dragX.value, exitTiming());
+          runOnJS(armClose)();
           dragY.value = withTiming(windowH, exitTiming(), (finished) => {
             if (finished) runOnJS(handleClose)();
           });
@@ -510,7 +539,11 @@ export function PhotoViewer({
     ),
   }));
 
-  const active = pages[page];
+  // The page state can outlive the array it points into — a feed that refetches
+  // shorter while the viewer is open would otherwise leave a black screen with
+  // no page in the window.
+  const current = count > 0 ? Math.min(page, count - 1) : 0;
+  const active = pages[current];
 
   return (
     <View style={styles.viewer}>
@@ -522,16 +555,16 @@ export function PhotoViewer({
               // mounted: the neighbours so a swipe lands on an image rather
               // than on a placeholder, and nothing further so that a parent's
               // whole term does not sit decoded in memory.
-              Math.abs(i - page) <= 1 ? (
+              Math.abs(i - current) <= 1 ? (
                 <ViewerPage
                   key={photo.id ?? `${photo.uri}-${i}`}
                   photo={photo}
-                  active={i === page}
+                  active={i === current}
                   left={i * pageWidth}
                   width={windowW}
                   height={windowH}
                   onIntrinsicSize={reportIntrinsicSize}
-                  zoom={i === page ? zoomStyle : undefined}
+                  zoom={i === current ? zoomStyle : undefined}
                 />
               ) : null,
             )}
@@ -544,23 +577,25 @@ export function PhotoViewer({
         pointerEvents="box-none"
       >
         {count > 1 ? (
+          // Adjustable rather than decorative: paging is a swipe, and a swipe
+          // is the one gesture a screen-reader user does not have. This gives
+          // them the same two moves without putting arrows on the photograph.
           <Text
             variant="caption"
             onInk
-            muted
             style={styles.counter}
             accessibilityRole="adjustable"
             accessibilityLabel="Photo"
             accessibilityValue={{
               min: 1,
               max: count,
-              now: page + 1,
-              text: `${page + 1} of ${count}`,
+              now: current + 1,
+              text: `${current + 1} of ${count}`,
             }}
             accessibilityActions={A11Y_PAGE_ACTIONS}
             onAccessibilityAction={handleAccessibilityAction}
           >
-            {page + 1} of {count}
+            {current + 1} of {count}
           </Text>
         ) : (
           <View />
@@ -808,14 +843,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
   },
+  /**
+   * Both marks carry their own ground.
+   *
+   * A photograph is fitted, not filled, so most of the time there is black
+   * behind the chrome — but a portrait shot reaches the top of the screen, and
+   * a white nursery wall behind pale type is unreadable. The ground is the
+   * viewer's own, at 0.72, which holds `text.onInk` above 6:1 over anything the
+   * photograph can put underneath it.
+   */
   counter: {
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.ms,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+    backgroundColor: withAlpha(colors.viewer.ground, 0.72),
   },
   closeButton: {
     width: MIN_TAP_SIZE,
     height: MIN_TAP_SIZE,
     borderRadius: radius.pill,
-    backgroundColor: withAlpha(colors.white, 0.14),
+    backgroundColor: withAlpha(colors.viewer.ground, 0.72),
     alignItems: 'center',
     justifyContent: 'center',
   },

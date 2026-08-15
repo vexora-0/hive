@@ -188,9 +188,18 @@ interface ToastViewProps {
  *
  * A toast is something the app decided, not something a finger caused, so it
  * arrives on a timing curve rather than a spring: an unprompted overshoot on
- * the edge of vision reads as a glitch. It leaves faster than it arrives —
- * `duration.exit` — because by then the person has already read it. Nothing is
- * *only* said by the exit, which is what lets Reduce Motion drop it outright.
+ * the edge of vision reads as a glitch.
+ *
+ * **It leaves on a cut, and that is not an oversight.** The outlet unmounts the
+ * view the moment the toast clears, and Moti only runs an `exit` prop for a
+ * child of `<AnimatePresence>` — so the `exit` that used to be declared here
+ * never once ran, in any build. Rather than leave a prop that describes
+ * behaviour the app does not have, it is gone: nothing in this component is
+ * carried *only* by its departure, and Reduce Motion omits exit animations
+ * outright, so anything said on the way out is already unsaid for the people
+ * who most need it stated. If a fade-out is wanted later it is an
+ * `<AnimatePresence>` around this view and `exitTransition={exitTiming()}` —
+ * worth doing on a device where it can be watched, not blind.
  */
 function ToastView({ toast, placement, onDismiss }: ToastViewProps) {
   const insets = useSafeAreaInsets();
@@ -220,13 +229,7 @@ function ToastView({ toast, placement, onDismiss }: ToastViewProps) {
       key={toast.id}
       from={{ opacity: 0, translateY: travelY, scale: restingScale }}
       animate={{ opacity: 1, translateY: 0, scale: 1 }}
-      exit={{ opacity: 0, translateY: travelY, scale: restingScale }}
       transition={{ type: 'timing', duration: duration.base, easing: easing.standard }}
-      exitTransition={{
-        type: 'timing',
-        duration: duration.exit,
-        easing: easing.accelerate,
-      }}
       style={[styles.container, offset]}
       pointerEvents="box-none"
     >
