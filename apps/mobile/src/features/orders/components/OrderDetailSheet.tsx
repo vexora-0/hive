@@ -1,11 +1,5 @@
 import React, { useCallback } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { formatRupees, PRODUCT_LABELS } from '../constants/products';
@@ -16,12 +10,17 @@ import {
 } from '../constants/orderStatus';
 import { formatOrderNumber } from '../utils/orderNumber';
 import { colors, spacing, radius, shadows, platformShadow } from '@/theme';
-import { Text, Button, Badge } from '@/components/ui';
+import { Text, Button, Badge, Divider } from '@/components/ui';
 import { HiveImage } from '@/components/media';
 import type { OrderStatus, ProductType } from '@/types/supabase';
 
 import { useOrderDetail, useCancelOrder } from '../hooks/useOrders';
-import { Modal, ConfirmDialog } from '@/components/feedback';
+import {
+  BottomSheet,
+  ConfirmDialog,
+  EmptyState,
+  SkeletonShimmer,
+} from '@/components/feedback';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -53,15 +52,34 @@ const STATUS_STEPS = ORDER_PROGRESSION.map((key) => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * When the order was placed, said the way a person would say it.
+ *
+ * It used to read "Tue, 12 Aug 2025, 3:04 pm" — a machine timestamp with
+ * commas in it. The minute an order was placed is not a fact a parent needs
+ * about their own order; which day it was is.
+ */
 function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-IN', {
-    weekday: 'short',
+  const date = new Date(dateString);
+  const now = new Date();
+
+  const startOfDay = (d: Date) =>
+    new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const daysAgo = Math.round(
+    (startOfDay(now) - startOfDay(date)) / (24 * 60 * 60 * 1000),
+  );
+
+  if (daysAgo === 0) return 'today';
+  if (daysAgo === 1) return 'yesterday';
+  if (daysAgo > 1 && daysAgo < 7) {
+    return `on ${date.toLocaleDateString(undefined, { weekday: 'long' })}`;
+  }
+
+  return `on ${date.toLocaleDateString(undefined, {
     day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+    month: 'long',
+    ...(date.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
+  })}`;
 }
 
 function getProductLabel(type: ProductType): string {
@@ -73,17 +91,77 @@ function getStatusStepIndex(status: OrderStatus): number {
 }
 
 // ---------------------------------------------------------------------------
+// Loading
+// ---------------------------------------------------------------------------
+
+/**
+ * The order's own shape, before it has arrived.
+ *
+ * The sheet used to open on a large spinner and a "Loading your order…" line,
+ * which is the app telling a parent it is busy rather than showing them where
+ * their order is going to be. This is the same rail, the same item row and the
+ * same total, with the words missing.
+ */
+function DetailSkeleton() {
+  return (
+    <View>
+      <View style={styles.section}>
+        <SkeletonShimmer width="70%" height={16} borderRadius={4} index={0} />
+        <View style={styles.skeletonRail}>
+          <SkeletonShimmer width="100%" height={11} borderRadius={6} index={1} />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        {[0, 1].map((i) => (
+          <View key={i} style={styles.itemRow}>
+            <SkeletonShimmer
+              width={60}
+              height={60}
+              borderRadius={radius.mount}
+              index={i + 2}
+            />
+            <View style={styles.itemDetails}>
+              <SkeletonShimmer width="60%" height={14} borderRadius={4} index={i + 2} />
+              <SkeletonShimmer width="35%" height={11} borderRadius={4} index={i + 2} />
+            </View>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.totalSection}>
+        <View style={styles.totalRow}>
+          <SkeletonShimmer width={54} height={16} borderRadius={4} index={4} />
+          <SkeletonShimmer width={92} height={26} borderRadius={4} index={4} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 /**
- * `<OrderDetailSheet>` — a bottom sheet showing the full details of an order.
+ * `<OrderDetailSheet>` — everything known about one order.
  *
- * Includes an items list with thumbnails, a status timeline/progress indicator,
- * shipping address, notes, and the total amount.
+ * It is the app's one sheet now: scrim, radius, handle, safe-area inset and
+ * height ceiling all belong to `<BottomSheet>` rather than being re-declared
+ * here, which is how fourteen sheets ended up with four different maximum
+ * heights and two different grounds.
+ *
+ * The order of the page is the order of a parent's questions: where has it got
+ * to, what is in it, where is it going, what did it cost. The order number is
+ * last on purpose — nobody looks one up until something has gone wrong.
  */
 export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
-  const { data: order, isLoading } = useOrderDetail(orderId ?? '');
+  const {
+    data: order,
+    isLoading,
+    isError,
+    refetch,
+  } = useOrderDetail(orderId ?? '');
   const isVisible = orderId != null;
 
   // ── Cancelling ───────────────────────────────────────────────────
@@ -108,12 +186,9 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
     if (isCancelled) {
       return (
         <View style={styles.section}>
-          <Text variant="eyebrow" color={colors.text.tertiary} style={styles.sectionTitle}>
-            Status
-          </Text>
-          <View style={styles.cancelledBadge}>
-            <Ionicons name="close-circle" size={19} color={colors.error.dark} />
-            <Text variant="bodySmall" color={colors.error.dark} style={styles.cancelledText}>
+          <View style={styles.cancelledBlock}>
+            <Ionicons name="close-circle-outline" size={19} color={colors.error.main} />
+            <Text variant="bodySmall" color={colors.error.main} style={styles.cancelledText}>
               {ORDER_STATUS.cancelled.description}
             </Text>
           </View>
@@ -123,16 +198,17 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
 
     return (
       <View style={styles.section}>
-        <Text variant="eyebrow" color={colors.text.tertiary} style={styles.sectionTitle}>
-          Progress
-        </Text>
-
         {/* What is happening right now, in words, above the rail. A row of
             dots tells a parent which stage is lit; it does not tell them what
             that stage means. */}
-        <Text variant="bodyBold" style={styles.timelineHeadline}>
-          {ORDER_STATUS[order.status].description}
-        </Text>
+        <View style={styles.statusHeadline}>
+          <Text variant="bodyBold" style={styles.statusText}>
+            {ORDER_STATUS[order.status].description}
+          </Text>
+          <Badge variant={ORDER_STATUS[order.status].variant} dot>
+            {ORDER_STATUS[order.status].label}
+          </Badge>
+        </View>
 
         <View style={styles.timeline}>
           {STATUS_STEPS.map((step, index) => {
@@ -184,21 +260,19 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
     );
   };
 
-  // ── Items list ───────────────────────────────────────────────────
+  // ── Items ────────────────────────────────────────────────────────
   const renderItems = () => {
     if (!order?.items?.length) return null;
 
     return (
       <View style={styles.section}>
-        <Text variant="eyebrow" color={colors.text.tertiary} style={styles.sectionTitle}>
-          {order.items.length === 1 ? 'Item' : `${order.items.length} items`}
-        </Text>
         {order.items.map((item) => (
           <View key={item.id} style={styles.itemRow}>
             {item.thumbnailUrl ? (
               <View style={styles.itemMount}>
                 <HiveImage
                   uri={item.thumbnailUrl}
+                  recyclingKey={item.id}
                   style={styles.itemImage}
                   contentFit="cover"
                 />
@@ -211,9 +285,7 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
               </View>
             )}
             <View style={styles.itemDetails}>
-              <Text variant="bodySmallBold">
-                {getProductLabel(item.product_type)}
-              </Text>
+              <Text variant="bodySmallBold">{getProductLabel(item.product_type)}</Text>
               <Text variant="caption" color={colors.text.tertiary}>
                 {item.quantity} × {formatRupees(item.unit_price_cents)}
               </Text>
@@ -227,104 +299,73 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
     );
   };
 
-  // ── Main render ──────────────────────────────────────────────────
-  return (
-    <Modal
-      visible={isVisible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.handleIndicator} />
-          <View style={styles.container}>
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary.amberDark} />
-            <Text variant="bodySmall" muted style={styles.loadingText}>
-              Loading your order…
+  // ── Body ─────────────────────────────────────────────────────────
+  const body = () => {
+    if (isLoading) return <DetailSkeleton />;
+
+    // A failed request must never be dressed up as an order that has nothing
+    // in it. "Order not found." was shown for a dropped connection too.
+    if (isError || !order) {
+      return (
+        <EmptyState
+          variant="error"
+          title="Couldn't load this order."
+          message="It may just be the connection. Try again in a moment."
+          action={{ label: 'Try again', onPress: () => refetch() }}
+        />
+      );
+    }
+
+    return (
+      <>
+        {renderTimeline()}
+        {renderItems()}
+
+        {order.shipping_address && (
+          <View style={styles.section}>
+            <Text variant="bodySmallBold" style={styles.sectionTitle}>
+              Delivering to
             </Text>
-          </View>
-        ) : order ? (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-          >
-            {/* Header */}
-            <View style={styles.header}>
-              <View style={styles.headerText}>
-                <Text variant="h2">Your order</Text>
-                <Text variant="caption" color={colors.text.tertiary} style={styles.headerMeta}>
-                  #{formatOrderNumber(order.id)} · placed {formatDate(order.created_at)}
-                </Text>
-              </View>
-              <Badge variant={ORDER_STATUS[order.status].variant} dot>
-                {ORDER_STATUS[order.status].label}
-              </Badge>
+            <View style={styles.infoCard}>
+              <Text variant="bodySmall" muted>
+                {order.shipping_address}
+              </Text>
             </View>
-
-            {/* Status timeline */}
-            {renderTimeline()}
-
-            {/* Items */}
-            {renderItems()}
-
-            {/* Delivery address */}
-            {order.shipping_address && (
-              <View style={styles.section}>
-                <Text variant="eyebrow" color={colors.text.tertiary} style={styles.sectionTitle}>
-                  Delivering to
-                </Text>
-                <View style={styles.infoCard}>
-                  <Text variant="bodySmall" muted>
-                    {order.shipping_address}
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {/* Notes */}
-            {order.notes && (
-              <View style={styles.section}>
-                <Text variant="eyebrow" color={colors.text.tertiary} style={styles.sectionTitle}>
-                  Your note
-                </Text>
-                <View style={styles.infoCard}>
-                  <Text variant="bodySmall" muted>
-                    {order.notes}
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {/* Total */}
-            <View style={styles.totalSection}>
-              <View style={styles.totalRow}>
-                <Text variant="bodyBold">Total</Text>
-                <Text variant="priceLarge">{formatRupees(order.total_cents)}</Text>
-              </View>
-            </View>
-
-            {canCancel && (
-              <Button
-                variant="outline"
-                fullWidth
-                onPress={() => setConfirmingCancel(true)}
-                loading={cancelOrder.isPending}
-                style={styles.cancelButton}
-              >
-                Cancel this order
-              </Button>
-            )}
-          </ScrollView>
-        ) : (
-          <View style={styles.loadingContainer}>
-            <Text variant="body" color={colors.text.secondary}>
-              Order not found.
-            </Text>
           </View>
         )}
+
+        {order.notes && (
+          <View style={styles.section}>
+            <Text variant="bodySmallBold" style={styles.sectionTitle}>
+              Your note
+            </Text>
+            <View style={styles.infoCard}>
+              <Text variant="bodySmall" muted>
+                {order.notes}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        <View style={styles.totalSection}>
+          <View style={styles.totalRow}>
+            <Text variant="bodySmall" muted>
+              Delivery
+            </Text>
+            <Text variant="bodySmall" muted>
+              Included
+            </Text>
+          </View>
+          <Divider style={styles.divider} />
+          <View style={styles.totalRow}>
+            <Text variant="bodyBold">Total</Text>
+            <Text variant="priceLarge">{formatRupees(order.total_cents)}</Text>
+          </View>
+        </View>
+
+        <Text variant="caption" color={colors.text.tertiary} style={styles.orderNumber}>
+          Order #{formatOrderNumber(order.id)}
+        </Text>
 
         {/* Nested inside the sheet on purpose — a ConfirmDialog rendered as a
             sibling Modal never appears on iOS. */}
@@ -338,10 +379,33 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
           onConfirm={handleConfirmCancel}
           onCancel={() => setConfirmingCancel(false)}
         />
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+      </>
+    );
+  };
+
+  return (
+    <BottomSheet
+      visible={isVisible}
+      onClose={onClose}
+      title="Your order"
+      subtitle={order ? `Placed ${formatDate(order.created_at)}` : undefined}
+      showClose
+      scroll
+      footer={
+        canCancel ? (
+          <Button
+            variant="outline"
+            fullWidth
+            onPress={() => setConfirmingCancel(true)}
+            loading={cancelOrder.isPending}
+          >
+            Cancel this order
+          </Button>
+        ) : undefined
+      }
+    >
+      {body()}
+    </BottomSheet>
   );
 }
 
@@ -350,62 +414,7 @@ export function OrderDetailSheet({ orderId, onClose }: OrderDetailSheetProps) {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: colors.overlay.scrim,
-  },
-  sheet: {
-    maxHeight: '88%',
-    backgroundColor: colors.background.cream,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    ...platformShadow(shadows.xlarge),
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    maxHeight: '100%',
-  },
-  handleIndicator: {
-    alignSelf: 'center',
-    backgroundColor: colors.border.default,
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    marginTop: spacing.ms,
-    marginBottom: spacing.md,
-  },
-  scrollContent: {
-    paddingBottom: spacing.xxl,
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: spacing.ms,
-  },
-  headerText: {
-    flex: 1,
-  },
-  headerMeta: {
-    marginTop: spacing.xs,
-  },
-
-  // Loading
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xxl,
-  },
-  loadingText: {
-    marginTop: spacing.sm,
-  },
-
-  // Sections
+  // ── Sections ──
   section: {
     marginTop: spacing.lg,
   },
@@ -413,12 +422,20 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
 
-  // Timeline
-  timelineHeadline: {
+  // ── Status ──
+  statusHeadline: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.ms,
     marginBottom: spacing.md,
   },
+  statusText: {
+    flex: 1,
+  },
+
   // Horizontal rail: five stages read left to right in the space three read
-  // vertically, and the shape matches the step rail in the order sheet.
+  // vertically, and the shape matches the recap in the order sheet.
   timeline: {
     flexDirection: 'row',
   },
@@ -442,7 +459,7 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
     borderWidth: 3.5,
-    borderColor: colors.background.cream,
+    borderColor: colors.surface.raised,
   },
   timelineLine: {
     height: 2,
@@ -453,31 +470,31 @@ const styles = StyleSheet.create({
     paddingRight: spacing.xs,
   },
 
-  // Cancelled
-  cancelledBadge: {
+  // ── Cancelled ──
+  cancelledBlock: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm,
     backgroundColor: colors.error.background,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.ms,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
   },
   cancelledText: {
     flex: 1,
   },
 
-  // Items
+  // ── Items ──
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.ms,
     paddingVertical: spacing.ms,
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border.light,
   },
   itemMount: {
-    padding: 4,
+    padding: spacing.xs,
     borderRadius: radius.mount,
     backgroundColor: colors.background.surface,
     ...platformShadow(shadows.small),
@@ -497,21 +514,21 @@ const styles = StyleSheet.create({
   },
   itemDetails: {
     flex: 1,
-    gap: 2,
+    gap: spacing.xxs,
   },
 
-  // Info cards
+  // ── Info cards ──
   infoCard: {
-    backgroundColor: colors.background.surface,
+    backgroundColor: colors.background.surfaceSecondary,
     borderRadius: radius.lg,
     padding: spacing.md,
   },
 
-  // Total
+  // ── Money ──
   totalSection: {
     marginTop: spacing.lg,
     paddingTop: spacing.md,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border.light,
   },
   totalRow: {
@@ -519,9 +536,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  divider: {
+    marginVertical: spacing.sm,
+  },
+  orderNumber: {
+    marginTop: spacing.md,
+    marginBottom: spacing.lg,
+  },
 
-  cancelButton: {
-    marginTop: spacing.lg,
+  // ── Loading ──
+  skeletonRail: {
+    marginTop: spacing.md,
   },
 });
 

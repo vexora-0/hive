@@ -31,7 +31,10 @@ export interface ProductPickerProps {
 
 interface ProductMeta {
   type: ProductType;
+  /** The line-weight glyph. One family, one weight, drawn unfilled. */
   icon: keyof typeof Ionicons.glyphMap;
+  /** The same glyph filled — **only** ever drawn for the selected card. */
+  iconSelected: keyof typeof Ionicons.glyphMap;
   /** What the parent actually receives. Sets expectations before they buy. */
   note: string;
 }
@@ -40,15 +43,56 @@ interface ProductMeta {
  * Icons rather than emoji. Emoji render differently on iOS and Android, cannot
  * take a brand colour, and three of the seven products were sharing the same
  * picture frame glyph — so the grid gave no help telling a 4×6 from an 8×10.
+ *
+ * **Every glyph is the outline cut, and fill is reserved strictly for the
+ * selected card.** That is what makes fill mean something: a filled icon in
+ * this app is never decoration, it is always the thing you have chosen. The
+ * grid used to be drawn entirely in solid glyphs, which spent the one signal
+ * the icon set has on nothing at all.
  */
 const PRODUCTS: ProductMeta[] = [
-  { type: 'print_4x6', icon: 'image', note: 'Postcard size' },
-  { type: 'print_5x7', icon: 'image', note: 'Desk frame size' },
-  { type: 'print_8x10', icon: 'expand', note: 'Wall size' },
-  { type: 'digital_download', icon: 'cloud-download', note: 'Full resolution file' },
-  { type: 'photo_book', icon: 'book', note: '20 pages, hardbound' },
-  { type: 'magnet', icon: 'magnet', note: 'For the fridge' },
-  { type: 'mug', icon: 'cafe', note: '330 ml ceramic' },
+  {
+    type: 'print_4x6',
+    icon: 'image-outline',
+    iconSelected: 'image',
+    note: 'Postcard size',
+  },
+  {
+    type: 'print_5x7',
+    icon: 'albums-outline',
+    iconSelected: 'albums',
+    note: 'Desk frame size',
+  },
+  {
+    type: 'print_8x10',
+    icon: 'expand-outline',
+    iconSelected: 'expand',
+    note: 'Wall size',
+  },
+  {
+    type: 'digital_download',
+    icon: 'cloud-download-outline',
+    iconSelected: 'cloud-download',
+    note: 'Full resolution file',
+  },
+  {
+    type: 'photo_book',
+    icon: 'book-outline',
+    iconSelected: 'book',
+    note: '20 pages, hardbound',
+  },
+  {
+    type: 'magnet',
+    icon: 'magnet-outline',
+    iconSelected: 'magnet',
+    note: 'For the fridge',
+  },
+  {
+    type: 'mug',
+    icon: 'cafe-outline',
+    iconSelected: 'cafe',
+    note: '330 ml ceramic',
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -96,7 +140,7 @@ function ProductCard({ product, isSelected, onPress }: ProductCardProps) {
     >
       <View style={styles.cardTop}>
         <Ionicons
-          name={product.icon}
+          name={isSelected ? product.iconSelected : product.icon}
           size={19}
           color={isSelected ? colors.text.accent : colors.text.tertiary}
         />
