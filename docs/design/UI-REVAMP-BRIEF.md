@@ -328,6 +328,17 @@ the app.
 an admitted placeholder · `(teacher)/dashboard` photos have **no tap action** · `(admin)/dashboard`
 is six static numbers · `(parent)/photo/[id]` loading is a bare spinner on black.
 
+### 9.8b Carried into Wave 2 from the component pass
+
+- `features/onboarding/components/SlideVignette.tsx:232` passes
+  `colors.primary.amberLight` to an `Ionicons`. Fine on ink (12.84:1), **1.35:1 on paper** —
+  rubric items 10 and 15. Check which ground it actually sits on and fix accordingly.
+- `features/teacher/hooks/useUpload.ts` still carries `showConfetti` / `dismissConfetti`
+  state that nothing renders any more. It is a hook, so it was out of scope for the
+  presentation pass; remove it with the teacher screens.
+- Two admin screens (`(admin)/schools.tsx`, `(admin)/class-detail.tsx`) still hand-roll a
+  round amber FAB instead of using `HoneycombFAB`.
+
 ### 9.9 Six screens are governed by two files
 Three `notifications` (25 lines each, byte-identical) and three `profile` (13–14 lines)
 are thin wrappers over `NotificationCenter.tsx` and `ProfileScreen.tsx`. **Redesigning
