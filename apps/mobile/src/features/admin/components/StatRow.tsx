@@ -2,14 +2,8 @@ import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import {
-  colors,
-  spacing,
-  duration as motionDuration,
-  MIN_TAP_SIZE,
-} from '@/theme';
+import { colors, spacing, MIN_TAP_SIZE } from '@/theme';
 import { Text } from '@/components/ui/Text';
-import { AnimatedCounter } from '@/components/animation/AnimatedCounter';
 import { formatRupees } from '@/features/orders/constants/products';
 
 // ---------------------------------------------------------------------------
@@ -58,6 +52,16 @@ export interface StatRowProps {
  * six they cannot. Rows without a destination — money taken, photographs
  * shared — stay quiet and lose the chevron, so the affordance keeps meaning.
  *
+ * **The number is a `Text`, not an `AnimatedCounter`, and that is load-bearing.**
+ * The counter paints into a `TextInput` so Reanimated can drive it from the UI
+ * thread, and a `TextInput` on react-native-web is an `<input>` with no width
+ * and no `size`, so it claims the browser's default twenty-character intrinsic
+ * width — **measured at 252.5px for a one-digit number at 22px**, against 13.6px
+ * of actual glyph. The label beside it is `flex: 1`, which is `flex-basis: 0`,
+ * so the label had nothing to defend itself with: the row rendered as an icon,
+ * no label at all, and a number. A count-up in a quiet list row was never worth
+ * that, and the hero figure on the dashboard keeps its counter.
+ *
  * ```tsx
  * <StatRow icon="receipt-outline" label="Orders" value={34} onPress={openQueue} />
  * <StatRow icon="cash-outline" label="Taken in prints" value={499000} format="rupees" />
@@ -89,15 +93,11 @@ export function StatRow({
         )}
       </View>
 
-      {/* The counter paints into a TextInput, which a screen reader announces
-          as an editable field, so it hides itself and the row carries the
-          label instead. */}
-      <AnimatedCounter
-        value={value}
-        format={format}
-        duration={motionDuration.slow}
-        style={styles.value}
-      />
+      {/* Sized to its own digits and never shrunk, so the label keeps the rest
+          of the row. The row carries the spoken label for both together. */}
+      <Text variant="h3" numberOfLines={1} style={styles.value}>
+        {spoken}
+      </Text>
 
       {onPress && (
         <Ionicons
@@ -151,15 +151,19 @@ const styles = StyleSheet.create({
   rowPressed: {
     backgroundColor: colors.background.surfaceSecondary,
   },
+  /** Takes the row. `minWidth: 0` so a long label truncates instead of pushing
+   *  the number off the end. */
   text: {
     flex: 1,
+    minWidth: 0,
   },
   caption: {
     marginTop: spacing.xxs,
   },
+  /** `h3` is Fraunces 22 at -0.9 tracking — the same face and size the counter
+   *  drew, so nothing about the row's look changed with it. */
   value: {
-    fontSize: 22,
-    letterSpacing: -0.9,
+    flexShrink: 0,
   },
 });
 

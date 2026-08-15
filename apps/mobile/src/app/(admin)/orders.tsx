@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
@@ -227,15 +226,17 @@ export default function OrdersScreen() {
       <HeaderBar large title="Fulfilment" eyebrow="Prints to make and send" />
 
       <View style={styles.container}>
-        {/* react-native-web gives a ScrollView flex: 1, so without the style
-            below the chip row stretches down the page and pushes the list to
-            the bottom. Native sizes it to content. */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll}
-          contentContainerStyle={styles.filterRow}
-        >
+        {/*
+          The four filters wrap rather than scroll.
+
+          They wanted about 497pt laid in a row against a 390pt screen, so the
+          last one was sliced by the screen edge — and a horizontal scroller
+          gives no hint that it scrolls, so a cut-off word reads as a bug
+          rather than as an invitation. Four fixed options are a set worth
+          seeing whole; wrapping shows all of them and costs one row of height
+          at most. `(admin)/users` does the same thing for the same reason.
+        */}
+        <View style={styles.filterRow}>
           {STATUS_FILTERS.map((filter) => (
             <Chip
               key={filter.label}
@@ -245,7 +246,7 @@ export default function OrdersScreen() {
               {filter.label}
             </Chip>
           ))}
-        </ScrollView>
+        </View>
 
         <FlashList
           data={orders}
@@ -287,12 +288,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  filterScroll: {
-    flexGrow: 0,
-    flexShrink: 0,
-  },
   filterRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     paddingHorizontal: layout.screenPaddingHorizontal,
     paddingBottom: spacing.md,

@@ -70,9 +70,17 @@ function DashboardSkeleton() {
   return (
     <View>
       <SkeletonShimmer width="100%" height={196} borderRadius={radius.lg} />
-      <View style={styles.skeletonGroup}>
-        <SkeletonShimmer width="100%" height={172} borderRadius={radius.lg} index={1} />
+
+      {/* The section header sits between the two cards in the loaded state, so
+          it is here too — a skeleton that skips it lets everything below jump
+          up by its height the moment the data lands. */}
+      <View style={styles.skeletonHeader}>
+        <SkeletonShimmer width={128} height={22} borderRadius={radius.xs} index={1} />
       </View>
+
+      {/* 165 = two 56pt rows, two hairlines, the 49pt closing line, and the
+          card's own border. */}
+      <SkeletonShimmer width="100%" height={165} borderRadius={radius.lg} index={2} />
     </View>
   );
 }
@@ -94,9 +102,13 @@ function DashboardSkeleton() {
  *  1. **Today**, and the one queue with work in it. Orders are the only thing
  *     on this screen that has a next step, so today's count leads and the
  *     screen's single primary action opens the queue underneath it.
- *  2. **The roster**, as three quiet rows in one card. Schools and people lead
- *     somewhere an admin can change something; photographs shared is context,
- *     so it keeps its number and loses its chevron.
+ *  2. **The roster**, as two quiet rows in one card. Schools and people lead
+ *     somewhere an admin can change something, so both are rows with a chevron
+ *     and both are built the same way. Photographs shared leads nowhere — there
+ *     is no admin photo screen — so it is not a row at all: it is the card's
+ *     closing line, in the same quiet voice the Today card signs off in. A
+ *     third row that looked identical to the two above it but did not respond
+ *     to a tap read as a broken row rather than as a deliberate statistic.
  *
  * Deliberately *not* here: anything that belongs at a desk. There is no report
  * export, no chart, no date-range picker and no per-school breakdown — Linear's
@@ -123,6 +135,13 @@ export default function DashboardScreen() {
     const capped = hasMoreOrders && count === orders.length && count > 0;
     return { count, capped };
   }, [orders, hasMoreOrders]);
+
+  /** The roster card's closing line. Reads as a sentence at any count. */
+  const photographLine = useMemo(() => {
+    const count = stats?.photos ?? 0;
+    if (count === 0) return 'No photographs shared yet';
+    return `${count} ${count === 1 ? 'photograph' : 'photographs'} shared in all`;
+  }, [stats?.photos]);
 
   const onRefresh = useCallback(() => {
     refetch();
@@ -248,6 +267,10 @@ export default function DashboardScreen() {
 
             <Reveal index={2}>
               <Card elevation="low" padding={0}>
+                {/* Both rows are built identically — icon, label, count,
+                    chevron — because both do the same thing. The caption that
+                    used to hang under "People" made one row taller than the
+                    other for no reason a reader could see. */}
                 <StatRow
                   icon="school-outline"
                   label="Schools"
@@ -260,16 +283,18 @@ export default function DashboardScreen() {
                   icon="people-outline"
                   label="People"
                   value={stats?.users ?? 0}
-                  caption="Teachers, parents and admins"
                   onPress={openPeople}
                   accessibilityHint="Opens the list of people"
                 />
+
                 <Divider inset={spacing.md} />
-                <StatRow
-                  icon="images-outline"
-                  label="Photographs shared"
-                  value={stats?.photos ?? 0}
-                />
+
+                {/* Context, not a destination. */}
+                <View style={styles.rosterFoot}>
+                  <Text variant="bodySmall" muted>
+                    {photographLine}
+                  </Text>
+                </View>
               </Card>
             </Reveal>
           </>
@@ -289,8 +314,11 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: layout.tabBarClearance,
   },
-  skeletonGroup: {
-    marginTop: spacing.lg,
+  skeletonHeader: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.ms,
+    height: 28,
+    justifyContent: 'center',
   },
   todayCard: {
     overflow: 'hidden',
@@ -327,5 +355,11 @@ const styles = StyleSheet.create({
   rosterHeader: {
     marginTop: spacing.xl,
     marginBottom: spacing.ms,
+  },
+  /** Same measures as `todayFoot`, so both cards sign off identically. */
+  rosterFoot: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.ms,
+    paddingBottom: spacing.md,
   },
 });
