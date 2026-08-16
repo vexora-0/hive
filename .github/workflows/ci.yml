@@ -59,17 +59,18 @@ jobs:
       - name: Typecheck mobile
         run: pnpm --filter @hive/mobile typecheck
 
-      # Not blocking yet. The suite needs a real Supabase project — it signs
-      # users in to mint JWTs and truncates tables between files — so it cannot
-      # run until TEST_SUPABASE_* are set as repository secrets, pointing at
-      # hive-test and nothing else. `continue-on-error` comes off once this has
-      # been green on a push, the same two-step used for lint (294b166) and
-      # mobile typecheck (1c9d035).
+      # Now blocking. The suite needs a real Supabase project — it signs users
+      # in to mint JWTs and truncates tables between files — so until
+      # TEST_SUPABASE_* existed as repository secrets it could not run at all:
+      # tests/setup.ts refused to start and the step exited 1 on every push,
+      # with `continue-on-error` painting the job green over it. That is worse
+      # than not gating, because the tick implied a guard that was not there.
       #
-      # Until then the 79+ tests still guard nothing on a pull request, which
-      # is the honest state of it.
+      # The secrets now point at hive-test, and the suite went green on a real
+      # run: 218 passed across 8 files in 373.86s. Same two-step used for lint
+      # (294b166) and mobile typecheck (1c9d035) — prove it green, then remove
+      # the escape hatch.
       - name: Test backend
-        continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_KEY }}
