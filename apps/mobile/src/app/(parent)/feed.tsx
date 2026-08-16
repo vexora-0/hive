@@ -588,6 +588,25 @@ export default function FeedScreen() {
     <ScreenContainer edges={['top', 'left', 'right']}>
       <HeaderBar hero title="Moments" eyebrow={eyebrow} scrollY={scrollY} />
 
+      {/**
+       * The switcher sits **above** the list, not inside it as
+       * `ListHeaderComponent`.
+       *
+       * FlashList pins a sticky row to the top of its viewport as soon as that
+       * row is the current sticky index — it does not wait for the row to
+       * actually reach the top, and it does not offset the pinned copy by the
+       * list header's height. With the switcher inside the list that put the
+       * pinned day header directly on top of it: the switcher was invisible at
+       * rest, and the day header appeared twice, once pinned and once in flow a
+       * switcher's height below. Only at scroll 0 — which is exactly where a
+       * parent opens the app.
+       *
+       * Outside the list, data index 0 *is* the top, so the pinned copy lands on
+       * its own row and the two coincide. The switcher also stops scrolling
+       * away, which matches what the loading state already did.
+       */}
+      {ListHeader}
+
       <FlashList
         data={rows}
         renderItem={renderRow}
@@ -609,7 +628,6 @@ export default function FeedScreen() {
             progressBackgroundColor={colors.background.surface}
           />
         }
-        ListHeaderComponent={ListHeader}
         ListFooterComponent={ListFooter}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
