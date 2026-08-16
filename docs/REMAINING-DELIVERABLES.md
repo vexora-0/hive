@@ -28,8 +28,8 @@ hand — a hand edit is lost the next time anyone runs the build.
 | Continuous evaluation | 20 | Evidence exists. Needs supervisor remarks — §2 below |
 | Implementation | 30 | Complete and verified |
 | Testing, validation & results | 15 | Strong. Performance is no longer empty — §3 |
-| Documentation | 20 | Chapters written, figures placed, **`.docx` built and formatted**. Outstanding: placeholders and page numbers |
-| Presentation, demo & viva | 15 | Drafted; **video + rehearsal outstanding** |
+| Documentation | 20 | **Complete.** Chapters written, 17 figures placed, `.docx` built and formatted, zero placeholders |
+| Presentation, demo & viva | 15 | Slides and viva prep drafted, **demo video recorded and linked**. Outstanding: rehearse against a clock |
 
 **Verified on 16 August, uncached:**
 
@@ -43,7 +43,7 @@ hand — a hand edit is lost the next time anyone runs the build.
 | k6 smoke, 1 VU / 30 s | 42/42 checks, **0.00% failures**, p95 **1.13 s**, feed page **3,908 B** |
 | `verify-security.sh` | **29 passed, 0 failed, 1 skipped** — full run, 16 Aug, against a production-mode target |
 | Endpoints | **40** — matches the claim exactly |
-| Repository | **429 commits** at `d691359` and moving, 4 contributors, 151 active days, 1 Feb – 16 Aug |
+| Repository | **443 commits** at `449f113` and moving, 4 contributors, 151 active days, 1 Feb – 16 Aug |
 
 **The commit count drifts every time anyone commits, including the commit that
 corrects it.** `make-report.py` compares §5.1's stated count against the
@@ -60,28 +60,23 @@ Assets already committed:
 
 ---
 
-## 2. Only Bhargav can do these
+## 2. Nothing is left in the document
 
-**34 `«»` placeholders** need a human. Of the rest: the 8 Table of Contents
-entries are gone — pandoc generates a real contents page with real page numbers —
-and the remaining 27 are the page columns in LIST OF FIGURES and LIST OF TABLES,
-which cannot be filled until pagination is final. Read them off the generated
-contents once the document is open in Word.
+**Zero `«»` placeholders.** Cover page, declaration, supervisor and the
+demonstration video link are all filled. The contents page, list of figures and
+list of tables are Word fields that populate themselves.
 
-| Where | Count | What is needed |
-|---|---|---|
-| `REPORT.md` §5.2 Weekly progress | 25 | Supervisor remarks, one per week |
-| `REPORT.md` §5.3 Supervisor interaction | 3 | Review dates and feedback received |
-| `REPORT.md` cover page | 3 | Name, roll number, institution |
-| `REPORT.md` declaration | 2 | Signature, date |
-| `PRESENTATION-15min.md` title slide | 2 | Name / roll number, supervisor |
-| `REPORT.md` §4.4 + Appendix D | 1 | Demonstration video link |
+The demonstration video is **https://youtu.be/_kvid-1KXxA**, referenced from
+§4.4 and Appendix D.
 
-Find them with:
+Two things still need a human, and neither is a placeholder:
 
-```bash
-grep -rn "«" docs/capstone/
-```
+| What | Where |
+|---|---|
+| Open the `.docx` in Word and press **F9** (select all first) | Populates the contents page and both lists with real page numbers |
+| Sign and date the declaration | A printed signature line, not a typed field |
+
+Then export to PDF.
 
 ---
 
@@ -91,11 +86,9 @@ grep -rn "«" docs/capstone/
 
 | # | Task | Marks | Notes |
 |---|---|---|---|
-| 1 | **Fill the ~34 placeholders** | part of 6 | §2 above. 25 are the weekly supervisor remarks |
-| 2 | **Record the demo video** | — | Required by Report §4.4. Follow `docs/demo-script.md`. Doubles as insurance if the live demo fails |
-| 3 | **Rehearse the demo twice with a timer** | 5 | Slide timings are in `PRESENTATION-15min.md` |
-| 4 | **Fill the figure/table page numbers** | part of 7 | Only possible once pagination is final. Open the built `.docx` in Word, update fields, read the page numbers off the generated contents, and type them into LIST OF FIGURES and LIST OF TABLES |
-| 5 | **Export to PDF** | part of 6 | Last step |
+| 1 | **Rehearse the demo twice with a timer** | 5 | Slide timings are in `PRESENTATION-15min.md`. The recording at https://youtu.be/_kvid-1KXxA is the fallback if the live demo fails |
+| 2 | **Open in Word, select all, press F9** | part of 7 | Populates the contents page and both lists with real page numbers. They are fields, not text — do not type numbers in |
+| 3 | **Sign and date the declaration, then export to PDF** | part of 6 | Last step |
 
 ### 3b. Evidence figures — all captured
 
@@ -111,7 +104,7 @@ produced it.
 | 3.4 | Rajesh's feed beside Vikram's | 2 photographs vs 1, zero overlap |
 | 3.5 | signed URL, then with `?token=` stripped | `HTTP/2 200` `image/jpeg` 42,497 B · `HTTP/2 400` |
 | 4.1 | `/health` healthy, then a second instance with the database unreachable | 200 `ok` · 503 `degraded` |
-| 5.1 | `git rev-list` / `git shortlog` | 429 commits at `d691359`, 4 contributors, 151 active days |
+| 5.1 | `git rev-list` / `git shortlog` | 443 commits at `449f113`, 4 contributors, 151 active days |
 | 5.2 | `gh run list` / `gh run view --job` | all four checks green — **218 tests now block a merge** |
 
 **Capture transcripts, do not write them.** A review pass found two figures whose

@@ -808,7 +808,7 @@ suite *and* found a test that was not testing anything.
 
 | Not verified | Reason | Consequence |
 |---|---|---|
-| **Deployment** | No hosted URL or application binary | HTTPS and CORS-origin checks skipped |
+| **Deployment** | Out of scope by decision (§4.2.2) — no hosted origin | The HTTPS check cannot run, so the score is 29/0/1 and never 30/30 |
 | **Capacity under load** | 50-VU run bound by the per-identity rate limiter, not the application | Smoke figures exist and pass; **no unconstrained throughput or latency figure** (§3.3.6) |
 | **iOS** | Run on a physical iPhone through Expo Go on 16 August, not as a standalone build; nothing captured | All three roles exercised, so the platform is no longer unexercised — but the evidence is an observed pass with no artefact, and the native paths ran under Expo Go's container rather than the application's own bundle identifier (§3.3.8) |
 | **Native deep links** | **Largely closed on 16 August.** The operating system now routes `hive://` into the application on Android; what remains unshown is the post-authentication screen resolution | Measured against the connected handset, before and after installing a standalone build. **Before:** `pm list packages` showed `host.exp.exponent` but no `com.hive.app`, `resolve-activity … "hive://feed"` answered *No activity found*, and the intent failed with *unable to resolve Intent* — the earlier device runs used Expo Go, which serves under `exp://`, so the scheme had never been registered. **After** `expo run:android` (BUILD SUCCESSFUL, 12m 16s): the scheme resolves to `com.hive.app.MainActivity`; a cold start from `am start -a android.intent.action.VIEW -d "hive://feed"` launches the app with that activity top-resumed; a second firing reports *intent has been delivered to currently running top-most instance*; and an unauthenticated link is correctly redirected to the login screen by the auth gate. **Not shown:** that an authenticated link resolves to the target screen — the sign-in could not be typed reliably under automation (Gboard's Google Translate mode rewrote the input, and the controlled `TextInput` drops injected characters), which is a harness limitation, not an application finding. iOS remains unexercised: Expo Go serves under `exp://` there |
@@ -1072,16 +1072,31 @@ so 503 indicates bad credentials rather than a stopped process. *(Figure 4.1)*
 Full instructions, including the anon versus service-role key distinction and the
 common failure modes, are in `docs/environment-setup.md`.
 
-### 4.2.2 Cloud deployment — not completed
+### 4.2.2 Cloud deployment — out of scope
 
-**The system is not deployed.** There is no hosted URL and no distributable
-application binary. A container image builds and continuous integration runs on
-every push, but no hosting target was provisioned.
+**The system is deliberately not deployed.** There is no hosted URL and no
+distributable application binary, and none is planned. A container image builds
+on every push and continuous integration runs the full suite against it, so the
+artefact that *would* be deployed is produced and verified — what was not done
+is provisioning a hosting target.
 
-This is stated plainly because it is the root cause of every entry in Table 3.6.
-The intended path — a container platform for the API, with the database, auth and
-storage already hosted, and Expo Application Services for mobile binaries — is
-described in §6.4.
+This is a scoping decision rather than an unfinished task, and it is recorded as
+one. The objectives in §1.3 are about a demonstrable privacy boundary and a
+correct ordering path; neither requires a public origin, and the system is
+exercised locally and on physical hardware over the local network instead
+(§3.3.8).
+
+**Three consequences follow, and are stated rather than quietly dropped:**
+
+1. The HTTPS check in `verify-security.sh` cannot run, so the honest score is
+   **29 passed, 0 failed, 1 skipped** — never 30 of 30.
+2. The k6 figures in §3.3.6 are a local measurement and are labelled as such. No
+   capacity figure for a hosted instance exists or is claimed.
+3. Checkpoint CP-5 is not met.
+
+The path a deployment would take — a container platform for the API, with the
+database, auth and storage already hosted, and Expo Application Services for
+mobile binaries — is described in §6.4 as future work.
 
 ## 4.3 Demonstration screenshots
 
@@ -1137,9 +1152,11 @@ entity-relationship diagrams in Chapter 2.*
 
 ## 4.4 Demonstration video
 
-«Link — record the flow in `docs/demo-script.md`, approximately six minutes:
-teacher upload and tagging, parent feed, the privacy comparison, signed-URL
-behaviour, order placement, administration dashboard.»
+**https://youtu.be/_kvid-1KXxA**
+
+The recording follows `docs/demo-script.md`: teacher upload and tagging, the
+parent feed, the privacy comparison between two parents at different schools,
+signed-URL behaviour, order placement, and the administration dashboard.
 
 ---
 
@@ -1149,14 +1166,14 @@ behaviour, order placement, administration dashboard.»
 
 **Repository:** https://github.com/vexora-0/hive
 
-*Counted at commit `d691359`, 16 August 2026. Figure 5.1 is a capture of the same
-commit — its `git log --oneline` lists `d691359` at the head — so the two agree
+*Counted at commit `449f113`, 16 August 2026. Figure 5.1 is a capture of the same
+commit — its `git log --oneline` lists `449f113` at the head — so the two agree
 by construction. Any commit made after that point moves the total; the figures
 below are a dated snapshot, not a live count.*
 
 | Metric | Value |
 |---|---|
-| Commits | 429 |
+| Commits | 443 |
 | Contributors | 4 |
 | Period | 1 February – 16 August 2026 |
 | Active development days | 151 |
@@ -1167,16 +1184,16 @@ below are a dated snapshot, not a live count.*
 
 | Contributor | Commits |
 |---|---|
-| Bhargav | 144 |
+| Bhargav | 154 |
 | Nagachaitanya | 99 |
-| Ruthwik | 96 |
+| Ruthwik | 100 |
 | Srujan | 82 |
 
 *Source files and lines count `apps/mobile/src` and `packages/backend/src`,
 excluding tests, generated types and configuration. Per-contributor counts
 exclude merges and are normalised through `.mailmap`, which folds four
-alternate author identities; they total 421, with a further 8 merge commits
-making 429.*
+alternate author identities; they total 435, with a further 8 merge commits
+making 443.*
 
 *(Figure 5.1 — commit history. Figure 5.2 — continuous integration run.)*
 
@@ -1270,7 +1287,11 @@ every resource accessed by identifier checked against the caller.
 
 Stated explicitly; each is evidenced in Table 3.6.
 
-1. **The system is not deployed.** No hosted URL, no application binary.
+1. **The system is not deployed, by decision rather than by omission.** No
+   hosted URL and no application binary, and none planned — see §4.2.2, which
+   states the three consequences that follow rather than leaving them implied.
+   The container image builds and is tested on every push; only the hosting
+   target is absent.
 2. **No performance measurement against a deployment exists.** The k6 suite has
    now run — locally, on 16 August — and the smoke profile passes every threshold
    with a 3,908-byte feed page (§3.3.6). What is missing is a *capacity* figure:
@@ -1477,7 +1498,7 @@ event, not needed. The directory holds 20 files, numbered `00001`–`00018`,
 
 ## Appendix D — Demonstration video
 
-«Link»
+**https://youtu.be/_kvid-1KXxA**
 
 ---
 

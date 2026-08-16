@@ -1,21 +1,21 @@
 $ git rev-list --count HEAD
-429
+443
 
 $ git shortlog -sn --no-merges
-   144	Bhargav
+   154	Bhargav
+   100	Ruthwik
     99	Nagachaitanya
-    96	Ruthwik
     82	Srujan
 
 $ git log --format=%ad --date=short | sort -u | wc -l
      151
 
 $ git log --oneline -8
-d691359 docs(capstone): capture the evidence transcripts instead of writing them
-620a0ec fix(docs): stop the report carrying two tables of contents
-3486c81 docs(capstone): generate the report as a formatted .docx
-900dfc4 docs(capstone): re-run the evidence and record what changed
-d46335e docs(api): count the endpoints the API actually serves
-9c3276f docs: record what is left before submission
-689d9b9 docs(capstone): record the device verification and run the load tests
-4787aa5 fix(orders): notify admins in rupees, not dollars
+449f113 fix(orders): file an order under the photo's school, not the buyer's profile
+6210d11 docs(capstone): record the iOS device run and correct the SDK version
+0252d05 docs(api): record that the forced-500 route also mints Sentry events
+202d423 docs(capstone): security verification reaches 29 passed, 0 failed, 1 skipped
+02f82bb feat(api): allow a forced 500 so the error handler can be verified
+fce17b7 docs(capstone): record the error pipeline carrying a real event
+cab40c1 docs(capstone): fill the institution on the cover page
+a22ea43 docs(capstone): fill the cover page and the title slide
