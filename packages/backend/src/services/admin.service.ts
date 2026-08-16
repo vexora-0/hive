@@ -58,14 +58,22 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       supabaseAdmin
         .from('profiles')
         .select('id', { count: 'exact', head: true }),
+      // `ready` only. Removing a photo archives the row rather than deleting
+      // it, and the teacher's own confirmation promises it "will disappear
+      // from every parent's feed" — so counting archived rows reports photos
+      // as shared that deliberately are not, and the figure only ever grows.
+      // A `pending` upload has not been shared either. Found on a device: three
+      // test photos were uploaded and removed again, and the dashboard still
+      // read nine.
       supabaseAdmin
         .from('photos')
-        .select('id', { count: 'exact', head: true }),
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'ready'),
       // Originally selected `total`, which never existed; then `total_amount`,
       // which migration 00017 renamed to total_cents. Both times the error went
       // unchecked and the dashboard silently reported zero. It is checked below
       // now, which is how the second break was caught. (G-06)
-      supabaseAdmin.from('orders').select('total_cents'),
+      supabaseAdmin.from('orders').select('total_cents, status'),
     ]);
 
   for (const [name, result] of Object.entries({
@@ -83,12 +91,23 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     }
   }
 
-  const totalOrders = ordersResult.data?.length ?? 0;
-  const totalRevenue =
-    ordersResult.data?.reduce(
-      (sum, order) => sum + Number(order.total_cents ?? 0),
-      0,
-    ) ?? 0;
+  // Two different questions, deliberately answered differently.
+  //
+  // `totalOrders` counts every order, cancelled included: it is a count of what
+  // happened, and an order that was placed and then cancelled did happen.
+  //
+  // `totalRevenue` excludes cancelled ones, because that is money the school
+  // never took. Summing every row reported a cancellation as income, and the
+  // figure could only ever grow — there is no path that reduces it. It reads
+  // correct on the seeded data purely by luck: none of the three demo orders is
+  // cancelled, so both sums agree. `PATCH /orders/:id/cancel` exists and works,
+  // so the first real cancellation would have made the dashboard overstate
+  // takings with nothing to indicate it.
+  const orders = ordersResult.data ?? [];
+  const totalOrders = orders.length;
+  const totalRevenue = orders
+    .filter((order) => order.status !== 'cancelled')
+    .reduce((sum, order) => sum + Number(order.total_cents ?? 0), 0);
 
   return {
     totalSchools: schoolsCount.count ?? 0,
