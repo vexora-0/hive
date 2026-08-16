@@ -352,7 +352,14 @@ export default function PhotoDetailScreen() {
               the picture is what the parent opened this screen for. */}
           {ageLine && (
             <Reveal delay={duration.base}>
-              <Text variant="editorial" onInk numberOfLines={1}>
+              {/* Two lines, not one. A photograph of siblings joins their names
+                  — "Aarav · 3y 1m  ·  Diya · 2y 4m" — and that does not fit
+                  beside the order button on a phone, so a single line truncated
+                  to "Aarav · 3y 1m ·…" and dropped the second child entirely.
+                  Losing a child's name off a photograph they are in is the one
+                  thing this line exists to prevent. Seen on a device against
+                  seeded siblings. */}
+              <Text variant="editorial" onInk numberOfLines={2}>
                 {ageLine}
               </Text>
             </Reveal>
