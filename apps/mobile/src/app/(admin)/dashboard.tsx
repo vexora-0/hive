@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 
 import {
   colors,
+  play,
   spacing,
   radius,
   layout,
@@ -12,6 +13,7 @@ import {
   tracking,
 } from '@/theme';
 import { ScreenContainer } from '@/components/layout/ScreenContainer';
+import { PlayfulBackdrop } from '@/components/decor';
 import { HeaderBar, useHeaderScroll } from '@/components/navigation';
 import { Text, Card, Divider, Button, SectionHeader } from '@/components/ui';
 import { EmptyState, SkeletonShimmer } from '@/components/feedback';
@@ -162,8 +164,15 @@ export default function DashboardScreen() {
 
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
+      {/* Plum, the admin's colour. Kept to `page` — an administrator is at
+          work, and the console gets the atmosphere without the pollen. */}
+      <PlayfulBackdrop level="page" tint={play.grape.base} />
+
       <HeaderBar
         large
+        play
+        translucent
+        mascot="idle"
         title="Overview"
         eyebrow="Across every school"
         scrollY={scrollY}

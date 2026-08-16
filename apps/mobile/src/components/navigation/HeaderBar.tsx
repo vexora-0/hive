@@ -16,8 +16,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, layout, MIN_TAP_SIZE } from '@/theme';
+import { colors, play as playColors, spacing, layout, MIN_TAP_SIZE } from '@/theme';
 import { Text } from '@/components/ui/Text';
+import { Bo, type BoPose } from '@/components/mascot';
+import { Doodle } from '@/components/decor';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -91,6 +93,35 @@ export interface HeaderBarProps {
    * where a thumb expects it.
    */
   trailing?: ReactNode;
+  /**
+   * Sets the large title in the **play voice** — Fredoka rather than Fraunces
+   * — with a hand-drawn rule under it.
+   *
+   * **The one screen a role opens first, and nothing else.** The play voice is
+   * a greeting; a greeting on every screen is not a greeting. `hero` picks the
+   * 46pt cut, `large` the 30pt one.
+   *
+   * Ignored on the compact bar entirely: a detail screen is somewhere a person
+   * navigated *to* on purpose, and it should get out of their way.
+   */
+  play?: boolean;
+  /**
+   * Draws Bo beside the large title, in this pose.
+   *
+   * Pair it with `play`. A mascot over a Fraunces title is two different
+   * products in one header.
+   */
+  mascot?: BoPose;
+  /**
+   * Drops the header's own paper fill so a `<PlayfulBackdrop>` behind the
+   * screen shows through it.
+   *
+   * Off by default, because a header that does not paint its own background is
+   * a header that content scrolls visibly *through* — which is only acceptable
+   * when there is a deliberate backdrop underneath. Pass it on the screens that
+   * have one, and nowhere else.
+   */
+  translucent?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -254,14 +285,33 @@ export function HeaderBar({
   leftAction,
   rightAction,
   trailing,
+  play = false,
+  mascot,
+  translucent = false,
 }: HeaderBarProps) {
   // ── Collapse ────────────────────────────────────────────────────────
   // Without a scrollY the header is static: the large block stays open and the
   // compact title stays hidden. The feed renders both forms — its loading
   // branch has no list to listen to — so every worklet has to survive the
   // value arriving late.
+  /**
+   * Whether the large title hands over to a compact one as the list scrolls.
+   *
+   * **A `play` header never collapses.** It is the one screen a role opens
+   * first, and its job is to greet: the 46pt name, the hand-drawn rule under it
+   * and the mascot beside it *are* the screen's identity, and trading them for
+   * a 17pt word the moment somebody scrolls throws that away exactly when they
+   * start using the app. It also looked wrong — the header keeps its height as
+   * the type fades (see the note below on why it must), so collapsing left one
+   * small word floating in a tall empty band.
+   *
+   * Every other large header still collapses. A detail or list screen has no
+   * greeting to protect and does want its chrome to step back.
+   */
+  const collapses = !play;
+
   const largeBlockStyle = useAnimatedStyle(() => {
-    if (!scrollY) return { opacity: 1, transform: [{ translateY: 0 }] };
+    if (!scrollY || !collapses) return { opacity: 1, transform: [{ translateY: 0 }] };
     const t = interpolate(
       scrollY.value,
       [0, COLLAPSE_DISTANCE],
@@ -275,7 +325,7 @@ export function HeaderBar({
   });
 
   const compactTitleStyle = useAnimatedStyle(() => {
-    if (!scrollY) return { opacity: 0 };
+    if (!scrollY || !collapses) return { opacity: 0 };
     const t = interpolate(
       scrollY.value,
       [COLLAPSE_DISTANCE * HANDOVER_POINT, COLLAPSE_DISTANCE],
@@ -330,10 +380,21 @@ export function HeaderBar({
     // the screen begins with its title instead of with 52px of empty paper.
     const hasActionRow = Boolean(leftAction || showBack || rightAction || trailing);
 
+    // Four combinations, resolved once. The play voice never appears below
+    // 30pt — see `typography.ts` for why that floor exists and what breaking it
+    // cost the last time.
+    const titleVariant = play
+      ? hero
+        ? 'playHero'
+        : 'playTitle'
+      : hero
+        ? 'displayLight'
+        : 'h1';
+
     return (
-      <View style={styles.largeWrapper}>
+      <View style={[styles.largeWrapper, translucent && styles.transparent]}>
         {hasActionRow && (
-          <View style={styles.bar}>
+          <View style={[styles.bar, translucent && styles.transparent]}>
             {left}
             <View style={styles.barSpacer} />
             {right}
@@ -352,13 +413,42 @@ export function HeaderBar({
                 {eyebrow}
               </Text>
             )}
-            <Text
-              variant={hero ? 'displayLight' : 'h1'}
-              numberOfLines={2}
-              accessibilityRole="header"
-            >
-              {title}
-            </Text>
+
+            {/* Bo sits *beside* the title rather than above it, so the header
+                stays one block tall. A mascot on her own row pushes the first
+                photograph off the fold, which is the wrong trade on the screen
+                a parent opens to see photographs. */}
+            <View style={styles.titleRow}>
+              <View style={styles.titleSlot}>
+                <Text
+                  variant={titleVariant}
+                  numberOfLines={2}
+                  accessibilityRole="header"
+                >
+                  {title}
+                </Text>
+                {play && (
+                  <Doodle
+                    kind="underline"
+                    size={Math.min(140, title.length * 11)}
+                    color={playColors.honey.base}
+                    style={styles.titleMark}
+                  />
+                )}
+              </View>
+
+              {mascot && (
+                <Bo
+                  pose={mascot}
+                  size={hero ? 76 : 62}
+                  // Facing back into the screen's content rather than off the
+                  // right edge.
+                  flip
+                  style={styles.mascot}
+                />
+              )}
+            </View>
+
             {subtitle && (
               <Text variant="bodySmall" muted style={styles.subtitle}>
                 {subtitle}
@@ -378,9 +468,28 @@ export function HeaderBar({
             importantForAccessibility="no-hide-descendants"
             style={[styles.compactOverlay, compactTitleStyle]}
           >
-            <Text variant="h4" numberOfLines={1}>
+            <Text variant="h4" numberOfLines={1} style={styles.compactTitle}>
               {title}
             </Text>
+
+            {/*
+              The mascot survives the collapse.
+
+              The header keeps its full height as the large title fades — see
+              the note above about why it must not shrink — so a collapsed
+              header used to be one small word floating in a tall empty band,
+              with the bee gone. It read as something failing to load rather
+              than as a heading that had stepped back.
+
+              She crosses over at a smaller size and stays put, which fills the
+              band and keeps the screen recognisable while scrolled. Still
+              hidden from assistive technology along with the rest of this
+              overlay: it is a second copy of a heading that is already
+              announced.
+            */}
+            {mascot && (
+              <Bo pose={mascot} size={38} flip animated={false} />
+            )}
           </Animated.View>
         </View>
 
@@ -391,8 +500,8 @@ export function HeaderBar({
 
   // ── Compact ─────────────────────────────────────────────────────────
   return (
-    <View style={styles.compactWrapper}>
-      <View style={styles.bar}>
+    <View style={[styles.compactWrapper, translucent && styles.transparent]}>
+      <View style={[styles.bar, translucent && styles.transparent]}>
         {left}
 
         <View style={styles.compactTitleSlot}>
@@ -455,10 +564,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: layout.screenPaddingHorizontal,
     paddingBottom: spacing.md,
   },
+  /** Lets a `<PlayfulBackdrop>` behind the screen show through the header. */
+  transparent: {
+    backgroundColor: colors.transparent,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.sm,
+  },
+  titleSlot: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  /** Pulled up under the baseline so the rule belongs to the word. */
+  titleMark: {
+    marginTop: -spacing.sm,
+    marginLeft: spacing.xs,
+  },
+  mascot: {
+    marginBottom: -spacing.xs,
+  },
   compactOverlay: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: layout.screenPaddingHorizontal,
+  },
+  compactTitle: {
+    flexShrink: 1,
   },
   eyebrow: {
     marginBottom: spacing.xs + 2,

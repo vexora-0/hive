@@ -7,6 +7,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Polygon } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
@@ -20,6 +21,7 @@ import {
   spring,
   duration,
   timing,
+  hexPoints,
   MIN_TAP_SIZE,
 } from '@/theme';
 import { Text } from '@/components/ui/Text';
@@ -180,7 +182,21 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       style={[styles.host, { paddingBottom: Math.max(insets.bottom, spacing.ms) }]}
     >
       <View style={styles.bar} onLayout={onLayout} accessibilityRole="tablist">
-        <Animated.View style={[styles.puck, puckStyle]} />
+        {/* The puck is a comb cell, not a circle.
+            It is the fourth place the same flat-top hexagon appears — after the
+            app mark, the onboarding page indicator and the confetti — and that
+            repetition is what turns a shape into a brand. It costs nothing: the
+            geometry comes from `hexPoints`, the same function all four use, so
+            they cannot drift apart. */}
+        <Animated.View style={[styles.puck, puckStyle]}>
+          <Svg width={PUCK_SIZE} height={PUCK_SIZE} viewBox="0 0 100 100">
+            <Polygon
+              points={hexPoints(50, 50, 48)}
+              fill={colors.primary.amber}
+              strokeLinejoin="round"
+            />
+          </Svg>
+        </Animated.View>
 
         {visibleRoutes.map((route) => {
           const { options } = descriptors[route.key];
@@ -353,8 +369,9 @@ const styles = StyleSheet.create({
     left: 0,
     width: PUCK_SIZE,
     height: PUCK_SIZE,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary.amber,
+    // No `borderRadius` and no `backgroundColor`: the shape is the polygon
+    // inside. Leaving a circular background behind a hexagon is how you end up
+    // with a hexagon on a circle.
   },
   tab: {
     flex: 1,

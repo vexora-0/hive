@@ -15,6 +15,8 @@ import {
 import { Text, Button, TextInput, Divider } from '@/components/ui';
 import { HiveImage } from '@/components/media';
 import { Reveal } from '@/components/animation';
+import { Bo } from '@/components/mascot';
+import { Confetti } from '@/components/decor';
 import { BottomSheet } from '@/components/feedback';
 import type { ProductType } from '@/types/supabase';
 
@@ -198,18 +200,24 @@ export function OrderBottomSheet({
         }
       >
         <View style={styles.successPanel}>
-          {/* One quiet mark. There used to be confetti here — forty pieces
-              over two and a half seconds, on a screen a parent sees perhaps
-              once a term and a teacher saw every working day. */}
+          {/* Confetti is back, and narrowly.
+              It was removed once for a good reason — forty pieces over two and
+              a half seconds, fired on a panel somebody might meet every working
+              day — and that reason still holds for anything routine. This panel
+              is not routine: a parent reaches it when they have decided to pay
+              to have a photograph of their child printed and posted, which
+              happens perhaps once a term. That is the whole test, and it is the
+              only place in the app that passes it. Twenty-two pieces, 1.4s, and
+              skipped entirely under Reduce Motion. */}
+          <Confetti active origin={{ x: 0.5, y: 0.3 }} />
+
           <Reveal scale>
-            <View style={styles.checkmark}>
-              <Ionicons name="checkmark" size={34} color={colors.success.main} />
-            </View>
+            <Bo pose="cheer" size={128} />
           </Reveal>
 
           <Reveal index={1}>
-            <Text variant="h2" center style={styles.successTitle}>
-              Order placed.
+            <Text variant="playTitle" center style={styles.successTitle}>
+              Order placed!
             </Text>
           </Reveal>
 
@@ -506,15 +514,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
-  },
-  checkmark: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.pill,
-    backgroundColor: colors.success.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
   },
   successTitle: {
     marginBottom: spacing.sm,

@@ -3,8 +3,9 @@ import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, radius, shadows, platformShadow, layout } from '@/theme';
+import { colors, play, spacing, radius, shadows, platformShadow, layout } from '@/theme';
 import { ScreenContainer } from '@/components/layout';
+import { PlayfulBackdrop } from '@/components/decor';
 import { ClassSelector, type ClassItem } from '@/components/forms/ClassSelector';
 import { PhotoMount, MasonryGrid, PhotoViewer, type ViewerPhoto } from '@/components/media';
 import { HoneycombFAB, Reveal } from '@/components/animation';
@@ -323,8 +324,16 @@ export default function DashboardScreen() {
 
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
+      {/* Sky rather than marigold. A teacher's screens are the peacock end of
+          the palette everywhere else in the app — the role accent, the avatar
+          ring — and the light behind the screen follows the same rule. */}
+      <PlayfulBackdrop level="page" tint={play.sky.base} />
+
       <HeaderBar
         large
+        play
+        translucent
+        mascot="point"
         title="Your class"
         eyebrow={selectedClass?.name ?? undefined}
         subtitle={
