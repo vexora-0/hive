@@ -634,7 +634,18 @@ async function notifyAdminsOfNewOrder(
 
   if (adminIds.length === 0) return;
 
-  const total = `$${(totalCents / 100).toFixed(2)}`;
+  // Rupees, not dollars. `total_cents` has held integer PAISE since the 13 Aug
+  // re-pricing (`print_4x6` is 3000 = ₹30), but this line still wore the dollar
+  // sign and the two-decimal format of the currency it was written for, so
+  // every admin was notified that a ₹60 order was "$60.00". The number happened
+  // to be right and the currency wrong, which is the hardest kind to notice.
+  //
+  // Grouped the Indian way — ₹1,404, not ₹1404 — to match the admin dashboard,
+  // and the fraction is dropped when the amount is whole, which every price in
+  // the catalogue is.
+  const total = `₹${(totalCents / 100).toLocaleString('en-IN', {
+    maximumFractionDigits: 2,
+  })}`;
 
   await Promise.allSettled(
     adminIds.map((adminId) =>
