@@ -117,7 +117,7 @@ styles.)*
 | 3.4 | Privacy comparison — two parents, zero overlap | «» |
 | 3.5 | Signed URL 200 versus stripped-token 400 | «» |
 | 4.1 | Health endpoint, healthy and degraded | «» |
-| 5.1 | Commit history — 422 commits | «» |
+| 5.1 | Commit history — 428 commits | «» |
 | 5.2 | Continuous integration run | «» |
 
 # LIST OF TABLES
@@ -896,14 +896,20 @@ throughput or latency figure exists. Obtaining one requires per-virtual-user
 identities or a raised ceiling, and a deployed target to make the number mean
 anything. **No figure has been extrapolated to fill that gap.**
 
-**The current suite has now been timed.** On 16 August the backend suite ran
-**218 tests across 8 files in 245 seconds**, all passing, including table
-truncation, approximately forty authentication-user creations and full HTTP
-round-trips against a real Postgres, GoTrue and Storage stack. This supersedes an
-earlier figure of 178 tests in 115 seconds, which belonged to the smaller suite
-and should not be restated against this one. The mobile unit suite runs
-**100 tests in 281 milliseconds** — it is pure logic with no I/O, which is why
-the two differ by three orders of magnitude.
+**The current suite has now been timed, and its wall time varies.** The backend
+suite ran **218 tests across 8 files** twice on 16 August, all passing both
+times, in **245 s** and **122.63 s** respectively. Figure 3.1 shows the second.
+The spread is not noise in the measurement — the suite performs full HTTP
+round-trips, table truncation and roughly forty authentication-user creations
+against a *remote* Postgres, GoTrue and Storage stack shared with CI, so wall
+time is dominated by network latency and contention rather than by the code
+under test. A single figure quoted without that qualification would be
+misleading. This supersedes an earlier 178-tests-in-115-seconds figure, which
+belonged to the smaller suite and should not be restated against this one.
+
+The mobile unit suite runs **100 tests in 284 milliseconds** — pure logic, no
+I/O, which is why the two differ by three orders of magnitude and why its timing
+is stable where the backend's is not.
 
 ### 3.3.7 Observations
 
@@ -1103,7 +1109,7 @@ behaviour, order placement, administration dashboard.»
 
 | Metric | Value |
 |---|---|
-| Commits | 422 |
+| Commits | 428 |
 | Contributors | 4 |
 | Period | 1 February – 16 August 2026 |
 | Active development days | 151 |
@@ -1114,16 +1120,16 @@ behaviour, order placement, administration dashboard.»
 
 | Contributor | Commits |
 |---|---|
-| Bhargav | 138 |
+| Bhargav | 143 |
 | Nagachaitanya | 99 |
-| Ruthwik | 95 |
+| Ruthwik | 96 |
 | Srujan | 82 |
 
 *Source files and lines count `apps/mobile/src` and `packages/backend/src`,
 excluding tests, generated types and configuration. Per-contributor counts
 exclude merges and are normalised through `.mailmap`, which folds four
-alternate author identities; they total 414, with a further 8 merge commits
-making 422.*
+alternate author identities; they total 420, with a further 8 merge commits
+making 428.*
 
 *(Figure 5.1 — commit history. Figure 5.2 — continuous integration run.)*
 

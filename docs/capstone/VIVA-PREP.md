@@ -57,10 +57,16 @@ legitimately knows other schools exist; there is nothing to conceal.
 
 This is the sabotage exercise, and it is the best answer in the report.
 
-Deleted one line — the ownership check — and re-ran. Exactly the 3 targeted tests
-failed. **And a similarly-named test stayed green**: both its teachers were at
-different schools, so the school check refused first and the ownership check
-never executed. It had never tested what its name claimed.
+Deleted one line — the ownership check — and re-ran. **Five tests failed and 213
+passed**: the three G-17 cases in `authorization.test.ts` plus the archive and
+untag cases in `photos.test.ts`, which route through the same guard. Nothing
+else moved, which is the part that matters — the sabotage is precise, not merely
+destructive. (When the exercise was first run the suite was smaller and exactly
+three failed; both figures are in Report §3.3.4.)
+
+**And a similarly-named test stayed green**: both its teachers were at different
+schools, so the school check refused first and the ownership check never
+executed. It had never tested what its name claimed.
 
 *"A passing suite proves nothing until you make it fail on purpose. When we did,
 it found a test that was lying to us."*
@@ -89,9 +95,13 @@ Volunteer the accounting if pressed: 4,727 requests issued, 2,070 in the server
 log, 2,657 refused upstream — the limiter is mounted ahead of the logging
 middleware, which is why the two totals differ.
 
-Also measured: 178 backend tests in 115 s (that figure belongs to the 178-test
-suite — it is 218 now and has not been re-timed, so do not restate it), and 100
-mobile unit tests in 281 ms.
+Also measured, and re-timed on 16 August: **218 backend tests, passing, in 245 s
+and again in 122.63 s** — two runs of the same suite. If asked why the spread,
+that is the honest and interesting answer: the suite does full HTTP round-trips
+and ~40 auth-user creations against a *remote* database shared with CI, so wall
+time is network contention, not code. **100 mobile unit tests in 284 ms** — pure
+logic, no I/O, and stable because of it. Do not quote the old 115 s figure; it
+belonged to the 178-test suite.
 
 Then pivot: *"A real capacity figure needs per-user identities and a deployed
 target. Deployment is first in future work because it unlocks the load tests, the
@@ -244,7 +254,7 @@ Naming this unprompted is worth more than being caught by it.
 
 ### "Four people. What did *you* do?"
 
-Data layer — schema, migrations, validation, seed data. 82 of 422 commits.
+Data layer — schema, migrations, validation, seed data. 82 of 428 commits.
 
 Lead with the two where diagnosis was the work:
 

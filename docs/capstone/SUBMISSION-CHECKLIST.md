@@ -31,7 +31,7 @@ unusually strong; make sure the supervisor has actually seen it.
 
 | Criterion | Marks | Point them at |
 |---|---|---|
-| Attendance & regularity | 5 | 422 commits over 151 active days, 1 Feb – 16 Aug, four contributors |
+| Attendance & regularity | 5 | 428 commits over 151 active days, 1 Feb – 16 Aug, four contributors |
 | Task progress & timelines | 5 | `docs/PROGRESS-REPORT.md` — 25 weekly entries |
 | Ownership | 5 | Per-person plan ownership; `## Deviations` sections recording what differed and why |
 | Communication & reporting | 5 | `IMPLEMENTATION-STATUS.md`, `security.md`, `architecture.md` |
@@ -135,7 +135,7 @@ than a missing one.
 | — | Order POST → **201**, `total_cents: 6000` — ₹60 | G-01 |
 | — | Same idempotency key → same order ID | Idempotency |
 | 4.1 | `/health` 200, then **503** with database stopped | Degradation detected |
-| 5.1 | Commit history — 422 commits | Version control evidence |
+| 5.1 | Commit history — 428 commits | Version control evidence |
 | 5.2 | GitHub Actions — green run | CI exists and runs |
 | 2.1 | Architecture diagram | Three tiers |
 | 2.3 | ER diagram | Schema |

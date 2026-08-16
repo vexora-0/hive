@@ -1,13 +1,23 @@
 $ pnpm --filter @hive/backend test
 
+> @hive/backend@1.0.0 test /Users/bhargav/Projects/bits_project/hive/packages/backend
+> vitest run
+
  RUN  v4.1.10 /Users/bhargav/Projects/bits_project/hive/packages/backend
 
  Test Files  8 passed (8)
       Tests  218 passed (218)
-   Duration  245.00s (transform 153ms, setup 201ms, import 1.86s, tests 242.33s, environment 0ms)
+   Start at  10:35:40
+   Duration  122.63s (transform 151ms, setup 207ms, import 1.84s, tests 119.98s, environment 0ms)
 
 $ pnpm --filter @hive/mobile test
 
+> @hive/mobile@1.0.0 test /Users/bhargav/Projects/bits_project/hive/apps/mobile
+> vitest run
+
+ RUN  v4.1.10 /Users/bhargav/Projects/bits_project/hive/apps/mobile
+
  Test Files  6 passed (6)
       Tests  100 passed (100)
-   Duration  281ms (transform 201ms, setup 90ms, import 372ms, tests 33ms, environment 0ms)
+   Start at  10:38:37
+   Duration  284ms (transform 188ms, setup 90ms, import 366ms, tests 32ms, environment 0ms)

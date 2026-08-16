@@ -71,12 +71,39 @@ def fig_md(num: str) -> str:
     return f"![Figure {num} — {caption}]({rel}){{width={WIDTH[kind]}}}"
 
 
+def check_commit_stats(md: str) -> None:
+    """Warn when §5.1's prose has drifted away from the repository.
+
+    This has now bitten twice. The commit count moves every time anyone commits
+    — including the commit that fixes the count — so the prose and Figure 5.1
+    silently disagree, and the figure sits directly beneath the number it
+    contradicts. Nothing here edits the document; it prints a warning loudly
+    enough that the last build before submission cannot miss it.
+    """
+    try:
+        live = subprocess.run(["git", "rev-list", "--count", "HEAD"],
+                              cwd=ROOT, capture_output=True, text=True, check=True)
+        total = int(live.stdout.strip())
+    except Exception:
+        return  # not a git checkout, or git unavailable — not worth failing over
+
+    stated = re.search(r"^\| Commits \| (\d+) \|$", md, re.M)
+    if stated and int(stated.group(1)) != total:
+        print(f"  !! §5.1 says {stated.group(1)} commits; the repository has {total}.")
+        print(f"     Figure 5.1 is a capture of the repository, so the document")
+        print(f"     would contradict its own figure. Update §5.1 and re-run:")
+        print(f"       git shortlog -sn --no-merges | cat")
+    elif stated:
+        print(f"  commit count in §5.1 matches the repository ({total})")
+
+
 def main() -> int:
     if not REF.exists():
         print(f"error: reference doc missing at {REF}", file=sys.stderr)
         return 1
 
     md = SRC.read_text(encoding="utf8")
+    check_commit_stats(md)
 
     # Drop the hand-written TABLE OF CONTENTS. pandoc --toc emits a real one
     # with real page numbers; keeping both gave the document two, the second

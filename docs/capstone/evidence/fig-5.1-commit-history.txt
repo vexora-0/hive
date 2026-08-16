@@ -1,21 +1,21 @@
 $ git rev-list --count HEAD
-426
+428
 
 $ git shortlog -sn --no-merges
-   141	Bhargav
+   143	Bhargav
     99	Nagachaitanya
     96	Ruthwik
     82	Srujan
 
-$ git log --format=%ad --date=short | sort -u | wc -l     # active days
-151
+$ git log --format=%ad --date=short | sort -u | wc -l
+     151
 
 $ git log --oneline -8
+620a0ec fix(docs): stop the report carrying two tables of contents
+3486c81 docs(capstone): generate the report as a formatted .docx
 900dfc4 docs(capstone): re-run the evidence and record what changed
 d46335e docs(api): count the endpoints the API actually serves
 9c3276f docs: record what is left before submission
 689d9b9 docs(capstone): record the device verification and run the load tests
 4787aa5 fix(orders): notify admins in rupees, not dollars
 a1f455b fix(orders): say why the place-order button is disabled
-223dec1 fix(ui): stop the unread badge biting a hole in the tab puck
-4b0410c fix(ui): retry a photograph that fails to load

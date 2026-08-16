@@ -1,7 +1,17 @@
-$ curl -s -o /dev/null -D - "$SIGNED_URL"
+$ # SIGNED_URL taken from the thumbnailUrl of GET /api/v1/feed?limit=1
+$ #   as the seeded parent parent.rajesh@bloom.demo
+
+$ curl -s -o /dev/null -D - "$SIGNED_URL" | head -6
 HTTP/2 200 
+date: Sun, 16 Aug 2026 05:07:25 GMT
 content-type: image/jpeg
 content-length: 42497
-
-$ curl -s "${SIGNED_URL%%\?*}"          # same URL, ?token= stripped
+cf-ray: a2bdea4ffe18e3fd-HYD
+cf-cache-status: MISS
+$ curl -s -o /dev/null -D - "${SIGNED_URL%%\?*}" | head -4
+HTTP/2 400 
+date: Sun, 16 Aug 2026 05:07:25 GMT
+content-type: application/json; charset=utf-8
+content-length: 120
+$ curl -s "${SIGNED_URL%%\?*}"
 {"statusCode":"400","error":"Error","message":"querystring must have required property 'token'","code":"InvalidRequest"}

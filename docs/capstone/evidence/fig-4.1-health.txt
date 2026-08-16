@@ -1,9 +1,13 @@
 $ curl -s -w "\nHTTP %{http_code}\n" http://localhost:4000/health
-{"status":"ok","service":"hive-backend","version":"1.0.0","uptimeSeconds":9296,"timestamp":"2026-08-16T04:37:33.862Z","checks":{"database":"ok","cache":"ok"}}
+{"status":"ok","service":"hive-backend","version":"1.0.0","uptimeSeconds":11138,"timestamp":"2026-08-16T05:08:16.060Z","checks":{"database":"ok","cache":"ok"}}
 HTTP 200
 
-$ # same build, second instance, database host made unreachable:
+$ # second instance of the same build, database host made unreachable
 $ PORT=4100 SUPABASE_URL="https://hive-db-unreachable.invalid" node dist/index.js &
+[1] 71444
+  10:38:16 info: Hive backend started {"service":"hive-backend","port":4100,"env":"development","pid":71444}
+  10:38:16 info: Redis connected {"service":"hive-backend"}
+
 $ curl -s -w "\nHTTP %{http_code}\n" http://localhost:4100/health
-{"status":"degraded","service":"hive-backend","version":"1.0.0","uptimeSeconds":8,"timestamp":"2026-08-16T04:37:33.889Z","checks":{"database":"error","cache":"ok"}}
+{"status":"degraded","service":"hive-backend","version":"1.0.0","uptimeSeconds":7,"timestamp":"2026-08-16T05:08:23.099Z","checks":{"database":"error","cache":"ok"}}
 HTTP 503
