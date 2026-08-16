@@ -14,7 +14,8 @@
     "seed:admin": "tsx src/scripts/seedAdmin.ts",
     "seed:demo": "tsx src/scripts/seedDemo.ts",
     "seed:demo:reset": "tsx src/scripts/seedDemo.ts --reset",
-    "verify:env": "tsx src/scripts/printVerifyEnv.ts"
+    "verify:env": "tsx src/scripts/printVerifyEnv.ts",
+    "seed:feed": "tsx src/scripts/seedFeedPhotos.ts"
   },
   "dependencies": {
     "@sentry/node": "^10.69.0",
