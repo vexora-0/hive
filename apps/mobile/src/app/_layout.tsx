@@ -15,6 +15,11 @@ import {
   Fraunces_700Bold,
 } from '@expo-google-fonts/fraunces';
 import {
+  Fredoka_500Medium,
+  Fredoka_600SemiBold,
+  Fredoka_700Bold,
+} from '@expo-google-fonts/fredoka';
+import {
   PlusJakartaSans_400Regular,
   PlusJakartaSans_500Medium,
   PlusJakartaSans_600SemiBold,
@@ -49,9 +54,18 @@ SplashScreen.preventAutoHideAsync();
 
 function RootLayout() {
   // ── Fonts ───────────────────────────────────────────────────────────
-  // Fraunces carries the three display sizes; Plus Jakarta Sans does
-  // everything else. See src/theme/typography.ts for which weight does what.
+  // Three voices, split by job. Fredoka greets and celebrates, Fraunces
+  // carries the editorial moments, Plus Jakarta Sans does everything else.
+  // See src/theme/typography.ts for which weight does what, and for why
+  // Fredoka is confined to three sizes.
   const [fontsLoaded, fontError] = useFonts({
+    // Fredoka is the one genuinely new dependency in the playful revamp — the
+    // other two families were already pinned. Three cuts, ~50KB each: the
+    // rounded semibold that greets, the bold that celebrates, and the medium
+    // the mascot speaks in.
+    Fredoka_500Medium,
+    Fredoka_600SemiBold,
+    Fredoka_700Bold,
     // Light is the airy hero cut and italic is the one editorial line a screen
     // is allowed. Both ship inside the already-pinned @expo-google-fonts
     // package, so neither is a dependency change.

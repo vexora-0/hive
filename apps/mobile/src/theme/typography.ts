@@ -41,6 +41,31 @@
 // ── Font Families ────────────────────────────────────────────────────
 
 export const fontFamily = {
+  /**
+   * Fredoka SemiBold — **the play voice.**
+   *
+   * The third face, and the one this system was missing. Fraunces and Jakarta
+   * between them can say *considered* and *legible*; neither can say *this is
+   * for a four-year-old's family*, and the app was read as plain for exactly
+   * that reason.
+   *
+   * The lesson from the Baloo 2 era stands and is encoded rather than
+   * re-learnt: **Fredoka is confined to ≥25pt and to greetings, celebrations
+   * and the mascot's own speech.** It never sets a body paragraph, never sets a
+   * label, never sets a form. What made the old system read as a toy was a
+   * rounded face doing duty down to 18px across every heading on every screen;
+   * what makes this one read as playful is the same kind of face appearing
+   * three or four times a day, always at the moment something nice happened.
+   *
+   * Fredoka is also the right choice for where Hive ships: it carries
+   * Devanagari, which Fraunces does not.
+   */
+  play: 'Fredoka_600SemiBold',
+  /** Fredoka Bold — the single loudest word on a celebration screen. */
+  playBold: 'Fredoka_700Bold',
+  /** Fredoka Medium — mascot speech, which should sound spoken, not shouted. */
+  playSoft: 'Fredoka_500Medium',
+
   /** Fraunces SemiBold — screen titles and hero numbers. */
   display: 'Fraunces_600SemiBold',
   /** Fraunces Bold — reserved for the single largest thing on a screen. */
@@ -72,6 +97,21 @@ export const fontFamily = {
 // ── Font Sizes ───────────────────────────────────────────────────────
 
 export const fontSize = {
+  /** 46 — the play hero. Bigger than `display`: it is a greeting, not a title. */
+  playHero: 46,
+  /** 30 — a celebration headline, a screen greeting. */
+  playTitle: 30,
+  /**
+   * 19 — mascot speech, and **the only place the play voice goes below 25.**
+   *
+   * The exception is safe because it is bounded by something the type system
+   * cannot express but the component can: this size is reachable only through
+   * `<SpeechBubble>`, which draws a tail pointing at a character. Rounded type
+   * inside a speech bubble is attributed — it is Bo talking, not the app
+   * shouting — and there is at most one bubble on screen at a time.
+   */
+  playSpeech: 19,
+
   display: 40,
   h1: 32,
   h2: 25,
@@ -95,6 +135,13 @@ export const fontSize = {
 // screen feel considered rather than merely spaced out.
 
 export const lineHeight = {
+  // Fredoka's x-height ratio is 0.53 against Fraunces's 0.482, so it fills its
+  // line more and takes proportionally *less* leading than the display face at
+  // the same nominal size, not more.
+  playHero: 50,
+  playTitle: 36,
+  playSpeech: 26,
+
   display: 44,
   h1: 38,
   h2: 31,
@@ -123,6 +170,19 @@ export const lineHeight = {
  * cramped.
  */
 export const tracking = {
+  /**
+   * 46px, play.
+   *
+   * Only **-1.2** where Fraunces at 40px takes -2.0. Fredoka is a rounded
+   * geometric face: its counters are already circles, and closing them the way
+   * you would close a serif's turns the word into a row of blobs. The purpose
+   * of tracking here is to stop a 46px greeting looking loose, not to tighten
+   * it into a logo.
+   */
+  playHero: -1.2,
+  /** 30px, play */
+  playTitle: -0.6,
+
   /** 40px */
   display: -2.0,
   /** 32px */
@@ -138,6 +198,9 @@ export const tracking = {
 } as const;
 
 export type TypographyVariant =
+  | 'playHero'
+  | 'playTitle'
+  | 'playSpeech'
   | 'display'
   | 'displayLight'
   | 'h1'
@@ -178,6 +241,33 @@ export interface TextStyle {
  */
 export function getTextStyle(variant: TypographyVariant): TextStyle {
   switch (variant) {
+    // ── Play voice (Fredoka) ──
+    //
+    // Three sizes and no fourth. The constraint is the whole design: a rounded
+    // face that appears at a greeting, at a celebration and in the mascot's
+    // mouth is a character; the same face on every heading is a toy.
+    case 'playHero':
+      return {
+        fontFamily: fontFamily.playBold,
+        fontSize: fontSize.playHero,
+        lineHeight: lineHeight.playHero,
+        letterSpacing: tracking.playHero,
+      };
+    case 'playTitle':
+      return {
+        fontFamily: fontFamily.play,
+        fontSize: fontSize.playTitle,
+        lineHeight: lineHeight.playTitle,
+        letterSpacing: tracking.playTitle,
+      };
+    /** Bo talking. Reachable through `<SpeechBubble>` and nowhere else. */
+    case 'playSpeech':
+      return {
+        fontFamily: fontFamily.playSoft,
+        fontSize: fontSize.playSpeech,
+        lineHeight: lineHeight.playSpeech,
+      };
+
     // ── Display voice (Fraunces) ──
     case 'display':
       return {
@@ -334,6 +424,9 @@ export function getTextStyle(variant: TypographyVariant): TextStyle {
 
 /** Every variant pre-composed — handy inside `StyleSheet.create()`. */
 export const textStyles: Record<TypographyVariant, TextStyle> = {
+  playHero: getTextStyle('playHero'),
+  playTitle: getTextStyle('playTitle'),
+  playSpeech: getTextStyle('playSpeech'),
   display: getTextStyle('display'),
   displayLight: getTextStyle('displayLight'),
   h1: getTextStyle('h1'),

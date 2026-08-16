@@ -20,6 +20,20 @@ export {
 } from './colors';
 export type { Colors, IdentityPalette } from './colors';
 
+export {
+  play,
+  PLAY_HUES,
+  playHue,
+  isDecorativeColor,
+  hexPoints,
+  combPitch,
+  PLAY_STROKE,
+  PLAY_STROKE_FINE,
+  PLAY_VIEW_BOX,
+  PLAY_LINE,
+} from './play';
+export type { PlayHue } from './play';
+
 export { spacing, radius, grid, layout } from './spacing';
 export type { Spacing, Radius, Layout } from './spacing';
 
@@ -55,6 +69,8 @@ export {
   stagger,
   pressScale,
   travel,
+  ambient,
+  phase,
   useReducedMotion,
   STAGGER_STEP,
 } from './motion';
@@ -83,6 +99,7 @@ import {
   identityPalette,
   withAlpha,
 } from './colors';
+import { play, playHue } from './play';
 import { spacing, radius, grid, layout } from './spacing';
 import {
   textStyles,
@@ -98,6 +115,8 @@ import * as constants from './constants';
 
 export const theme = {
   colors,
+  play,
+  playHue,
   roleAccent,
   identityColor,
   identityPalette,

@@ -113,7 +113,77 @@ export const spring = {
     mass: 1,
     reduceMotion: ReduceMotion.System,
   },
+  /**
+   * **The mascot's spring.** ζ = 0.42, ~430ms, ~23% overshoot.
+   *
+   * This is below the ζ 0.6 floor the header sets, deliberately and with a
+   * boundary. That floor exists because a *control* that overshoots reads as
+   * imprecise — a puck that misses its tab, a sheet that bounces past its
+   * detent. Neither of those is a character. A bee landing is supposed to
+   * overshoot; a bee that arrives with ζ 0.87 is a rectangle with wings, which
+   * is precisely the diagnosis this whole revamp is answering.
+   *
+   * **Permitted only on `components/mascot/**` and `components/decor/**`, and
+   * only on transforms of something that is drawn rather than tapped.** If it
+   * is under a finger or a person is waiting on it, it takes `press`, `snappy`
+   * or `gentle` like everything else.
+   */
+  alive: {
+    damping: 8,
+    stiffness: 180,
+    mass: 0.9,
+    reduceMotion: ReduceMotion.System,
+  },
+  /**
+   * Squish — the toy-key press, for playful controls. **ζ = 0.5, ~250ms.**
+   *
+   * `press` (ζ 0.57) at a scale of 1 → 0.96 hides its overshoot because the
+   * travel is 4%. This one is for controls that travel 8–12% and *should* be
+   * seen springing back: the mascot, the celebration button, a sticker card.
+   */
+  squish: {
+    damping: 14,
+    stiffness: 500,
+    mass: 0.8,
+    reduceMotion: ReduceMotion.System,
+  },
 } as const satisfies Record<string, WithSpringConfig>;
+
+// ── Ambient loops ────────────────────────────────────────────────────
+//
+// Periods, not durations. Everything below runs unattended and forever, so it
+// is described by how long one cycle takes rather than by how long a user
+// waits — nobody waits for these. **Every one of them must be skipped when
+// `useReducedMotion()` is true**: a config flag cannot help a `loop` prop, and
+// an endlessly moving background is the single most common accessibility
+// failure in a design like this one.
+
+export const ambient = {
+  /** 260ms — a wingbeat. Fast enough to blur, slow enough to see. */
+  wing: 260,
+  /** 2600ms — the hover bob a resting character never stops doing. */
+  bob: 2600,
+  /** 4200ms — a pollen mote crossing the screen. */
+  drift: 4200,
+  /** 7000ms — the slow breath of a background wash. */
+  breathe: 7000,
+  /** 1400ms — a sparkle twinkling on and off. */
+  twinkle: 1400,
+} as const;
+
+/**
+ * Spreads an ambient loop across N instances so they never beat in unison.
+ *
+ * Twelve pollen motes all rising on the same 4.2s cycle read as a progress
+ * bar. Offsetting each by an irrational-ish fraction of the period is what
+ * turns the same twelve into weather. The 0.618 is the golden ratio's
+ * fractional part, chosen because successive multiples of it mod 1 spread more
+ * evenly than any rational step — the same reason it is used for hue
+ * assignment in palette generators.
+ */
+export function phase(index: number, period: number): number {
+  return Math.round(((index * 0.618) % 1) * period);
+}
 
 // ── Durations ────────────────────────────────────────────────────────
 
@@ -209,6 +279,8 @@ export const pressScale = {
   card: 0.985,
   /** Icon-only controls, which need a bigger move to register at their size. */
   icon: 0.9,
+  /** Playful controls that should be seen to squash. Pair with `spring.squish`. */
+  toy: 0.9,
 } as const;
 
 /** Distance an entering element travels before settling, in px. */
@@ -241,6 +313,8 @@ export const motion = {
   stagger,
   pressScale,
   travel,
+  ambient,
+  phase,
   STAGGER_STEP,
 } as const;
 

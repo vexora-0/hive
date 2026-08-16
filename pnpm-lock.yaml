@@ -36,6 +36,9 @@ importers:
       '@expo-google-fonts/fraunces':
         specifier: 0.4.1
         version: 0.4.1
+      '@expo-google-fonts/fredoka':
+        specifier: ^0.4.1
+        version: 0.4.1
       '@expo-google-fonts/plus-jakarta-sans':
         specifier: 0.4.2
         version: 0.4.2
@@ -1065,6 +1068,9 @@ packages:
 
   '@expo-google-fonts/fraunces@0.4.1':
     resolution: {integrity: sha512-gYc9P92ObyWvz1rWPOeWSvVKyBFIuA8hgOdhvo4DSiPBaWLbFA6v8uLIEIBwW+0oWTlXbBzjeBReHQI2H7UNjQ==}
+
+  '@expo-google-fonts/fredoka@0.4.1':
+    resolution: {integrity: sha512-px3uHDidG1RI7mMAjfKQktK9yZoVn/Uvqgp1G/Zkd6ZN9flXFxhUoPDRZdcCj2knFvkKmlvOx96SD3j4fxq7ig==}
 
   '@expo-google-fonts/plus-jakarta-sans@0.4.2':
     resolution: {integrity: sha512-6LYVmVGwjQvH+uzzWlVc9+oMj4lkNQ41aymVDjO+x8aFk8kCye20wOyLomYMZaMezA++Uf1mZRCw3W3Fy/hxEA==}
@@ -6514,6 +6520,8 @@ snapshots:
   '@eslint/js@8.57.1': {}
 
   '@expo-google-fonts/fraunces@0.4.1': {}
+
+  '@expo-google-fonts/fredoka@0.4.1': {}
 
   '@expo-google-fonts/plus-jakarta-sans@0.4.2': {}
 
