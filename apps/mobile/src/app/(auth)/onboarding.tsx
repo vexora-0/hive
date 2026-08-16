@@ -6,23 +6,27 @@ import {
   View,
 } from 'react-native';
 import { MotiView } from 'moti';
+import Svg, { Polygon } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 
 import {
   colors,
   spacing,
-  radius,
   layout,
   spring,
   duration,
   easing,
+  hexPoints,
   useReducedMotion,
   MIN_TAP_SIZE,
 } from '@/theme';
 import { Text, Button } from '@/components/ui';
+import { HiveMark } from '@/components/brand';
 import { SafeArea } from '@/components/layout';
 import { EmptyState } from '@/components/feedback';
+import { PlayfulBackdrop } from '@/components/decor';
+import { BrandSlide } from '@/features/onboarding/components/BrandSlide';
 import { OnboardingSlide } from '@/features/onboarding/components/OnboardingSlide';
 import { slides } from '@/features/onboarding/data/slides';
 import { useOnboardingStore } from '@/features/onboarding/stores/onboardingStore';
@@ -34,8 +38,18 @@ import { getRoleRoute } from '@/types/navigation';
 // Constants
 // ---------------------------------------------------------------------------
 
-const DOT_SIZE = 7;
-const DOT_ACTIVE_WIDTH = 28;
+/** Width and height of one comb cell in the page indicator. */
+const DOT_SIZE = 14;
+
+/**
+ * How many pages the carousel has.
+ *
+ * The brand page is page 0 and is not in `slides` — it carries no benefit copy,
+ * no vignette and no mascot line, so putting it in that array would mean four
+ * required fields nothing on it uses. Every index below is therefore
+ * **one-based against `slides`**: feature slide `i` lives at page `i + 1`.
+ */
+const PAGE_COUNT = 1 + slides.length;
 
 /** How far a swipe has to travel, in px, before it turns the page. */
 const SWIPE_THRESHOLD = 60;
@@ -66,18 +80,17 @@ const PAGE_TRANSITION = {
   mass: spring.sheet.mass,
 } as const;
 
-const DOT_TRANSITION = {
-  width: {
-    type: 'spring',
-    damping: spring.snappy.damping,
-    stiffness: spring.snappy.stiffness,
-    mass: spring.snappy.mass,
-  },
-  backgroundColor: {
-    type: 'timing',
-    duration: duration.fast,
-    easing: easing.standard,
-  },
+const DOT_SCALE_TRANSITION = {
+  type: 'spring',
+  damping: spring.snappy.damping,
+  stiffness: spring.snappy.stiffness,
+  mass: spring.snappy.mass,
+} as const;
+
+const DOT_FILL_TRANSITION = {
+  type: 'timing',
+  duration: duration.fast,
+  easing: easing.standard,
 } as const;
 
 /**
@@ -122,7 +135,7 @@ export default function OnboardingScreen() {
   const completeOnboarding = useOnboardingStore((s) => s.completeOnboarding);
   const { user, setProfile, setRole } = useAuthStore();
 
-  const isLastSlide = activeIndex === slides.length - 1;
+  const isLastSlide = activeIndex === PAGE_COUNT - 1;
 
   /** After onboarding: if user is signed in, fetch profile and go to app; else go to login. */
   const navigateAfterOnboarding = useCallback(async () => {
@@ -152,7 +165,7 @@ export default function OnboardingScreen() {
 
   /** Turns to a page and marks it seen, so its entrance plays on arrival. */
   const goToPage = useCallback((page: number) => {
-    const clamped = Math.min(Math.max(page, 0), slides.length - 1);
+    const clamped = Math.min(Math.max(page, 0), PAGE_COUNT - 1);
     setActiveIndex(clamped);
     setRevealed((prev) => (prev.includes(clamped) ? prev : [...prev, clamped]));
   }, []);
@@ -211,8 +224,41 @@ export default function OnboardingScreen() {
 
   return (
     <SafeArea style={styles.root}>
-      {/* Skip — quiet, but always reachable. */}
+      {/* The weather. `hero` is the full three layers — light, comb and drifting
+          pollen — and this is the screen that most earns them: it is the first
+          thing anybody sees, it has no photographs of its own to compete with,
+          and it used to be a flat cream rectangle. */}
+      <PlayfulBackdrop level="hero" />
+
+      {/*
+        The name, and the reason it is here.
+
+        The intro carousel ran three slides explaining what the product does
+        without once saying what it is called. Somebody who opens the app,
+        reads all three and taps through has still never seen the word "Hive" —
+        which is a strange thing for a first-run screen to manage. The mark and
+        the wordmark sit opposite Skip, on every slide, at a weight that reads
+        as a masthead rather than as a logo splash.
+      */}
       <View style={styles.header}>
+        <View
+          style={[styles.brand, activeIndex === 0 && styles.brandHidden]}
+          // Hidden from assistive tech too when invisible: the brand page
+          // states the name in its heading, and a second silent "Hive" above it
+          // is a duplicate announcement.
+          accessibilityElementsHidden={activeIndex === 0}
+          importantForAccessibility={
+            activeIndex === 0 ? 'no-hide-descendants' : 'yes'
+          }
+        >
+          <HiveMark size={28} />
+          <Text variant="h4" style={styles.wordmark}>
+            Hive
+          </Text>
+        </View>
+
+        <View style={styles.headerSpacer} />
+
         <Pressable
           onPress={handleSkip}
           hitSlop={12}
@@ -234,14 +280,16 @@ export default function OnboardingScreen() {
           <MotiView
             animate={{ translateX: -activeIndex * width }}
             transition={reduced ? STILL : PAGE_TRANSITION}
-            style={[styles.row, { width: slides.length * width }]}
+            style={[styles.row, { width: PAGE_COUNT * width }]}
           >
+            <BrandSlide width={width} active={revealed.includes(0)} />
+
             {slides.map((slide, index) => (
               <OnboardingSlide
                 key={slide.id}
                 slide={slide}
                 width={width}
-                active={revealed.includes(index)}
+                active={revealed.includes(index + 1)}
               />
             ))}
           </MotiView>
@@ -252,24 +300,21 @@ export default function OnboardingScreen() {
         <View
           style={styles.dotsRow}
           accessibilityRole="progressbar"
-          accessibilityLabel={`Slide ${activeIndex + 1} of ${slides.length}`}
+          accessibilityLabel={`Slide ${activeIndex + 1} of ${PAGE_COUNT}`}
         >
-          {/* The current page is drawn in the **readable** marigold. `#F0A03A`
-              is 2.03:1 on paper: as the mark saying which of three pages you
-              are on, it has to be read, and at that ratio it simply is not.
-              `text.accent` is 5.12:1 and still unmistakably marigold. */}
-          {slides.map((slide, index) => (
-            <MotiView
-              key={slide.id}
-              animate={{
-                width: index === activeIndex ? DOT_ACTIVE_WIDTH : DOT_SIZE,
-                backgroundColor:
-                  index === activeIndex
-                    ? colors.text.accent
-                    : colors.border.dark,
-              }}
-              transition={reduced ? STILL : DOT_TRANSITION}
-              style={styles.dot}
+          {/* Comb cells, not dots.
+              The page indicator is three marks a person looks at for a quarter
+              of a second, which makes it the cheapest possible place to put the
+              brand: the same flat-top cell as the app mark, the tab puck and
+              the confetti. The current page is a **filled** cell rather than a
+              differently-coloured one — marigold is 2.03:1 on paper and cannot
+              be relied on to say which of three you are on, so the signal is
+              fill and size, both of which survive at any contrast. */}
+          {Array.from({ length: PAGE_COUNT }, (_, index) => (
+            <CombDot
+              key={index}
+              active={index === activeIndex}
+              reduced={reduced}
             />
           ))}
         </View>
@@ -279,6 +324,55 @@ export default function OnboardingScreen() {
         </Button>
       </View>
     </SafeArea>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page indicator
+// ---------------------------------------------------------------------------
+
+/**
+ * One comb cell in the page indicator.
+ *
+ * Two transforms and one crossfade, split by what each may legally drive:
+ * `scale` is a transform and takes `spring.snappy` (ζ 0.91, ~220ms — the app's
+ * selection spring, the same one under the tab puck), while the fill is an
+ * opacity and takes a timing curve. A spring on the fill would clamp at 1.0
+ * below ζ 1 and visibly stall, which is a bug class rather than a preference
+ * and was already documented on the pill this replaces.
+ */
+function CombDot({ active, reduced }: { active: boolean; reduced: boolean }) {
+  return (
+    <MotiView
+      animate={{ scale: active ? 1.3 : 1 }}
+      transition={reduced ? STILL : DOT_SCALE_TRANSITION}
+      style={styles.dot}
+    >
+      <Svg width={DOT_SIZE} height={DOT_SIZE} viewBox="0 0 100 100">
+        <Polygon
+          points={hexPoints(50, 50, 44)}
+          fill="none"
+          stroke={colors.border.dark}
+          strokeWidth={10}
+          strokeLinejoin="round"
+        />
+      </Svg>
+      <MotiView
+        style={styles.dotFill}
+        animate={{ opacity: active ? 1 : 0 }}
+        transition={reduced ? STILL : DOT_FILL_TRANSITION}
+      >
+        <Svg width={DOT_SIZE} height={DOT_SIZE} viewBox="0 0 100 100">
+          <Polygon
+            points={hexPoints(50, 50, 44)}
+            fill={colors.primary.amber}
+            stroke={colors.text.accent}
+            strokeWidth={8}
+            strokeLinejoin="round"
+          />
+        </Svg>
+      </MotiView>
+    </MotiView>
   );
 }
 
@@ -298,8 +392,36 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    alignItems: 'center',
     paddingHorizontal: spacing.ms,
+  },
+  brand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingLeft: spacing.ms,
+    // Matches the Skip control's height so the masthead and the escape hatch
+    // sit on one line rather than on two that happen to be close.
+    minHeight: MIN_TAP_SIZE,
+  },
+  /**
+   * The masthead on the brand page.
+   *
+   * Invisible, not unmounted — the mark and the name are the hero of that page
+   * and printing them twice, 24pt apart, reads as a rendering fault. Keeping
+   * the row in the layout stops Skip jumping as the first page turns.
+   */
+  brandHidden: {
+    opacity: 0,
+  },
+  wordmark: {
+    // The name is set in the UI face, not the play face. Fredoka on a mark
+    // that appears on every slide would spend the play voice on furniture —
+    // it is reserved for the one greeting per screen.
+    letterSpacing: 0.2,
+  },
+  headerSpacer: {
+    flex: 1,
   },
   skip: {
     minHeight: MIN_TAP_SIZE,
@@ -327,9 +449,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   dot: {
+    width: DOT_SIZE,
     height: DOT_SIZE,
-    // From the scale rather than `DOT_SIZE / 2`: a 3.5 nobody can find is how
-    // a screen ends up with a sixth radius value.
-    borderRadius: radius.pill,
+  },
+  dotFill: {
+    ...StyleSheet.absoluteFillObject,
   },
 });

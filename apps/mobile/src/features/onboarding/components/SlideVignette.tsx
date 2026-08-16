@@ -203,6 +203,7 @@ function FeedVignette({ active, width }: VignetteProps) {
           ratio={0.8}
           from={PHOTO.rose.from}
           to={PHOTO.rose.to}
+          scene="painting"
           tilt={-6}
         />
       </Piece>
@@ -219,6 +220,7 @@ function FeedVignette({ active, width }: VignetteProps) {
           ratio={0.75}
           from={PHOTO.leaf.from}
           to={PHOTO.leaf.to}
+          scene="outdoors"
           tilt={7}
         />
       </Piece>
@@ -237,6 +239,7 @@ function FeedVignette({ active, width }: VignetteProps) {
           ratio={0.84}
           from={PHOTO.sun.from}
           to={PHOTO.sun.to}
+          scene="blocks"
           caption="by Meera ma'am"
           isNew
           tilt={-1.5}
@@ -305,6 +308,7 @@ function PrivateVignette({ active, width }: VignetteProps) {
           ratio={0.84}
           from={PHOTO.rose.from}
           to={PHOTO.rose.to}
+          scene="story"
           caption="Aarav · Sunflower"
         />
       </Piece>
@@ -362,6 +366,7 @@ function PrintsVignette({ active, width }: VignetteProps) {
           ratio={0.8}
           from={PHOTO.plum.from}
           to={PHOTO.plum.to}
+          scene="snack"
           tilt={8}
         />
       </Piece>
@@ -378,6 +383,7 @@ function PrintsVignette({ active, width }: VignetteProps) {
           ratio={0.84}
           from={PHOTO.sun.from}
           to={PHOTO.sun.to}
+          scene="outdoors"
           caption="Sports day"
           tilt={-3}
         />

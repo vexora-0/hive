@@ -11,6 +11,7 @@ import {
   withAlpha,
 } from '@/theme';
 import { Text } from '@/components/ui';
+import { Scene, type SceneKind } from '@/components/decor';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,9 +24,18 @@ export interface MiniMountProps {
   width: number;
   /** Aspect ratio of the print inside it. */
   ratio?: number;
-  /** The two ends of the window's gradient. */
+  /** The two ends of the window's gradient. Used when `scene` is omitted. */
   from: string;
   to: string;
+  /**
+   * A drawn photograph to put in the window instead of the gradient.
+   *
+   * **Omit it deliberately, not by default.** A blank window is not a missing
+   * scene — on the privacy slide the two featureless mounts *are* the other
+   * children's photographs, the ones this parent cannot see, and giving them a
+   * picture would say the opposite of what the slide says.
+   */
+  scene?: SceneKind;
   /** Printed in the bottom margin. Omit for a blank mat. */
   caption?: string;
   /** Draws the folded marigold corner. */
@@ -58,6 +68,7 @@ export function MiniMount({
   ratio = 1,
   from,
   to,
+  scene,
   caption,
   isNew = false,
   tilt = 0,
@@ -75,22 +86,26 @@ export function MiniMount({
       ]}
     >
       <View style={[styles.window, { height: windowHeight }]}>
-        <Svg width="100%" height="100%">
-          <Defs>
-            <LinearGradient id={`grad-${id}`} x1="0" y1="0" x2="0.8" y2="1">
-              <Stop offset="0" stopColor={from} />
-              <Stop offset="1" stopColor={to} />
-            </LinearGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill={`url(#grad-${id})`} />
-          {/* The blown highlight a camera leaves in a bright room. */}
-          <Circle
-            cx="72%"
-            cy="26%"
-            r={windowWidth * 0.17}
-            fill={withAlpha(colors.white, 0.34)}
-          />
-        </Svg>
+        {scene ? (
+          <Scene kind={scene} width={windowWidth} height={windowHeight} />
+        ) : (
+          <Svg width="100%" height="100%">
+            <Defs>
+              <LinearGradient id={`grad-${id}`} x1="0" y1="0" x2="0.8" y2="1">
+                <Stop offset="0" stopColor={from} />
+                <Stop offset="1" stopColor={to} />
+              </LinearGradient>
+            </Defs>
+            <Rect width="100%" height="100%" fill={`url(#grad-${id})`} />
+            {/* The blown highlight a camera leaves in a bright room. */}
+            <Circle
+              cx="72%"
+              cy="26%"
+              r={windowWidth * 0.17}
+              fill={withAlpha(colors.white, 0.34)}
+            />
+          </Svg>
+        )}
       </View>
 
       <View style={styles.margin}>
