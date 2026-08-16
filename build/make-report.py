@@ -78,6 +78,13 @@ def main() -> int:
 
     md = SRC.read_text(encoding="utf8")
 
+    # Drop the hand-written TABLE OF CONTENTS. pandoc --toc emits a real one
+    # with real page numbers; keeping both gave the document two, the second
+    # of which was a table of «» placeholders. The LIST OF FIGURES and LIST OF
+    # TABLES stay — pandoc does not generate those, the template requires them,
+    # and their page column is filled once pagination is final.
+    md = re.sub(r"\n# TABLE OF CONTENTS\n.*?(?=\n# LIST OF FIGURES\n)", "\n", md, flags=re.S)
+
     # 3.4 first — its anchor is a plain *(Figure 3.4)* and the pair needs a table.
     a = (FIGDIR / "fig-3.4a-rajesh-feed.png").relative_to(ROOT)
     b = (FIGDIR / "fig-3.4b-vikram-feed.png").relative_to(ROOT)
