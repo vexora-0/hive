@@ -254,7 +254,7 @@ Naming this unprompted is worth more than being caught by it.
 
 ### "Four people. What did *you* do?"
 
-Data layer — schema, migrations, validation, seed data. 82 of 428 commits.
+Data layer — schema, migrations, validation, seed data. 82 of 429 commits.
 
 Lead with the two where diagnosis was the work:
 

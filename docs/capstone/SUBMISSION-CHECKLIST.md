@@ -31,7 +31,7 @@ unusually strong; make sure the supervisor has actually seen it.
 
 | Criterion | Marks | Point them at |
 |---|---|---|
-| Attendance & regularity | 5 | 428 commits over 151 active days, 1 Feb – 16 Aug, four contributors |
+| Attendance & regularity | 5 | 429 commits over 151 active days, 1 Feb – 16 Aug, four contributors |
 | Task progress & timelines | 5 | `docs/PROGRESS-REPORT.md` — 25 weekly entries |
 | Ownership | 5 | Per-person plan ownership; `## Deviations` sections recording what differed and why |
 | Communication & reporting | 5 | `IMPLEMENTATION-STATUS.md`, `security.md`, `architecture.md` |
@@ -83,7 +83,7 @@ Do at least 2 or 3. Never invent numbers.
 | Aspect | Marks | State |
 |---|---|---|
 | Implementation & testing chapters | 7 | ✅ `REPORT.md` chapters 2 and 3, plus §3.3.8 device verification |
-| Results, screenshots, tables | 7 | ✅ 14 tables; **17 application figures captured on a physical device** and written up in §4.3. Outstanding: 6 terminal/browser captures and the 2 diagrams — §7 |
+| Results, screenshots, tables | 7 | ✅ 14 tables; **all 16 numbered figures placed** — 17 application captures from a physical device (§4.3), 6 terminal transcripts, 4 diagrams. Outstanding: page numbers in the two lists, which can only be filled after pagination |
 | Clarity, formatting, references | 6 | ⚠️ Transfer to Word + formatting — §8 |
 
 ---
@@ -128,15 +128,15 @@ than a missing one.
 |---|---|---|
 | 3.1 | **`pnpm test` — 218/218** | Headline test result |
 | 3.2 | **`verify-security.sh` — 27/0/2** | Security verification |
-| 3.3 | **Sabotage run — 3 targeted tests failing** | The suite detects regressions |
+| 3.3 | **Sabotage run — 5 tests failing, 213 passing** | The suite detects regressions |
 | 3.4 | **Rajesh's feed beside Vikram's** | 2 vs 1, zero overlap |
 | 3.5 | **Signed URL 200 beside stripped-token 400** | Private bucket |
 | — | Cross-school `curl` → **403** | G-08 |
 | — | Order POST → **201**, `total_cents: 6000` — ₹60 | G-01 |
 | — | Same idempotency key → same order ID | Idempotency |
-| 4.1 | `/health` 200, then **503** with database stopped | Degradation detected |
-| 5.1 | Commit history — 428 commits | Version control evidence |
-| 5.2 | GitHub Actions — green run | CI exists and runs |
+| 4.1 | `/health` 200, then **503** on a second instance with the database unreachable | Degradation detected |
+| 5.1 | Commit history | Version control evidence |
+| 5.2 | GitHub Actions run **with its annotations** | CI exists and runs — **and** that the test step exits 1 on every run while `continue-on-error` shows it green. Do not crop to the green ticks; the contradiction is the evidence |
 | 2.1 | Architecture diagram | Three tiers |
 | 2.3 | ER diagram | Schema |
 

@@ -1,0 +1,34 @@
+$ gh run list --limit 5
+completed  success  docs(capstone): capture the evidence transcripts ins push  1m33s
+completed  success  docs(capstone): generate the report as a formatted . push  1m43s
+completed  success  docs(capstone): re-run the evidence and record what  push  1m21s
+completed  success  docs: record what is left before submission          push  1m29s
+completed  success  docs(capstone): record the device verification and r push  1m30s
+
+$ gh run view --job 95120346675
+
+✓ main CI · 31928762530
+Triggered via push about 8 minutes ago
+
+✓ Lint, typecheck, build in 1m12s (ID 95120346675)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Run pnpm/action-setup@v4
+  ✓ Run actions/setup-node@v4
+  ✓ Run pnpm install --frozen-lockfile
+  ✓ Lint
+  ✓ Typecheck backend
+  ✓ Typecheck mobile
+  ✓ Test backend
+  ✓ Build backend
+  ✓ Post Run actions/setup-node@v4
+  ✓ Post Run pnpm/action-setup@v4
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+
+  ... ANNOTATIONS on the same, green, run:
+X Process completed with exit code 1.
+Lint, typecheck, build: .github#105
+
+X Error: SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in packages/backend/.env.test.

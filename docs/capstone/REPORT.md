@@ -117,7 +117,7 @@ styles.)*
 | 3.4 | Privacy comparison — two parents, zero overlap | «» |
 | 3.5 | Signed URL 200 versus stripped-token 400 | «» |
 | 4.1 | Health endpoint, healthy and degraded | «» |
-| 5.1 | Commit history — 428 commits | «» |
+| 5.1 | Commit history | «» |
 | 5.2 | Continuous integration run | «» |
 
 # LIST OF TABLES
@@ -811,7 +811,7 @@ suite *and* found a test that was not testing anything.
 | **Native deep links** | `hive://` never opened through the operating system | Route-group resolution verified through a browser URL instead |
 | **Server-side HEIC conversion** | `sharp`'s prebuilt libvips has no HEVC decoder | Cannot work, and does not. Tested 24 July against a real HEVC HEIC. Handled by a device-side transcode instead; the server refuses HEVC with an actionable 400 |
 | **Error reporting** | Sentry requires a DSN | Pipeline unproven end to end |
-| **CI test gate** | Repository secrets absent | 218 tests do not yet block a pull request; lint, typecheck and build do |
+| **CI test gate** | Repository secrets absent, so the harness guard refuses to start | The step **fails on every run** (`exit code 1`) and `continue-on-error` masks it as green. 218 tests gate nothing; lint, typecheck and build do (Figure 5.2) |
 
 The application **has** been driven end to end in a desktop browser via Expo's
 web target, so the screens are exercised rather than merely compiled. Web is a
@@ -854,7 +854,7 @@ The k6 suite was **executed on 16 August 2026** against a **local single instanc
 with the seeded dataset** — not a deployment. Every figure below carries that
 qualification; none of it characterises production behaviour on a hosted tier.
 
-**Table 3.5 — k6 smoke profile (1 VU, 30 s)**
+**Table 3.8 — k6 smoke profile (1 VU, 30 s)**
 
 | Metric | Result | Threshold | |
 |---|---|---|---|
@@ -1107,9 +1107,14 @@ behaviour, order placement, administration dashboard.»
 
 **Repository:** https://github.com/vexora-0/hive
 
+*Counted at commit `d691359`, 16 August 2026. Figure 5.1 is a capture of the same
+commit — its `git log --oneline` lists `d691359` at the head — so the two agree
+by construction. Any commit made after that point moves the total; the figures
+below are a dated snapshot, not a live count.*
+
 | Metric | Value |
 |---|---|
-| Commits | 428 |
+| Commits | 429 |
 | Contributors | 4 |
 | Period | 1 February – 16 August 2026 |
 | Active development days | 151 |
@@ -1120,7 +1125,7 @@ behaviour, order placement, administration dashboard.»
 
 | Contributor | Commits |
 |---|---|
-| Bhargav | 143 |
+| Bhargav | 144 |
 | Nagachaitanya | 99 |
 | Ruthwik | 96 |
 | Srujan | 82 |
@@ -1128,8 +1133,8 @@ behaviour, order placement, administration dashboard.»
 *Source files and lines count `apps/mobile/src` and `packages/backend/src`,
 excluding tests, generated types and configuration. Per-contributor counts
 exclude merges and are normalised through `.mailmap`, which folds four
-alternate author identities; they total 420, with a further 8 merge commits
-making 428.*
+alternate author identities; they total 421, with a further 8 merge commits
+making 429.*
 
 *(Figure 5.1 — commit history. Figure 5.2 — continuous integration run.)*
 
@@ -1240,8 +1245,19 @@ Stated explicitly; each is evidenced in Table 3.6.
    unverified on either, because route-group resolution was checked through a
    browser URL rather than the operating system's linking path.
 4. **The error-reporting pipeline has never carried an error.**
-5. **The continuous-integration test step is advisory**, pending repository
-   secrets; lint, typecheck and build do block.
+5. **The continuous-integration test step does not merely fail to gate — it
+   fails, on every run, and the failure is masked.** The workflow reports green;
+   the step is marked `continue-on-error: true`; and the run's annotations record
+   `Process completed with exit code 1` alongside the test harness refusing to
+   start: *"SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in
+   `packages/backend/.env.test`"*. That guard is deliberate — it exists to stop
+   the suite truncating a non-test database — but without `TEST_SUPABASE_URL`,
+   `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` as repository
+   secrets, it refuses on every push. **Figure 5.2 shows the step list with a
+   green tick beside `Test backend` and the annotation proving that same step
+   exited 1**, which is why the figure is presented with both halves rather than
+   as a green screenshot. Lint, typecheck and build do genuinely block. The three
+   secrets are the entire fix.
 6. **Server-side HEIC conversion does not work.** `sharp`'s prebuilt libvips
    ships libheif without an HEVC decoder, and an iPhone HEIC is HEVC-coded, so
    the container parses and the pixel decode fails. Established by testing a
