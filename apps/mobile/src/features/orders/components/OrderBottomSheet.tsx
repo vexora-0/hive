@@ -236,23 +236,41 @@ export function OrderBottomSheet({
       scroll
       keyboard
       footer={
-        <Button
-          variant="primary"
-          size="lg"
-          fullWidth
-          onPress={handlePlaceOrder}
-          loading={createOrder.isPending}
-          disabled={!canPlace}
-          accessibilityHint={
-            canPlace
-              ? undefined
-              : 'Choose what you would like and add a delivery address first'
-          }
-        >
-          {selectedType
-            ? `Place order · ${formatRupees(totalPrice)}`
-            : 'Place order'}
-        </Button>
+        <>
+          {/* The reason, on screen and not only in the accessibility tree.
+              A screen reader has always been told why this button is dead —
+              sighted parents were left to guess, and the thing standing in
+              their way is usually the address field, which is far enough down
+              the sheet to be off screen when the button is in view. */}
+          {!canPlace && !createOrder.isPending && (
+            <Text
+              variant="caption"
+              color={colors.text.tertiary}
+              style={styles.footerHint}
+            >
+              {!selectedType
+                ? 'Choose a size to continue.'
+                : 'Add a delivery address to place this order.'}
+            </Text>
+          )}
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            onPress={handlePlaceOrder}
+            loading={createOrder.isPending}
+            disabled={!canPlace}
+            accessibilityHint={
+              canPlace
+                ? undefined
+                : 'Choose what you would like and add a delivery address first'
+            }
+          >
+            {selectedType
+              ? `Place order · ${formatRupees(totalPrice)}`
+              : 'Place order'}
+          </Button>
+        </>
       }
     >
       {/* The photograph being ordered, mounted the way it will be printed. */}
@@ -383,6 +401,10 @@ export function OrderBottomSheet({
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
+  footerHint: {
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
   // ── The photograph ──
   photoRow: {
     alignItems: 'flex-start',
