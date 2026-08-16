@@ -67,17 +67,35 @@ it found a test that was lying to us."*
 
 ### "What are your performance numbers?"
 
-**"There are none, and I would rather tell you that than invent them."**
+**Lead with the one that is solid:** *"A twenty-photograph feed page transfers
+3,908 bytes. Before we generated thumbnails the client fell back to
+full-resolution originals and a page could exceed 100 MB."* That is four orders
+of magnitude and it is measured, not estimated.
 
-The k6 suite — smoke, load, stress, spike — is written and committed, but has
-never run because there is no deployed target. The only timing figure measured is
-the test suite: 178 tests in 115 s including database truncation and ~40 auth
-user creations, measured 9 August. **That figure belongs to the 178-test suite**;
-it is 218 tests now and the larger suite has not been timed, so do not restate
-115 s against it.
+The k6 suite ran on 16 August against a **local instance** — say "local", never
+imply production. Smoke, 1 VU over 30 s: **42/42 checks, 0.00% failures, p95
+1.13 s**, every threshold passed.
 
-Then pivot: *"Deployment is the first item of future work precisely because it
-unlocks the load tests, the HTTPS checks and device testing at the same time."*
+**If they ask about the load profile, do not hide it — it failed, and the reason
+is the good part.** 50 VUs over 5 minutes recorded 69% failures. It decomposes
+exactly: 2,657 requests were **429s from our own per-identity rate limiter**
+(50 VUs sharing three tokens), and 492 were **403s from the cross-school check**,
+because the run was configured with a class from the wrong school. Neither is a
+capacity failure. *"We measured our own rate limiter. The honest conclusion is
+that we have no capacity number, because at that concurrency the application was
+never the bottleneck."*
+
+Volunteer the accounting if pressed: 4,727 requests issued, 2,070 in the server
+log, 2,657 refused upstream — the limiter is mounted ahead of the logging
+middleware, which is why the two totals differ.
+
+Also measured: 178 backend tests in 115 s (that figure belongs to the 178-test
+suite — it is 218 now and has not been re-timed, so do not restate it), and 100
+mobile unit tests in 281 ms.
+
+Then pivot: *"A real capacity figure needs per-user identities and a deployed
+target. Deployment is first in future work because it unlocks the load tests, the
+HTTPS checks and the iOS build together."*
 
 Do not estimate. An invented number is the one thing that can lose the
 credibility of every real number in the report.
@@ -226,7 +244,7 @@ Naming this unprompted is worth more than being caught by it.
 
 ### "Four people. What did *you* do?"
 
-Data layer — schema, migrations, validation, seed data. 72 of 376 commits.
+Data layer — schema, migrations, validation, seed data. 82 of 422 commits.
 
 Lead with the two where diagnosis was the work:
 
@@ -272,9 +290,18 @@ Good options — pick one and tell it as a story with a root cause:
 
 ## Traps
 
-**"So it's fully working?"** — No. It works locally and is verified locally.
-Nothing is deployed and nothing has run on a physical device. Answer the question
-asked, not the one you wish had been asked.
+**"So it's fully working?"** — No. It works locally and is verified locally, and
+it runs on a physical Android device — but **nothing is deployed**, and iOS has
+never been launched. Answer the question asked, not the one you wish had been
+asked.
+
+**"You said it runs on a device — so it's tested on mobile?"** — On Android, yes,
+and that is where seven defects were found, including one the browser could not
+expose: the root layout remounting 145 times into a blank screen. On iOS, no
+build has been launched, so the keychain session and the image picker are proven
+on one platform of two. Native `hive://` deep links are unverified on either —
+route groups were checked through a browser URL, which does not go through the
+operating system's linking path. Report §3.3.8 has the detail.
 
 **"You said 27 security checks passed — so it's secure?"** — 27 passed, 0 failed,
 **2 skipped** (11 August; it was 26/0/3 on 1 August). One skip needs HTTPS and a

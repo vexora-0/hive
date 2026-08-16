@@ -1,0 +1,6 @@
+k6 smoke.js — 1 VU, 30s, local single instance, seeded dataset
+  checks_succeeded ... 100.00%  42 out of 42
+  http_req_failed .... 0.00%    (threshold rate<0.01  PASS)
+  http_req_duration .. p95=1.13s (threshold p(95)<2000  PASS)
+  feed_payload_bytes . 3908 B   (threshold 2MB p95     PASS)
+  http_reqs .......... 29 over 32.1s, 14 iterations, 0 interrupted

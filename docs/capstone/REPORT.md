@@ -117,7 +117,7 @@ styles.)*
 | 3.4 | Privacy comparison — two parents, zero overlap | «» |
 | 3.5 | Signed URL 200 versus stripped-token 400 | «» |
 | 4.1 | Health endpoint, healthy and degraded | «» |
-| 5.1 | Commit history — 376 commits | «» |
+| 5.1 | Commit history — 422 commits | «» |
 | 5.2 | Continuous integration run | «» |
 
 # LIST OF TABLES
@@ -786,8 +786,9 @@ suite *and* found a test that was not testing anything.
 | Not verified | Reason | Consequence |
 |---|---|---|
 | **Deployment** | No hosted URL or application binary | HTTPS and CORS-origin checks skipped |
-| **Load and performance** | k6 suite has no target | **No performance figures exist** (§3.3.6) |
-| **Physical device** | No iOS or Android build launched | Keychain session, image picker, deep links unverified |
+| **Capacity under load** | 50-VU run bound by the per-identity rate limiter, not the application | Smoke figures exist and pass; **no unconstrained throughput or latency figure** (§3.3.6) |
+| **iOS** | No iOS build launched | Keychain session and image picker proven on Android only (§3.3.8) |
+| **Native deep links** | `hive://` never opened through the operating system | Route-group resolution verified through a browser URL instead |
 | **Server-side HEIC conversion** | `sharp`'s prebuilt libvips has no HEVC decoder | Cannot work, and does not. Tested 24 July against a real HEVC HEIC. Handled by a device-side transcode instead; the server refuses HEVC with an actionable 400 |
 | **Error reporting** | Sentry requires a DSN | Pipeline unproven end to end |
 | **CI test gate** | Repository secrets absent | 218 tests do not yet block a pull request; lint, typecheck and build do |
@@ -829,19 +830,60 @@ credible.
 
 ### 3.3.6 Performance
 
-**No load-test measurements exist.** The k6 suite — smoke, load, stress and spike
-profiles — is written and committed but has never executed, because there is no
-deployed target.
+The k6 suite was **executed on 16 August 2026** against a **local single instance
+with the seeded dataset** — not a deployment. Every figure below carries that
+qualification; none of it characterises production behaviour on a hosted tier.
 
-The one timing figure measured is the test suite: **178 tests in 115 seconds**,
-including table truncation, approximately forty authentication-user creations and
-full HTTP round-trips. That measurement predates `3b2f4c4`, which took the suite
-to 218; the larger suite has not been timed, and the 115-second figure should not
-be restated against it.
+**Table 3.5 — k6 smoke profile (1 VU, 30 s)**
 
-Presenting invented latency or throughput figures would be worse than presenting
-none. §6.4 lists deployment first precisely because it is the step that unlocks
-this measurement.
+| Metric | Result | Threshold | |
+|---|---|---|---|
+| Checks succeeded | **42 / 42 (100%)** | — | ✔ |
+| `http_req_failed` | **0.00%** | `rate<0.01` | ✔ |
+| `http_req_duration` p95 | **1.13 s** | `p(95)<2000 ms` | ✔ |
+| `feed_payload_bytes` | **3,908 B** | 2 MB p95 | ✔ |
+| Requests | 29 over 32.1 s, 14 iterations, 0 interrupted | — | |
+
+**`feed_payload_bytes` is the figure that matters most.** A twenty-photograph
+feed page transfers **3,908 bytes** of metadata and signed URLs. Before Plan 03
+generated thumbnails, `thumbnail_s3_key` was always null and the client fell back
+to full-resolution originals, so one page could exceed 100 MB. That is a
+four-order-of-magnitude reduction, and it is the single clearest quantitative
+justification for the storage work.
+
+**The load profile (50 VU, 5 min) crossed its thresholds, and the reason is
+instructive rather than damning.** It recorded 69.38% `http_req_failed` over
+4,727 requests. The failures decompose exactly:
+
+| Cause | Requests | Assessment |
+|---|---|---|
+| **429 — the project's own rate limiter** | **2,657** | Not a capacity limit. 50 virtual users share three authentication tokens, and the limiter is keyed per identity, so the budget was exhausted within roughly two minutes. The control worked; the test was shaped wrongly for it |
+| **403 — cross-school refusal** | **492** | **Correct behaviour.** The run was configured with a class belonging to a different school from the teacher account, so the G-08 boundary refused every teacher request. A misconfiguration of the run — and incidentally a 492-sample confirmation that the school boundary holds under concurrency |
+| 200 / 304 — served | 1,578 | Throughput 15.6 req/s; p95 3.3 s on expected responses |
+
+The 429s appear in k6's totals and **not** in the server's request log, because
+`globalRateLimiter` is mounted at `app.ts:62` and the logging middleware at
+`app.ts:69` — a refused request never reaches the logger. The arithmetic closes:
+4,727 issued, 2,070 logged, 2,657 refused upstream.
+
+**What this does and does not establish.** It establishes that the application
+serves a correctly-shaped single-user workload well within threshold, that the
+feed payload is small, and that two protective controls — per-identity rate
+limiting and cross-school authorization — hold under concurrent load. It does
+**not** establish a capacity ceiling: at 50 virtual users the binding constraint
+was the project's own rate limiter, by design, so no unconstrained
+throughput or latency figure exists. Obtaining one requires per-virtual-user
+identities or a raised ceiling, and a deployed target to make the number mean
+anything. **No figure has been extrapolated to fill that gap.**
+
+**The current suite has now been timed.** On 16 August the backend suite ran
+**218 tests across 8 files in 245 seconds**, all passing, including table
+truncation, approximately forty authentication-user creations and full HTTP
+round-trips against a real Postgres, GoTrue and Storage stack. This supersedes an
+earlier figure of 178 tests in 115 seconds, which belonged to the smaller suite
+and should not be restated against this one. The mobile unit suite runs
+**100 tests in 281 milliseconds** — it is pure logic with no I/O, which is why
+the two differ by three orders of magnitude.
 
 ### 3.3.7 Observations
 
@@ -853,10 +895,12 @@ integer-cent arithmetic and genuine idempotency. The storage layer produces
 thumbnails and placeholders for both orientations and serves them only through
 signed, expiring URLs.
 
-**What it does not support.** Nothing has been observed on the platform the
-product ships on. No performance characteristic has been measured. The
-error-reporting pipeline has never carried an error. These are not oversights
-discovered late; each follows from one absent step — deployment.
+**What it does not support.** No performance characteristic has been measured.
+The error-reporting pipeline has never carried an error. Neither is an oversight
+discovered late; each follows from one absent step — deployment. Observation on
+the shipping platform, previously listed here, is now partly closed: the
+application has been driven end to end on a physical Android device, and §3.3.8
+records both what that proved and what it did not.
 
 **A note on suite stability.** Repeated runs exhaust the shared authentication
 provider's sign-in quota; each run creates roughly forty users, and beyond the
@@ -864,6 +908,62 @@ quota sign-ins stall rather than fail. Three runs within half an hour produced
 timeouts. **Every failure observed was a timeout, never a failed assertion**, and
 the same files passed in isolation immediately afterwards. The 178/178-in-115s
 figure is a measurement of that suite *running alone*.
+
+### 3.3.8 Device verification
+
+The application was driven end to end on a **physical Android device** — a
+OnePlus CPH2487, connected over USB with `adb reverse` mapping the development
+server and API to the handset. Every application figure in §4.3 is a capture
+from that device rather than a browser.
+
+**Table 3.7 — Behaviour verified on the device**
+
+| Behaviour | Result |
+|---|---|
+| Keychain-backed session | Survives force-quit and cold start |
+| Native image picker | Opens, selects and cancels correctly |
+| Upload, end to end | Completes with genuine per-file progress (G-27) |
+| Role routing | Teacher lands on the teacher dashboard (G-05) |
+| Privacy scoping | Aarav 2 photographs, Diya 1 — correct per child (G-04) |
+| Safe-area handling | Floating action button clears the tab bar against a real inset |
+| Order arithmetic | Order detail renders 2 × ₹30 → ₹60, 1 × ₹99 → ₹99, total ₹159 |
+
+**Seven defects were found that no other method had surfaced**, four of them
+invisible to a type checker, a test suite and a desktop browser alike: a
+truncated age line when two siblings are tagged, order-status labels breaking
+mid-word, a truncated upload button, an admin photograph count including
+archived rows, a notification badge clipping the tab indicator, a failed image
+that never retried, and a disabled *Place order* button that gave no reason.
+
+**The most significant is worth stating in full, because it is the clearest
+argument for testing on hardware.** The application opened to a blank screen and
+never recovered — no crash, no error, nothing in the logs. `app/_layout.tsx`
+returns `null` while authentication loads, and the root layout is itself a route
+component: returning `null` destroys the navigator, so expo-router tears down and
+re-creates the root route, producing a *fresh* component instance whose `useRef`
+bootstrap guard is reset. The bootstrap therefore ran again, set the loading flag
+again, and rendered `null` again. **The loop ran 145 times in one session,
+measured, with no exit and no symptom beyond an application that would not
+paint.**
+
+What made it expensive was that everything below the root looked guilty. The
+feed's render logged continuously with correct data — 2 photographs, 3 rows,
+every gate open — because React kept executing the component body during the
+brief windows the tree existed. But the list's `onLayout` and `renderItem` never
+fired once, because nothing survived long enough to commit. That reads exactly
+like a broken list. The fix moves the guard to module scope so it outlives the
+component that triggers it; the device then showed one initialisation instead of
+145, and one mount instead of a remount every ~600 ms.
+
+**This class of defect is not reachable by the other methods used in this
+project.** It is a lifecycle race between a navigation library and a React ref,
+with correct types, passing integration tests and a functioning browser build.
+
+**What the device run did *not* establish.** Only Android was exercised — no iOS
+build has been launched, so the keychain session and the image picker are proven
+on one platform of two. Native `hive://` deep links remain unverified on either:
+route-group resolution was checked through a browser URL, which does not
+traverse the operating system's linking path.
 
 ---
 
@@ -917,7 +1017,55 @@ described in §6.4.
 
 ## 4.3 Demonstration screenshots
 
-*(Figures 2.5–2.8 and 3.1–3.5. Capture list: `SUBMISSION-CHECKLIST.md` §7.)*
+**Capture conditions.** Every application figure below was taken on a **physical
+Android device** (OnePlus CPH2487) running the application against the local API
+over `adb reverse`, not in a browser or an emulator. All are 1240 px wide,
+captured in light mode against the seeded demonstration dataset, and cropped
+uniformly to remove the operating-system status bar. Nothing is composed,
+retouched or recreated; where a figure shows a number, that number came from the
+database.
+
+**Table 4.2 — Application figures**
+
+| Fig. | File | What it evidences |
+|---|---|---|
+| — | `app-01-login.png` | Entry point and role selection |
+| — | `app-02-teacher-dashboard.png` | Class-scoped teacher view |
+| **2.5** | `fig-2.5-upload-tagger.png` | **The tagging gate** — student tagger open during upload |
+| 2.5b | `fig-2.5b-tagger-tagged.png` | Children tagged; the upload control becomes enabled |
+| 2.5c | `fig-2.5c-upload-sent.png` | Upload completing with real per-file progress (G-27) |
+| **2.6** | `fig-2.6-feed-child-switcher.png` | **The many-to-many model** — Rajesh's switcher showing Aarav and Diya |
+| — | `app-03-feed-switched-child.png` | Feed after switching child — different photographs, scoping is live |
+| — | `app-04-photo-detail.png` | Signed-URL rendering with a blurhash placeholder |
+| 2.7a | `fig-2.7a-order-sheet-60.png` | Order sheet priced from the server catalogue |
+| **2.7** | `fig-2.7-order-confirm.png` | **Monetary correctness** — 2 × ₹30 → ₹60, 1 × ₹99 → ₹99, total **₹159**, with per-item signed thumbnails. Per-line arithmetic *and* the total, against a database row of `total_cents: 15900` |
+| — | `app-05-order-history.png` | Order history with per-item signed URLs |
+| — | `app-06-notifications.png` | Trigger-generated notifications naming the correct child |
+| — | `app-07-parent-profile.png` | Parent profile |
+| — | `app-08-upload-empty.png` | Upload empty state |
+| **2.8** | `fig-2.8-admin-dashboard.png` | **Administration** — non-zero counts, `totalPhotos` excluding archived rows |
+
+**Table 4.3 — The privacy comparison (Figure 3.4)**
+
+The two most important figures in the submission, and they are only meaningful as
+a pair. Both were captured on the same device at the same resolution with the
+same crop, so the comparison is between the application's behaviour and nothing
+else.
+
+| Fig. | File | Account | Result |
+|---|---|---|---|
+| **3.4a** | `fig-3.4a-rajesh-feed.png` | `parent.rajesh@bloom.demo` — Bloom Preschool, two children | **2 photographs**, Aarav and Diya |
+| **3.4b** | `fig-3.4b-vikram-feed.png` | `parent.vikram@stars.demo` — Little Stars Academy | **1 photograph**, Arjun and Myra |
+
+Six photographs exist in the dataset. Neither parent sees all six, and the two
+sets **do not intersect**. This is the central requirement of the product
+demonstrated as an observable property rather than asserted as a feature — §3.3.2
+gives the same result measured at the API.
+
+*Evidence figures 3.1, 3.2, 3.3, 3.5, 4.1, 5.1 and 5.2 are terminal and
+repository captures rather than application screenshots; §3.3 and Chapter 5 carry
+their results in full. Figures 2.1 and 2.3 are the architecture and
+entity-relationship diagrams in Chapter 2.*
 
 ## 4.4 Demonstration video
 
@@ -935,26 +1083,27 @@ behaviour, order placement, administration dashboard.»
 
 | Metric | Value |
 |---|---|
-| Commits | 376 |
+| Commits | 422 |
 | Contributors | 4 |
-| Period | 1 February – 13 August 2026 |
-| Active development days | 149 |
-| Source files | 209 TypeScript / TSX |
-| Lines of source | ~31,000 |
+| Period | 1 February – 16 August 2026 |
+| Active development days | 151 |
+| Source files | 219 TypeScript / TSX |
+| Lines of source | ~37,200 |
 | Migrations | 20 |
 | Automated tests | 318 — 218 backend integration, 100 mobile unit |
 
 | Contributor | Commits |
 |---|---|
-| Bhargav | 114 |
+| Bhargav | 138 |
 | Nagachaitanya | 99 |
-| Ruthwik | 91 |
-| Srujan | 72 |
+| Ruthwik | 95 |
+| Srujan | 82 |
 
 *Source files and lines count `apps/mobile/src` and `packages/backend/src`,
-excluding tests, generated types and configuration; the test suites add a further
-17 files and 4,089 lines. Commit counts are for `main` and include 7 merge
-commits.*
+excluding tests, generated types and configuration. Per-contributor counts
+exclude merges and are normalised through `.mailmap`, which folds four
+alternate author identities; they total 414, with a further 8 merge commits
+making 422.*
 
 *(Figure 5.1 — commit history. Figure 5.2 — continuous integration run.)*
 
@@ -1049,10 +1198,21 @@ every resource accessed by identifier checked against the caller.
 Stated explicitly; each is evidenced in Table 3.6.
 
 1. **The system is not deployed.** No hosted URL, no application binary.
-2. **No performance measurements exist.** The k6 suite has no target.
-3. **Nothing has been observed on a physical device.** Verification used a
-   desktop browser; platform-specific behaviour — keychain-backed sessions, the
-   image picker, deep links — remains unproven where it ships.
+2. **No performance measurement against a deployment exists.** The k6 suite has
+   now run — locally, on 16 August — and the smoke profile passes every threshold
+   with a 3,908-byte feed page (§3.3.6). What is missing is a *capacity* figure:
+   at 50 virtual users the binding constraint was the project's own per-identity
+   rate limiter rather than the application, so no unconstrained throughput or
+   latency number has been obtained, and none has been estimated.
+3. **iOS is unverified, and native deep links with it.** The application *has*
+   been driven end to end on a physical Android device, which closed most of what
+   this limitation formerly covered — the keychain-backed session, the image
+   picker, upload progress, role routing and privacy scoping are all proven on
+   hardware, and seven defects were found there that no other method surfaced
+   (§3.3.8). What remains unproven: no iOS build has been launched, so those
+   platform behaviours hold for one platform of two; and `hive://` deep links are
+   unverified on either, because route-group resolution was checked through a
+   browser URL rather than the operating system's linking path.
 4. **The error-reporting pipeline has never carried an error.**
 5. **The continuous-integration test step is advisory**, pending repository
    secrets; lint, typecheck and build do block.

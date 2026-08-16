@@ -31,7 +31,7 @@ unusually strong; make sure the supervisor has actually seen it.
 
 | Criterion | Marks | Point them at |
 |---|---|---|
-| Attendance & regularity | 5 | 376 commits over 149 active days, 1 Feb – 13 Aug, four contributors |
+| Attendance & regularity | 5 | 422 commits over 151 active days, 1 Feb – 16 Aug, four contributors |
 | Task progress & timelines | 5 | `docs/PROGRESS-REPORT.md` — 25 weekly entries |
 | Ownership | 5 | Per-person plan ownership; `## Deviations` sections recording what differed and why |
 | Communication & reporting | 5 | `IMPLEMENTATION-STATUS.md`, `security.md`, `architecture.md` |
@@ -60,9 +60,9 @@ adding a framework does.
 
 | Aspect | Marks | State |
 |---|---|---|
-| Test cases & coverage | 5 | **Strong** — 218 tests, Table 3.2 has 37 documented cases |
-| Result analysis | 5 | **Strong** — §3.3.7, including the sabotage finding |
-| Performance / reliability | 5 | ⚠️ **Weak** — no load figures |
+| Test cases & coverage | 5 | **Strong** — 218 backend + 100 mobile, Table 3.2 has 37 documented cases |
+| Result analysis | 5 | **Strong** — §3.3.7, the sabotage finding, and §3.3.8's seven device defects |
+| Performance / reliability | 5 | ✅ **k6 executed 16 Aug against a local instance.** Smoke: 42/42 checks, 0.00% failures, p95 1.13 s, feed page **3,908 bytes** against a 2 MB threshold. See §3.3.6 |
 
 ⚠️ **The one soft spot in the submission.** Options, best first:
 
@@ -82,8 +82,8 @@ Do at least 2 or 3. Never invent numbers.
 
 | Aspect | Marks | State |
 |---|---|---|
-| Implementation & testing chapters | 7 | ✅ `REPORT.md` chapters 2 and 3 |
-| Results, screenshots, tables | 7 | ⚠️ 11 tables done; **23 screenshots outstanding** — §7 |
+| Implementation & testing chapters | 7 | ✅ `REPORT.md` chapters 2 and 3, plus §3.3.8 device verification |
+| Results, screenshots, tables | 7 | ✅ 14 tables; **17 application figures captured on a physical device** and written up in §4.3. Outstanding: 6 terminal/browser captures and the 2 diagrams — §7 |
 | Clarity, formatting, references | 6 | ⚠️ Transfer to Word + formatting — §8 |
 
 ---
@@ -135,7 +135,7 @@ than a missing one.
 | — | Order POST → **201**, `total_cents: 6000` — ₹60 | G-01 |
 | — | Same idempotency key → same order ID | Idempotency |
 | 4.1 | `/health` 200, then **503** with database stopped | Degradation detected |
-| 5.1 | Commit history — 376 commits | Version control evidence |
+| 5.1 | Commit history — 422 commits | Version control evidence |
 | 5.2 | GitHub Actions — green run | CI exists and runs |
 | 2.1 | Architecture diagram | Three tiers |
 | 2.3 | ER diagram | Schema |
@@ -196,8 +196,15 @@ Items 1, 2 and 5 need nothing from anyone else.
 - **Claim 29/29 on the security script.** It is 27 passed, 0 failed, **2
   skipped** (11 Aug; 26/0/3 on 1 Aug). One skip needs a deployment (HTTPS); the
   other needs `FORCE_500_PATH` **and** `NODE_ENV=production`.
-- **Say "fully working".** It works locally. Nothing is deployed and nothing has
-  run on a physical device.
+- **Say "fully working".** It works locally and on a physical Android device.
+  Nothing is deployed, and iOS has never been launched.
+- **Undersell the device testing.** It is no longer true that nothing has run on
+  hardware, and the report said so in five places after it had stopped being
+  true. Seven defects were found on the device — one of them, a root layout
+  remounting 145 times into a blank screen, was unreachable by typecheck, test
+  suite and browser alike. That is a *result*, not a caveat: Report §3.3.8.
+  Saying "never run on a device" while showing an Android screenshot is worse
+  than either statement alone.
 - **Hide the limitations.** Report §6.3 and slide 9 state them deliberately.
   Volunteering them reads as judgement; being caught concealing one discounts
   everything else.

@@ -246,8 +246,8 @@ like an omission.
 | Not done | Why |
 |---|---|
 | **Not deployed** | No hosted URL, no app binary |
-| **No performance figures** | k6 suite written; no target to run it against |
-| **Never run on a physical device** | Driven end to end in a browser; iOS/Android unverified |
+| **No capacity figure** | k6 *has* run locally — smoke passes every threshold, feed page 3,908 B. But at 50 VU the limit hit was our own rate limiter, not the app, so there is no unconstrained number |
+| **iOS unverified; native deep links unverified** | Run end to end on a physical **Android** device — that is where seven defects were found (slide 8a). iOS not launched; `hive://` never opened through the OS |
 | **Error reporting never carried an error** | Needs a DSN — an account signup |
 | **CI test step advisory** | Repository secrets absent; lint, typecheck and build do block |
 
