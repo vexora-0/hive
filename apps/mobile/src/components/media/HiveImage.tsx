@@ -1,8 +1,22 @@
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleProp, ImageStyle } from 'react-native';
 import { Image, type ImageLoadEventData } from 'expo-image';
 
 import { duration } from '@/theme';
+
+/**
+ * How many times a photograph is re-fetched before the caller is told.
+ *
+ * Two, with a widening gap. A photo app that silently shows nothing is worse
+ * than one that admits it failed, and worse still is one that never tries
+ * again: `expo-image` reports an error once and then holds the placeholder for
+ * the life of the view, so a single dropped request left a permanently blank
+ * card that only an app restart cleared. Seen on a device — six photographs
+ * whose signed URLs all answered 200 to `curl`, three of them blank on screen
+ * and still blank a minute later.
+ */
+const MAX_RETRIES = 2;
+const RETRY_BASE_MS = 400;
 
 // expo-image stopped exporting ContentFit. Declared locally rather than
 // reaching into the package's internal types.
@@ -99,6 +113,43 @@ export function HiveImage({
   accessibilityLabel,
   style,
 }: HiveImageProps) {
+  // Bumped on failure. It is appended to the recycling key rather than kept as
+  // state alone, because that is what makes `expo-image` drop the view it has
+  // already given up on and fetch again — the same trick `PhotoViewer` uses.
+  const [attempt, setAttempt] = useState(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clear = () => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+  };
+
+  // A new photograph starts its own budget. Without this a cell recycled into a
+  // row after two failures would arrive with the retries already spent.
+  useEffect(() => {
+    clear();
+    setAttempt(0);
+    return clear;
+  }, [uri]);
+
+  const handleError = useCallback(() => {
+    setAttempt((current) => {
+      if (current >= MAX_RETRIES) {
+        // Out of budget: tell the caller so it can show something honest.
+        onError?.();
+        return current;
+      }
+      clear();
+      timer.current = setTimeout(
+        () => setAttempt((n) => n + 1),
+        RETRY_BASE_MS * 2 ** current,
+      );
+      return current;
+    });
+  }, [onError]);
+
   return (
     <Image
       source={{ uri }}
@@ -106,11 +157,11 @@ export function HiveImage({
       placeholderContentFit={placeholderContentFit ?? contentFit}
       contentFit={contentFit}
       transition={transition}
-      recyclingKey={recyclingKey}
+      recyclingKey={recyclingKey ? `${recyclingKey}:${attempt}` : undefined}
       priority={priority}
       cachePolicy={cachePolicy}
       onLoad={onLoad}
-      onError={onError ? () => onError() : undefined}
+      onError={handleError}
       accessibilityLabel={accessibilityLabel}
       style={style}
     />
