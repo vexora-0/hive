@@ -553,13 +553,19 @@ export default function UploadScreen() {
               )}
               <Button
                 variant="primary"
-                size="lg"
+                // `md`, not `lg`. This button does not get the row to itself —
+                // it shares it with the "+ n/20" control — and `lg`'s padding
+                // left about 300px for a label that needs 330, so the primary
+                // action truncated itself to "Share 3 pho…". Dropping the icon
+                // was not enough; the padding is what eats the width. Verified
+                // on a device at 1240x2772.
+                size="md"
                 onPress={handleStartUpload}
                 disabled={!canUpload}
                 loading={isUploading}
                 style={styles.sendButton}
                 leftIcon={(color) => (
-                  <Ionicons name="cloud-upload-outline" size={20} color={color} />
+                  <Ionicons name="cloud-upload-outline" size={18} color={color} />
                 )}
               >
                 {failedCount > 0 && !isUploading
