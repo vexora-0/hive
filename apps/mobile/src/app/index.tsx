@@ -1,46 +1,9 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
 import { Redirect } from 'expo-router';
 
-import { colors } from '@/theme';
-import { HiveMark } from '@/components/brand';
-import { Reveal } from '@/components/animation';
 import { useOnboardingStore } from '@/features/onboarding/stores/onboardingStore';
 import { useAuthStore } from '@/features/auth/stores/authStore';
 import { getRoleRoute } from '@/types/navigation';
-
-// ---------------------------------------------------------------------------
-// The hold
-// ---------------------------------------------------------------------------
-
-/**
- * What the app shows while it works out where to send you.
- *
- * This used to be `return null`, which renders a bare cream rectangle. The
- * native splash is dismissed on *auth* resolving, not on the onboarding flag
- * landing, so on a cold start where the AsyncStorage read is the slower of the
- * two the splash lifted onto an empty page and the app looked, for a beat, like
- * it had failed to start.
- *
- * The mark arrives through `<Reveal>` rather than being painted straight on,
- * and that is the whole trick: the fade runs over `duration.slow`, so a read
- * that resolves in 30ms unmounts this while the mark is still at a few per cent
- * opacity and nobody sees anything at all. Only a genuinely slow read ever
- * shows a logo — which is the same judgment `SkeletonShimmer` makes about
- * placeholders, applied to the app's front door.
- *
- * No spinner. A spinner on a storage read that normally takes one frame is the
- * app apologising for something it has not done.
- */
-function HydrationHold() {
-  return (
-    <View style={styles.hold}>
-      <Reveal scale>
-        <HiveMark size={56} />
-      </Reveal>
-    </View>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Entry Redirect
@@ -56,29 +19,32 @@ function HydrationHold() {
  */
 export default function IndexRedirect() {
   const hasOnboarded = useOnboardingStore((s) => s.hasOnboarded);
-  const hasHydrated = useOnboardingStore((s) => s.hasHydrated);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const role = useAuthStore((s) => s.role);
 
-  // `hasOnboarded` is read back from AsyncStorage asynchronously and is `false`
-  // until it lands. Redirecting before then could not distinguish "has never
-  // onboarded" from "we have not looked yet", so whenever the read lost the
-  // race a returning user was dropped into the intro carousel — and once they
-  // tapped through it, `completeOnboarding` overwrote whatever was in storage.
-  // The splash screen is gated on auth, not on this, so wait here instead.
-  if (!hasHydrated) {
-    return <HydrationHold />;
-  }
+  // There is nothing to wait for here any more.
+  //
+  // This used to hold on a `hasHydrated` flag and paint the app mark while
+  // `hasOnboarded` was read back from AsyncStorage — a genuinely necessary
+  // wait, because the flag defaults to `false` and deciding before the read
+  // landed would drop a returning user into the carousel and then overwrite
+  // their stored value. The flag is no longer persisted (see the store), so
+  // there is no read, no race and no hold. Auth is already resolved before
+  // this renders: `_layout.tsx` holds the splash until `useSession` settles.
 
   // 1. Signed in: straight to their home, checked before the onboarding flag on
   //    purpose. Someone with a session is not a first-time user whatever that
-  //    flag says — and if the AsyncStorage read failed it says `false`.
+  //    flag says. **This is what still skips the carousel between takes when a
+  //    recording left a session behind** — sign out, or clear site data, to get
+  //    a true first run.
   if (isAuthenticated && role) {
     const route = getRoleRoute(role);
     return <Redirect href={route as never} />;
   }
 
-  // 2. First-time user: show onboarding
+  // 2. Not seen the carousel yet **this run**: show it. Since the flag is no
+  //    longer persisted, that means every cold start by a signed-out user —
+  //    which is exactly what recording a demo needs.
   if (!hasOnboarded) {
     return <Redirect href="/(auth)/onboarding" />;
   }
@@ -87,16 +53,3 @@ export default function IndexRedirect() {
   //    which case the login screen fetches the profile and forwards them on.
   return <Redirect href="/(auth)/login" />;
 }
-
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
-
-const styles = StyleSheet.create({
-  hold: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background.cream,
-  },
-});
