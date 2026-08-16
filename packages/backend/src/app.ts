@@ -169,6 +169,19 @@ app.use('/api/v1/me', profileRoutes);
 // set it has no such endpoint to find. It is placed after the API routes and
 // before the 404 handler, and throws synchronously so Express hands it to
 // errorHandler exactly as an unexpected fault would arrive.
+//
+// It is also, necessarily, a Sentry-event generator. The throw lands in
+// errorHandler's unknown branch, which calls reportToSentry — that is the whole
+// point, since the branch under test is the one that reports. This file has
+// been bitten by that shape before: see the comment in errorHandler.ts about
+// malformed bodies falling through to the unknown branch and letting any
+// authenticated client fill Sentry with stack traces by POSTing garbage.
+//
+// What bounds it here is that the route sits behind `globalRateLimiter`
+// (mounted above), so it inherits the per-identity budget like everything else.
+// If this is ever moved above that middleware, or the limiter is relaxed, an
+// operator who left the variable set has handed anyone who learns the path a
+// cheap way to burn the Sentry quota. Keep it below line 62.
 if (env.FORCE_500_PATH) {
   logger.warn('FORCE_500_PATH is set — registering a route that throws', {
     path: env.FORCE_500_PATH,
