@@ -39,6 +39,24 @@ const envSchema = z.object({
     .transform((val) =>
       val === '*' ? '*' : val.split(',').map((origin) => origin.trim()),
     ),
+
+  // Optional, and off unless deliberately set. When present, app.ts registers a
+  // single route at this path that throws, so `scripts/verify-security.sh` §7
+  // can assert that a 500 returns a generic body with no stack trace. That
+  // check is the difference between believing the error handler redacts and
+  // having seen it.
+  //
+  // The route only exists when the variable is set, and the operator chooses
+  // the path — there is no fixed endpoint to find, and an ordinary deployment
+  // that never sets this has no such route at all. It must begin with a slash
+  // so it cannot be mistaken for a value that could be appended to a URL.
+  FORCE_500_PATH: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z
+      .string()
+      .startsWith('/', 'FORCE_500_PATH must begin with /')
+      .optional(),
+  ),
 });
 
 export type Env = z.infer<typeof envSchema>;

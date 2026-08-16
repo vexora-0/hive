@@ -157,6 +157,27 @@ app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/schools', schoolsRoutes);
 app.use('/api/v1/me', profileRoutes);
 
+// A route that reliably throws, registered only when FORCE_500_PATH is set.
+//
+// scripts/verify-security.sh §7 asserts that a 500 returns a generic body and
+// carries no stack trace. Until now that check could only skip, because nothing
+// in the application 500s on demand — so the one property the error handler
+// exists to guarantee was the one property never verified over HTTP.
+//
+// Deliberately not a fixed path. The route exists only when an operator sets
+// the variable, and they choose where it lives, so a deployment that does not
+// set it has no such endpoint to find. It is placed after the API routes and
+// before the 404 handler, and throws synchronously so Express hands it to
+// errorHandler exactly as an unexpected fault would arrive.
+if (env.FORCE_500_PATH) {
+  logger.warn('FORCE_500_PATH is set — registering a route that throws', {
+    path: env.FORCE_500_PATH,
+  });
+  app.get(env.FORCE_500_PATH, () => {
+    throw new Error('Forced failure for error-handler verification');
+  });
+}
+
 // 404 handler for unmatched routes
 app.use((_req, res) => {
   res.status(404).json({
