@@ -9,7 +9,15 @@ import {
   orderProgressIndex,
 } from '../constants/orderStatus';
 import { formatOrderNumber } from '../utils/orderNumber';
-import { colors, spacing, radius, shadows, platformShadow } from '@/theme';
+import {
+  colors,
+  spacing,
+  radius,
+  shadows,
+  platformShadow,
+  fontSize,
+  lineHeight,
+} from '@/theme';
 import { Text, Button, Badge, Divider } from '@/components/ui';
 import { HiveImage } from '@/components/media';
 import type { OrderStatus, ProductType } from '@/types/supabase';
@@ -467,7 +475,17 @@ const styles = StyleSheet.create({
   },
   timelineLabel: {
     marginTop: spacing.sm,
-    paddingRight: spacing.xs,
+    // No right padding, and the smallest size in the scale.
+    //
+    // Five steps split the row five ways, so each label gets about a fifth of
+    // the sheet's width. At `caption` that fits "Printing" and not "Confirmed",
+    // and a single word wider than its column cannot wrap at a space — React
+    // Native breaks it mid-character instead. On a device the timeline read
+    // "Confirme / d" and "On the / way". `tiny` is 10pt against caption's 12,
+    // which is enough for the longest label here, and the step's own weight and
+    // colour still carry the emphasis.
+    fontSize: fontSize.tiny,
+    lineHeight: lineHeight.tiny,
   },
 
   // ── Cancelled ──
