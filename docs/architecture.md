@@ -30,7 +30,7 @@ graph TB
         APP["Expo / React Native app<br/>iOS · Android"]
     end
     subgraph Server
-        API["Express + TypeScript API<br/>22 endpoints, 5 domains"]
+        API["Express + TypeScript API<br/>40 endpoints, 7 domains"]
     end
     subgraph Supabase
         AUTH["Auth<br/>email OTP + password"]
