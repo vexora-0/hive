@@ -155,13 +155,19 @@ nothing runs; create them from the `.env.example` templates first.
    `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` exist as repository
    secrets. Until then 218 passing tests still guard nothing on a pull request.
    Lint, typecheck and build are blocking.
-3. **Nothing has been seen on a device.** This changed by half a step on 9
-   August: the app was driven end to end **in Chrome**, so the screens are no
-   longer merely typechecked. But web is not the target. No iOS or Android
-   build has been launched and no simulator run is recorded, so anything
-   platform-specific — the keychain-backed session, the image picker, deep
-   links, `AppState` transitions — is still unverified where it ships. Plan
-   04's mobile deep-link checks remain unticked.
+3. ~~**Nothing has been seen on a device.**~~ **Done, 16 August — on a physical
+   iPhone.** Expo Go, SDK 54, talking to the local backend over the LAN; all
+   three roles signed in and their functionality driven across both demo
+   schools. The half-step on 9 August was Chrome; this is the real thing, so
+   the keychain-backed session, the image picker and `AppState` transitions are
+   no longer unverified where they ship. Two caveats, both real. **Nothing was
+   captured** — no recording, no screenshots, no logs kept — so it is an
+   observed pass, and nothing fails if it regresses. And **deep links are still
+   unproven**: Expo Go serves under `exp://`, so the app's `hive://` scheme was
+   never exercised, and Plan 04's mobile deep-link checks remain unticked. That
+   needs `expo run:ios` or an EAS build. Setup notes: `EXPO_PUBLIC_API_URL`
+   must be the Mac's LAN IP, not `localhost` — on the phone `localhost` is the
+   phone.
 4. **The web file picker was never driven end to end.** The tagging gate and
    the class default were checked in the browser; an actual file upload through
    the web picker was not completed. The pipeline itself is covered by the API

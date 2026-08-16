@@ -201,7 +201,21 @@ guard does nothing unless the variable exists.
   migrations, driven through the real Express app. That proves the authorization
   logic. It is not evidence about how `hive-dev` or any hosted project is
   configured, and the HTTPS and CORS checks still skip for want of a hosted URL.
-- **Nothing has been seen on a device.**
+- ~~**Nothing has been seen on a device.**~~ **Changed on 16 August — the app
+  ran on a physical iPhone.** Expo Go, SDK 54, against the local backend over
+  the LAN: `EXPO_PUBLIC_API_URL` was repointed from `localhost` to the Mac's
+  LAN IP, and `/health` answered `"database":"ok"`, `"cache":"ok"` from that
+  address. All three roles were signed in — admin, teacher and parent, across
+  both demo schools — and the functionality was driven through each of them.
+  **No capture was taken.** This is the developer's observed pass, not an
+  artifact: there is no recording, screenshot set or log to re-read, and no
+  assertion anywhere fails if it regresses. It is evidence that the screens and
+  flows work on real hardware; it is not a per-gap verification record, and it
+  does not tick anything in §4 on its own.
+  **Deep links are the exception and stay unproven** — Expo Go serves the bundle
+  under `exp://`, so the app's own `hive://` scheme was never exercised. That
+  needs `expo run:ios` or an EAS build, and Plan 04's mobile deep-link checks
+  remain unticked.
 - **Nothing is deployed** — no hosted URL, no APK. CI itself *does* run: 43
   workflow runs on 1 Aug, 26 green, each building the Docker image. What has
   never happened is a deployment, not a build.

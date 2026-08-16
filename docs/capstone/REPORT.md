@@ -342,7 +342,7 @@ refused response contains no signed URL.
 | Layer | Technology | Version | Rationale |
 |---|---|---|---|
 | Language | TypeScript | 5.4 | Strict mode; catches contract drift between client and API at compile time |
-| Mobile | React Native / Expo | SDK 51 | Single codebase for iOS and Android; removes native build tooling from the critical path |
+| Mobile | React Native / Expo | SDK 54 (React Native 0.81) | Single codebase for iOS and Android; removes native build tooling from the critical path |
 | Routing (mobile) | expo-router | 3.x | File-based routing with typed route parameters |
 | Client state | Zustand | 4.x | Minimal boilerplate for UI state |
 | Server state | TanStack Query | 5.x | Caching and invalidation kept separate from UI state |
@@ -810,7 +810,7 @@ suite *and* found a test that was not testing anything.
 |---|---|---|
 | **Deployment** | No hosted URL or application binary | HTTPS and CORS-origin checks skipped |
 | **Capacity under load** | 50-VU run bound by the per-identity rate limiter, not the application | Smoke figures exist and pass; **no unconstrained throughput or latency figure** (§3.3.6) |
-| **iOS** | No iOS build launched | Keychain session and image picker proven on Android only (§3.3.8) |
+| **iOS** | Run on a physical iPhone through Expo Go on 16 August, not as a standalone build; nothing captured | All three roles exercised, so the platform is no longer unexercised — but the evidence is an observed pass with no artefact, and the native paths ran under Expo Go's container rather than the application's own bundle identifier (§3.3.8) |
 | **Native deep links** | `hive://` never opened through the operating system | Route-group resolution verified through a browser URL instead |
 | **Server-side HEIC conversion** | `sharp`'s prebuilt libvips has no HEVC decoder | Cannot work, and does not. Tested 24 July against a real HEVC HEIC. Handled by a device-side transcode instead; the server refuses HEVC with an actionable 400 |
 | **Mobile error reporting** | `EXPO_PUBLIC_SENTRY_DSN` unset | Server-side reporting is proven (§6.3 item 4); the client is not |
@@ -927,9 +927,10 @@ signed, expiring URLs.
 Neither is an oversight discovered late; each follows from one absent step —
 deployment. The error-reporting pipeline, previously listed here, has since
 carried a real event; §6.3 item 4 records it. Observation on
-the shipping platform, previously listed here, is now partly closed: the
-application has been driven end to end on a physical Android device, and §3.3.8
-records both what that proved and what it did not.
+the shipping platform, previously listed here, is now largely closed: the
+application has been driven end to end on a physical Android device, and on a
+physical iPhone on 16 August. §3.3.8 records both runs, what each proved, and
+why the iOS one carries less weight than the Android one.
 
 **A note on suite stability.** Repeated runs exhaust the shared authentication
 provider's sign-in quota; each run creates roughly forty users, and beyond the
@@ -988,11 +989,29 @@ component that triggers it; the device then showed one initialisation instead of
 project.** It is a lifecycle race between a navigation library and a React ref,
 with correct types, passing integration tests and a functioning browser build.
 
-**What the device run did *not* establish.** Only Android was exercised — no iOS
-build has been launched, so the keychain session and the image picker are proven
-on one platform of two. Native `hive://` deep links remain unverified on either:
-route-group resolution was checked through a browser URL, which does not
-traverse the operating system's linking path.
+**iOS, 16 August.** The application was subsequently run on a **physical
+iPhone**, through Expo Go on Expo SDK 54, against the same backend over the
+local network — `EXPO_PUBLIC_API_URL` repointed from `localhost` to the
+development machine's LAN address, with `/health` answering `"database":"ok"`
+and `"cache":"ok"` from that address. All three roles were signed in — admin,
+teacher and parent, across both seeded schools — and the corresponding
+functionality was driven through each. No defect was observed.
+
+Two qualifications are stated deliberately, because both bear on how much the
+run proves. **Nothing was captured:** there is no recording, screenshot set or
+retained log, so this is an observed pass rather than an artefact, and unlike
+the Android run it contributes no figure to §4.3. And the application ran
+**inside the Expo Go container**, not as a standalone build, so while the native
+`expo-secure-store` and image-picker paths did execute — rather than the web
+fallbacks exercised in the browser — they executed under Expo Go's bundle
+identifier and entitlements rather than the application's own.
+
+**What the device runs did *not* establish.** Native `hive://` deep links
+remain unverified on both platforms. Route-group resolution was checked through
+a browser URL, which does not traverse the operating system's linking path, and
+Expo Go serves the bundle under the `exp://` scheme, so the iOS run could not
+exercise the application's own scheme either. Closing this needs a standalone
+build — `expo run:ios` or an EAS build — on either platform.
 
 ---
 
@@ -1238,15 +1257,20 @@ Stated explicitly; each is evidenced in Table 3.6.
    at 50 virtual users the binding constraint was the project's own per-identity
    rate limiter rather than the application, so no unconstrained throughput or
    latency number has been obtained, and none has been estimated.
-3. **iOS is unverified, and native deep links with it.** The application *has*
-   been driven end to end on a physical Android device, which closed most of what
-   this limitation formerly covered — the keychain-backed session, the image
-   picker, upload progress, role routing and privacy scoping are all proven on
-   hardware, and seven defects were found there that no other method surfaced
-   (§3.3.8). What remains unproven: no iOS build has been launched, so those
-   platform behaviours hold for one platform of two; and `hive://` deep links are
-   unverified on either, because route-group resolution was checked through a
-   browser URL rather than the operating system's linking path.
+3. **Native deep links are unverified, and the iOS evidence is weaker than the
+   Android evidence.** This limitation formerly read "iOS is unverified"; both
+   platforms have now run on hardware. The Android run was the substantial one —
+   the keychain-backed session, the image picker, upload progress, role routing
+   and privacy scoping are all proven there, seven defects were found that no
+   other method surfaced, and it supplies the application figures in §4.3
+   (§3.3.8). The iOS run, on 16 August, exercised all three roles on a physical
+   iPhone but through Expo Go rather than a standalone build, and **nothing was
+   captured** — so it is an observed pass, and the native paths ran under Expo
+   Go's container rather than the application's own bundle identifier. What
+   remains genuinely unproven is `hive://` deep linking, on **both** platforms:
+   route-group resolution was checked through a browser URL rather than the
+   operating system's linking path, and Expo Go serves under `exp://`, so the
+   iOS run could not reach the application's scheme either.
 4. ~~The error-reporting pipeline has never carried an error.~~ **Closed on
    16 August.** A Sentry project was created, `SENTRY_DSN` supplied, and the
    backend now logs *"Sentry initialised"* where it previously took its no-op

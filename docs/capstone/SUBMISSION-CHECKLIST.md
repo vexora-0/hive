@@ -196,8 +196,16 @@ Items 1, 2 and 5 need nothing from anyone else.
 - **Claim 30/30 on the security script.** It is 29 passed, 0 failed, **1
   skipped** (16 Aug; 27/0/2 on 11 Aug, 26/0/3 on 1 Aug). The remaining skip is
   HTTPS, and it needs a deployment — nothing else will close it.
-- **Say "fully working".** It works locally and on a physical Android device.
-  Nothing is deployed, and iOS has never been launched.
+- **Say "fully working".** It works locally, on a physical Android device, and —
+  since 16 August — on a physical iPhone. Nothing is deployed, and the iOS run
+  was through Expo Go rather than a standalone build, with nothing captured.
+- **Overstate the iOS run.** It is real and it covered all three roles, but it
+  is an *observed pass*: no recording, no screenshots, no retained log, so it
+  contributes no figure to §4.3 and nothing fails if it regresses. It also ran
+  inside Expo Go's container, so the native paths executed under Expo Go's
+  bundle identifier, not the application's. Android remains the substantial
+  device evidence. If asked which platform is properly verified, the answer is
+  Android.
 - **Undersell the device testing.** It is no longer true that nothing has run on
   hardware, and the report said so in five places after it had stopped being
   true. Seven defects were found on the device — one of them, a root layout

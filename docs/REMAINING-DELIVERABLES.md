@@ -223,11 +223,15 @@ the failing file alone before believing it.
   print is ₹30, so two is `total_cents: 6000` = **₹60**. The `*_cents` columns
   are named historically and hold paise. Every graded document said `$9.98`
   until 16 August.
-- **Do not say the app has never run on a device.** It has, on Android. The
-  report said otherwise in five places while Figure 2.7 showed it running.
+- **Do not say the app has never run on a device.** It has, on Android, and
+  since 16 August on a physical iPhone as well. The report said otherwise in
+  five places while Figure 2.7 showed it running. Equally, **do not overstate
+  the iOS run** — Expo Go rather than a standalone build, nothing captured, so
+  Android remains the substantial device evidence.
 - **Do not invent a performance number.** See §3d.
 - **Do not claim 30/30 on the security script.** It is 29 passed, 0 failed,
-  **2 skipped**.
+  **1 skipped** (16 Aug; 27/0/2 on 11 Aug, 26/0/3 on 1 Aug). The remaining skip
+  is HTTPS, which only a deployment closes.
 - **Do not rewrite git history.** The commit log is graded evidence — Report
   Chapter 5, and 5 marks for attendance rest on 422 commits over 151 days.
   Commits follow the `Area: <area> (<Owner>)` convention, which decides author

@@ -143,7 +143,7 @@ worth more than any diagram.
 | | |
 |---|---|
 | **Language** | TypeScript 5.4 (strict) |
-| **Frameworks** | React Native / Expo SDK 51 · Express 4.19 |
+| **Frameworks** | React Native 0.81 / Expo SDK 54 · Express 4.19 |
 | **Database** | PostgreSQL 15 via Supabase — RLS, triggers, 20 migrations |
 | **Storage** | Supabase Storage, private bucket, signed URLs |
 | **Tools** | Zod · TanStack Query · Zustand · sharp · Redis · Vitest + Supertest · k6 · Docker · GitHub Actions · pnpm + Turborepo |
