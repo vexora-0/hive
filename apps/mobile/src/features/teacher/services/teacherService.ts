@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { apiRequest, ApiError } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
@@ -70,11 +71,34 @@ export async function uploadPhotoFile(
   const token = sessionData.session?.access_token;
 
   const formData = new FormData();
-  formData.append('file', {
-    uri: localUri,
-    type: contentType,
-    name: filename,
-  } as unknown as Blob);
+
+  if (Platform.OS === 'web') {
+    // ── Web ──────────────────────────────────────────────────────────
+    //
+    // Browsers have no `{uri, type, name}` convention. `FormData.append` takes
+    // a Blob or a string and **stringifies anything else**, so the React Native
+    // shape below arrives at the server as a text field containing the literal
+    // "[object Object]". Multer then finds no file part and the request fails
+    // with `400 No file provided` — which is what it did, on web only, while
+    // the same code worked on a device.
+    //
+    // The picker hands back a `blob:` or `data:` URL here, and `fetch` reads
+    // both, so the file is pulled back into a real Blob and appended as one.
+    const response = await fetch(localUri);
+    const blob = await response.blob();
+    formData.append('file', blob, filename);
+  } else {
+    // ── iOS / Android ────────────────────────────────────────────────
+    //
+    // The native FormData implementation resolves this shape by reading the
+    // file off disk, which is what keeps a 4MB photograph out of JavaScript
+    // memory. Do not "fix" this branch to match the web one.
+    formData.append('file', {
+      uri: localUri,
+      type: contentType,
+      name: filename,
+    } as unknown as Blob);
+  }
 
   await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();

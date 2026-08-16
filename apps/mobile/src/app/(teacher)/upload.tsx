@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -11,6 +12,7 @@ import { Text, Button, Chip } from '@/components/ui';
 import { ScreenContainer } from '@/components/layout';
 import { HeaderBar } from '@/components/navigation';
 import { Reveal } from '@/components/animation';
+import { Bo } from '@/components/mascot';
 import { StackOfPrints } from '@/components/illustration';
 import { SkeletonShimmer, useToast } from '@/components/feedback';
 import { ClassSelector, type ClassItem } from '@/components/forms/ClassSelector';
@@ -217,7 +219,11 @@ export default function UploadScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      // `MediaTypeOptions.Images` is deprecated in SDK 54 and routes through
+      // `mapDeprecatedOptions`, which is the `parseMediaTypes` warning that
+      // opens the console every time the picker is used. The array form is the
+      // current API and behaves identically.
+      mediaTypes: ['images'],
       allowsMultipleSelection: true,
       selectionLimit: remaining,
       quality: 0.8,
@@ -355,6 +361,39 @@ export default function UploadScreen() {
     setSelectedStudentIds([]);
   }, [lockedStudentIds, completedCount, resetUpload]);
 
+  /**
+   * A finished batch does not survive leaving the screen.
+   *
+   * Before this, the only thing that cleared a completed batch was the "Share
+   * more" button. Switching to Class and back left the teacher looking at last
+   * batch's "Sent" ticks and "Shared with 1 family", with the primary action
+   * reading "Share more" instead of offering to choose photographs — so the
+   * screen appeared stuck on a job that was already done.
+   *
+   * Two things this deliberately does **not** do:
+   *
+   *  - It never touches a batch that is still going. A teacher who switches
+   *    tabs mid-upload comes back to their upload, not to an empty screen.
+   *  - It banks the tag ledger on the way out, by going through the same
+   *    `handleShareMore` the button uses. The "Today so far" counts are the
+   *    session's coverage record — the answer to "who have I still not
+   *    photographed" — and dropping them on a tab switch would quietly lose
+   *    the one number this screen exists to accumulate.
+   */
+  const completedBatchRef = useRef(false);
+  completedBatchRef.current = isComplete;
+  const clearBatchRef = useRef(handleShareMore);
+  clearBatchRef.current = handleShareMore;
+
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        if (completedBatchRef.current) clearBatchRef.current();
+      },
+      [],
+    ),
+  );
+
   // A batch can also end by being emptied: every photograph in it failed and
   // the teacher dropped them one by one. There is no batch left to protect, so
   // the freeze lifts and the next one starts clean — otherwise the rail stays
@@ -448,12 +487,15 @@ export default function UploadScreen() {
           />
         )}
 
-        {/* Finished. A checkmark and a sentence — the batch already spent its
-            one Success haptic, and a teacher runs this flow every working day.
-            Anything louder becomes a delay by Wednesday. */}
+        {/* Finished. A small cheering Bo and a sentence — and deliberately
+            **no confetti**, which is the one thing on this screen the playful
+            revamp did not add. The batch already spent its one Success haptic,
+            and a teacher runs this flow every working day: anything louder
+            becomes a delay by Wednesday. A 44px bee with her arms up is warmth
+            that costs no time. */}
         {isComplete && (
           <Reveal scale style={styles.doneRow}>
-            <Ionicons name="checkmark-circle" size={22} color={colors.success.main} />
+            <Bo pose="cheer" size={44} />
             <Text variant="bodySmallBold" color={colors.success.main}>
               {`Shared with ${taggedCount} famil${taggedCount === 1 ? 'y' : 'ies'}`}
             </Text>
