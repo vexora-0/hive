@@ -17,8 +17,11 @@
 
 **Project Title:** Hive — A Privacy-First Photo Sharing Platform for Preschools
 
-**Student Name(s) & Roll Number(s):** «Your name — roll number»
-*(Team: Srujan, Ruthwik, Bhargav, Nagachaitanya)*
+**Student Name(s) & Roll Number(s):**
+Dharma Srujan Reddy (2023ebcs634) ·
+Vanapala Naga Chaitanya Varma (2023ebcs662) ·
+Chikoti Ruthwik (2023ebcs675) ·
+Munigonda Bhargav (2023ebcs724)
 
 **Program:** BSc Computer Science (Online Mode)
 
@@ -26,7 +29,7 @@
 
 **Academic Year:** 2025–2026
 
-**Internal Supervisor:**
+**Internal Supervisor:** Prof Raj Kumar
 
 ---
 
@@ -37,7 +40,7 @@ Photo Sharing Platform for Preschools"** is an original work carried out by
 me/us and has not been submitted to any other university or institution for the
 award of any degree.
 
-«Signature» · «Date»
+Signature: _______________________________    Date: ____________________
 
 ---
 

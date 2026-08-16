@@ -19,9 +19,9 @@
 
 **Hive — A Privacy-First Photo Sharing Platform for Preschools**
 
-Presented by: «Your name — roll number»
+Presented by: Munigonda Bhargav (2023ebcs724)
 Team members: Srujan · Ruthwik · Bhargav · Nagachaitanya
-Under the guidance of: «Supervisor name»
+Under the guidance of: Prof Raj Kumar
 BSc Computer Science (Online Mode) — 2025–2026
 
 **Say:** *"Hive lets preschool teachers share classroom photos with parents,
