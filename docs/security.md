@@ -123,14 +123,15 @@ From the Week 14 audit. Severity is the audit's.
 | **G-L3** | `auth.ts` logged `req.ip` on every invalid token. | Low | Removed | `security(obs): stop logging client IPs…` |
 | **G-L4** | `auth.ts` logged the raw error object, which can embed the request and its bearer token. | Low | `err.message` only | same commit |
 | **G-39** | No error tracking. | Medium | Sentry with PII scrubbing, both apps | `feat(obs): integrate Sentry with PII scrubbing…` |
+| **S-16** | `createOrder` attributed the order to `req.user.schoolId` rather than to the school that owns the photograph. Because `mapParentToStudent` back-fills a parent's `school_id` only when empty, a parent with children at two schools had every order filed under whichever school linked them first — so **an admin at school A could list an order for a school B photograph**, including the parent's shipping address, in their own fulfilment queue. Scoped deliberately: the leak is order metadata, not photo content, because `withThumbnailUrls` is reached only from the parent-scoped `getOrderById`, so no signed URL for the other school's photograph was ever issued to that admin. Authorization to *order* was never wrong — that is by photo tag. | Medium | Derive the school from `photos.school_id` (`NOT NULL`); refuse a cross-school basket with 400 `ORDER_SPANS_SCHOOLS` | `fix(orders): file an order under the photo's school` (16 Aug) |
 
 ### ⚠ Open
 
 | ID | Finding | Severity | Owner |
 |---|---|---|---|
-| **G-45** | Supabase's default SMTP is rate-limited to a handful of emails an hour, so **OTP delivery fails under any real load** — including a live demo. Unowned. | Medium | Plan 01 Step 8 |
-| **G-S10** | `CORS_ORIGINS` defaults to `*`. Must be set explicitly at deploy time. | Medium | Plan 09 |
-| **S-15** | Supabase project ref committed at `supabase/README_MIGRATIONS.md:20`; keys not yet rotated. | Low | Plan 11 |
+| **G-45** | Supabase's default SMTP is rate-limited to a handful of emails an hour, so **OTP delivery fails under any real load**. **Accepted, 16 Aug — out of project scope.** Not remediated. It is accepted only because no path in this project sends an OTP: every demo and test account signs in with a password. Any deployment that enables email sign-in inherits this finding unmitigated and must configure custom SMTP first. | Medium | Accepted — was Plan 01 Step 8 |
+| **G-S10** | `CORS_ORIGINS` defaults to `*`. Must be set explicitly at deploy time. **Untriggered rather than fixed**: deployment is out of scope as of 16 Aug, so no origin is ever configured and the default is never exercised in anger. The defect stands for whoever deploys first. | Medium | Deferred with deployment |
+| **S-15** | Supabase project ref committed at `supabase/README_MIGRATIONS.md:20`; keys not yet rotated. **Accepted, 16 Aug.** The ref identifies a project, not a credential; the service-role key is gitignored and was never committed. Rotation remains advisable before any public release. | Low | Accepted |
 
 **G-01 has been closed** and is no longer listed here. A parent placed a real
 order — 201, `total_cents: 998` for 2 × `print_4x6` at 499 — and a repeated
@@ -221,7 +222,7 @@ Stated plainly. Every one of these is a real gap.
 
 1. **⚠ Signed URLs are bearer credentials.** Anyone holding one can fetch the photo until it expires, with no further check — so their lifetime is the security parameter, and forwarding one forwards the photo. This is the residue of G-02, not a regression: it is the accepted trade-off of the private-bucket design.
 2. **OTP lockout is client-side only.** `useOTP.ts` tracks attempts and lockout in React state, which resets on remount and is absent entirely from a modified client. The real protection is Supabase's own rate limiting. The lockout UI is a courtesy to honest users, not a control.
-3. **OTP delivery is rate-limited by Supabase's default SMTP (G-45)** and no custom SMTP is configured, so codes stop arriving under load. Unowned, and it fails during a live demo.
+3. **OTP delivery is rate-limited by Supabase's default SMTP (G-45)** and no custom SMTP is configured, so codes stop arriving under load. **Accepted as out of scope on 16 August** — not fixed. The reasoning is narrow and worth stating precisely: no path this project demonstrates or tests sends an OTP, because every account signs in with a password, so the rate limit is never reached. That makes the finding *unreachable here*, not *absent*. Enabling email sign-in re-exposes it immediately.
 4. **No audit log.** There is no record of who viewed which photo, or who changed a role. For a product handling children's images this is the most significant *missing* control rather than a broken one — a breach could not be scoped after the fact.
 5. **No 2FA**, including for admin accounts.
 6. **No account lockout or breach-password checking** on the seeded password accounts.
@@ -232,7 +233,7 @@ Stated plainly. Every one of these is a real gap.
 9. **No password reset flow for the admin account.** Recovery means re-running
    `pnpm seed:admin` with new environment values.
 10. **Authorization is enforced in application code, not the database, on the API path.** This is a consequence of the service-role key and it means a new endpoint that forgets its ownership check is insecure by default. RLS would be secure by default. Rewriting the backend to use per-request user tokens would fix this class of bug outright, and is the single change that would most improve this system's security posture. It was not attempted within the project's scope.
-11. **The §4 fixes are now observed behaviour, not reviewed code** — see §9 for the run and its limits. What remains true is narrower: nothing has been verified against a *deployed* instance over HTTPS, because nothing is deployed.
+11. **The §4 fixes are now observed behaviour, not reviewed code** — see §9 for the run and its limits. What remains true is narrower: nothing has been verified against a *deployed* instance over HTTPS, because nothing is deployed — and as of 16 August deployment is out of scope, so this will not change. It is a permanent limitation of this submission rather than a pending task, which is why the security script's honest result is **29 passed, 0 failed, 1 skipped** and must never be quoted as 30/30.
 12. **No audit of who has held a signed URL.** Related to item 1: because signed URLs are bearer credentials and there is no audit log, a leaked URL leaves no trace either at issue time or at use time.
 
 ---

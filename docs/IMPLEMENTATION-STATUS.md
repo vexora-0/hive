@@ -212,13 +212,22 @@ guard does nothing unless the variable exists.
   assertion anywhere fails if it regresses. It is evidence that the screens and
   flows work on real hardware; it is not a per-gap verification record, and it
   does not tick anything in §4 on its own.
-  **Deep links are the exception and stay unproven** — Expo Go serves the bundle
-  under `exp://`, so the app's own `hive://` scheme was never exercised. That
-  needs `expo run:ios` or an EAS build, and Plan 04's mobile deep-link checks
-  remain unticked.
-- **Nothing is deployed** — no hosted URL, no APK. CI itself *does* run: 43
-  workflow runs on 1 Aug, 26 green, each building the Docker image. What has
-  never happened is a deployment, not a build.
+  **Deep links were closed separately on 16 August, and on Android only.**
+  Neither device run registered `hive://`, because Expo Go serves under
+  `exp://` — confirmed by measurement, the scheme answering *No activity
+  found*. A standalone build (`expo run:android`, 12m 16s) was then installed,
+  after which the OS resolves `hive://` to `com.hive.app.MainActivity` and
+  routes it both cold and warm, with an unauthenticated link correctly
+  redirected to login. Two pieces remain: the authenticated-link target screen,
+  which the automation harness could not reach, and iOS. Plan 04's mobile
+  deep-link checks are therefore partly, not fully, satisfied.
+- **Nothing is deployed, and deployment is now out of scope** (16 Aug). No
+  hosted URL, no APK, no `eas.json`, and none planned. CI itself *does* run: 43
+  workflow runs on 1 Aug, 26 green, each building the Docker image — what never
+  happened is a deployment, not a build. The consequences are kept visible
+  rather than dropped: the HTTPS check in `verify-security.sh` stays skipped
+  (29/0/**1**, never 30/30), the k6 numbers are a local measurement and are
+  labelled so, and CP-5 is not met.
 
 ---
 
@@ -232,10 +241,10 @@ guard does nothing unless the variable exists.
 | ~~G-26, G-28…G-33~~ | Bhargav · Plan 07 | **Done.** Toasts on all nine admin mutations, confirm dialogs on all six destructive actions, empty states, onboarding and 404 placeholders replaced, schools routes split into validator/service/controller, controllers all throw `AppError`. See the plan's Deviations. |
 | **Plan 10 / 11 (Bhargav's share)** | — | **Done.** README rewritten against the real stack — it described a Flutter app. Added `user-flows.md` (diagram G-6), `docs/README.md` index and `demo-script.md`. Remaining on this side is deployment only: Render, the EAS APK and the demo video. |
 | **8a, 8b** | Ruthwik / Srujan | Plan 07 polish needing API changes: the feed does not return the uploader's name, and order items carry only `photoId` so no thumbnail can be rendered. Both need an endpoint to return more, not UI work. |
-| **G-45** | unowned | Plan 01 Step 8 — custom SMTP. Supabase's default is rate-limited to a few emails an hour, so **OTP delivery will fail mid-demo**. Dashboard task, no code fix. Lower priority now that teacher/parent can sign in with a password. |
+| ~~**G-45**~~ | — | **Out of scope, 16 August.** Custom SMTP was never done and will not be. Every demo and test account signs in with a password, so no demonstrated path sends an OTP and Supabase's default rate limit cannot bite. This is a scope decision, not a fix: the limitation is still real for any deployment that turns email sign-in on, and `docs/security.md` keeps it recorded as accepted. |
 | ~~**T-23 fails**~~ | Ruthwik · Plan 08 | **Closed and confirmed green.** It was a defect in the test, not the product: `createTestPhoto` wrote a row with no object behind it, and `confirmUpload` calls `fileExistsInStorage` and 404s when the object is absent. `2928b76` made the helper upload a real fixture. `photos.test.ts > notifies tagged children's parents` — the only automated guard on G-07 — now passes, as part of 79 of 79. |
 | **S-15** | Plan 11 | Supabase project ref committed; keys not rotated. |
-| **Two-school parents file every order under one school** | Ruthwik | **Found 13 Aug while writing the order tests; not fixed.** `createOrder` files the order under `req.user.schoolId`, and `mapParentToStudent` back-fills a parent's `school_id` only when it is absent — deliberate, and its own comment says so. So a parent with children at two schools has every order attributed to whichever school linked them first: the second school's admin never sees those orders in their fulfilment queue, and the first sees an order for a photo that is not theirs. The school should come from the ordered photo, not the buyer's profile. |
+| ~~**Two-school parents file every order under one school**~~ | Ruthwik (fixed by Bhargav) | **Fixed 16 August.** `createOrder` took the school from `req.user.schoolId`, and `mapParentToStudent` back-fills a parent's `school_id` only when it is absent — deliberate, and its own comment says so. A parent with children at two schools therefore had every order attributed to whichever school linked them first: the second school's admin never saw those orders in their fulfilment queue, and the first saw an order for a photo that was not theirs. Authorization was never wrong — that is by photo tag — only attribution was. The school now comes from `photos.school_id` (`NOT NULL`), and a basket spanning two schools is refused with **400 `ORDER_SPANS_SCHOOLS`** rather than silently attributed, because one order row carries one `school_id`. **Three tests added and proven by mutation**: reintroducing the old line fails "files an order under the photo's school" and "shows that order to the photo school's admin", and both pass again on the fix. `orders.test.ts` is 40 of 40. ⚠️ **Crosses the ownership map** — `order.service.ts` is Ruthwik's; done at Bhargav's direction, and Ruthwik should review it. |
 | — | Bhargav | ~~Create the first `.env`.~~ **Done 1 Aug** — dev environment runs, 19 migrations applied. |
 | — | Bhargav | ~~Create the `hive-test` Supabase project.~~ **Done** — `sdbiuzuyipneioceqysm`, 19 migrations applied, suite runs. |
 | — | — | ~~Seed data.~~ **Done** — the seed photographs landed in `abe853a` and the dataset is loaded. This was the last infrastructure blocker; everything remaining is ordinary work. |
@@ -249,8 +258,8 @@ guard does nothing unless the variable exists.
 | **CP-1** | App compiles · no "Coming Soon" · no credentials in repo | ✔ **Met.** |
 | **CP-2** | Order placeable · private storage with thumbnails · role guards · IDORs closed | ✔ **Met.** All four verified at runtime — order placed with correct cents and working idempotency, photos private with thumbnails and signed URLs, role guards returning 403, cross-school IDOR closed. |
 | **CP-3** | Demo seed on a fresh DB · test harness runs | ✔ **Met.** Seed loads schools, classes, students, parents, 6 photos with thumbnails and 16 notifications. Harness runs against a separate project. |
-| **CP-4** | 36 tests green · CI on every PR | ✔ **Met. 218 tests across 8 files** since `3b2f4c4` (13 Aug); 178 of 178 green when re-run 9 Aug. Includes 20 authorization tests and the `orders`/`admin` files Plan 08 specified but nobody wrote. T-23 is fixed. The suite has also been shown to *detect* — see the sabotage exercise in §4. **Two caveats:** the CI test step is `continue-on-error` until `TEST_SUPABASE_*` exist as repository secrets, so the suite still gates nothing on a PR; and the 40 tests `3b2f4c4` added for the 9 Aug work were not proven by mutation, because the sandbox refused edits under `src/`. One known flake — see §10. |
-| **CP-5** | Deployed and reachable · Sentry receiving · docs complete | ✗ Nothing deployed. |
+| **CP-4** | 36 tests green · CI on every PR | ✔ **Met. 218 tests across 8 files** since `3b2f4c4` (13 Aug); 178 of 178 green when re-run 9 Aug. Includes 20 authorization tests and the `orders`/`admin` files Plan 08 specified but nobody wrote. T-23 is fixed. The suite has also been shown to *detect* — see the sabotage exercise in §4. **The CI caveat is gone:** `68021c4` removed `continue-on-error`, the `TEST_SUPABASE_*` secrets exist, and the suite went green in CI at 218 across 8 files in 373.86 s — so the tests now genuinely block a pull request alongside lint, typecheck and build. **One caveat remains:** the 40 tests `3b2f4c4` added for the 9 Aug work were not proven by mutation, because the sandbox refused edits under `src/`. The three added on 16 Aug for the two-school order fix *were* — see §6. One known flake — see §10. |
+| **CP-5** | Deployed and reachable · Sentry receiving · docs complete | ✗ **Not met, and will not be.** Deployment was descoped on 16 Aug, so the first clause cannot be satisfied. The other two are: Sentry has carried a real event (`fce17b7`), and the documentation set is complete. Recorded as unmet rather than redefined — moving the goalposts to claim a checkpoint would be worse than missing it. |
 | **CP-6** | Manual QA green · demo rehearsed · submission pack | ✗ |
 
 ---
@@ -267,22 +276,35 @@ than anything else here; check §4 before trusting it.*
    and cursor-validation fixes are all server-side and testable with the
    existing harness, so this is cheap and it is the only one of these items that
    needs nobody's account or credit card.
-1. **Deploy.** The largest remaining gap, and now the blocker on three separate
-   verification items: HTTPS and CORS still skip in `verify-security.sh`, the
-   k6 suite has no target, and there is no APK. Bhargav, Plan 09 Step 6.
-2. **Run `verify-security.sh` against the deployed URL** once it exists. The
-   1 Aug run was against a local stack, which proves the authorization logic but
-   says nothing about how a hosted project is configured. `verify:env` prints
-   the environment; `STRICT=1` makes skips count so CI can gate on it.
-3. **Make the CI test step blocking.** The step exists as of 2 Aug but carries
-   `continue-on-error: true`, because it needs `TEST_SUPABASE_URL`,
-   `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` as **repository
-   secrets** before it can go red on failure. Until somebody adds them, 218
-   passing tests still guard nothing on a pull request.
-4. **Drive the app on a device.** Nothing has been seen rendered.
-5. **Sentry has never received an error.** Needs a DSN. Account signup, not code.
-6. **Plan 01 Step 8 (SMTP).** Unowned. Lower priority than it was — teacher and
-   parent can now sign in with a password, so OTP is no longer the only way in.
+**Re-checked 16 Aug, and six of the seven items below are gone.** Items 1 and 2
+were descoped rather than done; 3, 4 and 5 were done; 6 was descoped. What is
+left is the submission itself.
+
+1. ~~**Deploy.**~~ **Out of scope, 16 Aug.** Not deferred — decided against. The
+   project is demonstrated locally and on hardware over the LAN. The
+   consequences stay on the record: HTTPS still skips in `verify-security.sh`
+   (29/0/**1**), the k6 figures are local and labelled so, there is no APK, and
+   CP-5 is unmet.
+2. ~~**Run `verify-security.sh` against the deployed URL.**~~ Moot — see above.
+   The local run stands as what it is: proof of the authorization logic, not
+   evidence about a hosted configuration.
+3. ~~**Make the CI test step blocking.**~~ **Done** (`68021c4`). The
+   `TEST_SUPABASE_*` secrets exist and no workflow step allows failure; the
+   suite went green in CI at 218 across 8 files in 373.86 s.
+4. ~~**Drive the app on a device.**~~ **Done** — physical Android, and a
+   physical iPhone on 16 Aug. See §5 for what each run does and does not prove.
+5. ~~**Sentry has never received an error.**~~ **Done** (`fce17b7`) — issue
+   `HIVE-BACKEND-1`, event `8a5130bf`, with the `beforeSend` scrubber exercised
+   on a real transported event.
+6. ~~**Plan 01 Step 8 (SMTP).**~~ **Out of scope, 16 Aug.** Every demo and test
+   account signs in with a password, so no demonstrated path sends an OTP.
+   Recorded as an accepted limitation in `docs/security.md` rather than deleted.
+7. **What actually remains is the submission pack**, not the software: PDF
+   export and the page numbers in the two lists, the demonstration video link in
+   §4.4 and Appendix D, and the supervisor remarks in §5.3. Two product items
+   are still open and neither is mine to close — the feed does not return the
+   uploader's name, and order items carry only `photoId` so no thumbnail can be
+   rendered (8a/8b, Ruthwik and Srujan).
 
 ---
 
@@ -650,8 +672,9 @@ The same caveat as §5, and it applies to all of the above:
   skipping. Both fixed in `701c999`; see `docs/security.md` §9.
 - **The rate-limit rekeying is untested under load.** Keying on a hash of the
   bearer token is a behaviour change to a security control, verified by reading.
-- **Nothing is deployed.** No hosted URL, no APK, no `eas.json` in the tree.
-  Unchanged since §5.
+- **Nothing is deployed, and deployment is out of scope** as of 16 Aug. No
+  hosted URL, no APK, no `eas.json` in the tree, and none planned. See §5 for
+  what that leaves permanently unverified.
 
 ---
 

@@ -811,7 +811,7 @@ suite *and* found a test that was not testing anything.
 | **Deployment** | No hosted URL or application binary | HTTPS and CORS-origin checks skipped |
 | **Capacity under load** | 50-VU run bound by the per-identity rate limiter, not the application | Smoke figures exist and pass; **no unconstrained throughput or latency figure** (§3.3.6) |
 | **iOS** | Run on a physical iPhone through Expo Go on 16 August, not as a standalone build; nothing captured | All three roles exercised, so the platform is no longer unexercised — but the evidence is an observed pass with no artefact, and the native paths ran under Expo Go's container rather than the application's own bundle identifier (§3.3.8) |
-| **Native deep links** | `hive://` never opened through the operating system | Route-group resolution verified through a browser URL instead |
+| **Native deep links** | **Largely closed on 16 August.** The operating system now routes `hive://` into the application on Android; what remains unshown is the post-authentication screen resolution | Measured against the connected handset, before and after installing a standalone build. **Before:** `pm list packages` showed `host.exp.exponent` but no `com.hive.app`, `resolve-activity … "hive://feed"` answered *No activity found*, and the intent failed with *unable to resolve Intent* — the earlier device runs used Expo Go, which serves under `exp://`, so the scheme had never been registered. **After** `expo run:android` (BUILD SUCCESSFUL, 12m 16s): the scheme resolves to `com.hive.app.MainActivity`; a cold start from `am start -a android.intent.action.VIEW -d "hive://feed"` launches the app with that activity top-resumed; a second firing reports *intent has been delivered to currently running top-most instance*; and an unauthenticated link is correctly redirected to the login screen by the auth gate. **Not shown:** that an authenticated link resolves to the target screen — the sign-in could not be typed reliably under automation (Gboard's Google Translate mode rewrote the input, and the controlled `TextInput` drops injected characters), which is a harness limitation, not an application finding. iOS remains unexercised: Expo Go serves under `exp://` there |
 | **Server-side HEIC conversion** | `sharp`'s prebuilt libvips has no HEVC decoder | Cannot work, and does not. Tested 24 July against a real HEVC HEIC. Handled by a device-side transcode instead; the server refuses HEVC with an actionable 400 |
 | **Mobile error reporting** | `EXPO_PUBLIC_SENTRY_DSN` unset | Server-side reporting is proven (§6.3 item 4); the client is not |
 
@@ -1006,12 +1006,32 @@ the Android run it contributes no figure to §4.3. And the application ran
 fallbacks exercised in the browser — they executed under Expo Go's bundle
 identifier and entitlements rather than the application's own.
 
-**What the device runs did *not* establish.** Native `hive://` deep links
-remain unverified on both platforms. Route-group resolution was checked through
-a browser URL, which does not traverse the operating system's linking path, and
-Expo Go serves the bundle under the `exp://` scheme, so the iOS run could not
-exercise the application's own scheme either. Closing this needs a standalone
-build — `expo run:ios` or an EAS build — on either platform.
+**Native deep links, 16 August.** Both device runs above used Expo Go, which
+serves the bundle under `exp://`, so neither registered the application's own
+`hive://` scheme — a fact confirmed rather than assumed: with only Expo Go
+installed, `cmd package resolve-activity -a android.intent.action.VIEW -d
+"hive://feed"` answered *No activity found* and firing the intent failed with
+*unable to resolve Intent*.
+
+A standalone Android build was then produced with `expo run:android` — Expo
+prebuild followed by a Gradle debug build, BUILD SUCCESSFUL in 12 m 16 s — and
+installed on the same handset. Repeating the measurement:
+
+- the scheme resolves to `com.hive.app.MainActivity`;
+- a cold start (`am force-stop`, then the `VIEW` intent for `hive://feed`)
+  launches the application, with `topResumedActivity=com.hive.app/.MainActivity`;
+- firing the intent again reports *intent has been delivered to currently
+  running top-most instance*, so warm delivery works as well as cold;
+- an unauthenticated link is redirected to the login screen, which is the auth
+  gate behaving correctly rather than a routing failure.
+
+**What this still does not establish.** That an *authenticated* deep link
+resolves to its target screen was not shown, and the reason is the harness
+rather than the application: the device keyboard was in Google Translate mode,
+which rewrote injected text, and with the input method disabled the controlled
+`TextInput` dropped characters faster than React could reconcile them, so a
+clean sign-in could not be typed. iOS is also unexercised — Expo Go serves under
+`exp://` there too, and no standalone iOS build was produced.
 
 ---
 
@@ -1267,10 +1287,15 @@ Stated explicitly; each is evidenced in Table 3.6.
    iPhone but through Expo Go rather than a standalone build, and **nothing was
    captured** — so it is an observed pass, and the native paths ran under Expo
    Go's container rather than the application's own bundle identifier. What
-   remains genuinely unproven is `hive://` deep linking, on **both** platforms:
-   route-group resolution was checked through a browser URL rather than the
-   operating system's linking path, and Expo Go serves under `exp://`, so the
-   iOS run could not reach the application's scheme either.
+   remains unproven is narrower than it was. `hive://` deep linking **was
+   closed on Android on 16 August**: a standalone build was produced with
+   `expo run:android` and installed, after which the operating system resolves
+   the scheme to `com.hive.app.MainActivity` and routes it both cold and warm,
+   with an unauthenticated link correctly redirected to login (§3.3.8). Two
+   things are still outstanding — that an *authenticated* link resolves to its
+   target screen, which the automation harness could not type a clean sign-in
+   to reach, and iOS, where no standalone build was produced and Expo Go serves
+   under `exp://`.
 4. ~~The error-reporting pipeline has never carried an error.~~ **Closed on
    16 August.** A Sentry project was created, `SENTRY_DSN` supplied, and the
    backend now logs *"Sentry initialised"* where it previously took its no-op

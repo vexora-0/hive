@@ -90,7 +90,7 @@ export async function createOrder(
   // are permanent once ordered: order_items.photo_id is ON DELETE RESTRICT.
   const { data: orderablePhotos, error: photoStatusError } = await supabaseAdmin
     .from('photos')
-    .select('id')
+    .select('id, school_id')
     .in('id', photoIds)
     .eq('status', 'ready');
 
@@ -108,6 +108,43 @@ export async function createOrder(
       409,
       'PHOTO_UNAVAILABLE',
     );
+  }
+
+  // The order belongs to the school that took the photographs, not to whichever
+  // school happens to sit on the buyer's profile.
+  //
+  // `schoolId` here is `req.user.schoolId`, and for a parent that field is
+  // back-filled by `mapParentToStudent` only when it is empty — deliberately, so
+  // a second mapping cannot silently move a parent between schools. The
+  // consequence for a parent with children at two schools was that every order
+  // was filed under whichever school linked them first: the other school's admin
+  // never saw those orders in the fulfilment queue, and the first school saw an
+  // order for a photograph that was not theirs. Nothing rejected it, because
+  // authorization is by photo tag — which was correct — and attribution was by
+  // profile, which was not.
+  const photoSchoolIds = new Set(
+    (orderablePhotos ?? []).map((p) => p.school_id as string),
+  );
+
+  // One order carries one school_id, so a basket spanning two schools has no
+  // correct answer. Refuse it rather than pick one; the client can place an
+  // order per school.
+  if (photoSchoolIds.size > 1) {
+    throw new AppError(
+      'An order cannot combine photos from more than one school',
+      400,
+      'ORDER_SPANS_SCHOOLS',
+    );
+  }
+
+  const orderSchoolId = [...photoSchoolIds][0] as string;
+
+  if (orderSchoolId !== schoolId) {
+    logger.info('Order filed under the photo school rather than the buyer profile', {
+      parentId,
+      profileSchoolId: schoolId,
+      orderSchoolId,
+    });
   }
 
   // 2. Calculate server-side prices
@@ -149,7 +186,7 @@ export async function createOrder(
   const { error: rpcError } = await supabaseAdmin.rpc('create_order_with_items', {
     p_order_id: orderId,
     p_parent_id: parentId,
-    p_school_id: schoolId,
+    p_school_id: orderSchoolId,
     p_idempotency_key: idempotencyKey ?? uuidv4(),
     p_shipping_address: shippingAddress,
     p_notes: notes ?? null,
@@ -173,14 +210,14 @@ export async function createOrder(
   });
 
   // Fire-and-forget: notify school admins about the new order
-  notifyAdminsOfNewOrder(schoolId, orderId, items.length, subtotal).catch(
+  notifyAdminsOfNewOrder(orderSchoolId, orderId, items.length, subtotal).catch(
     (err) => logger.error('Failed to notify admins of new order', { error: String(err), orderId }),
   );
 
   return {
     id: orderId,
     parent_id: parentId,
-    school_id: schoolId,
+    school_id: orderSchoolId,
     status: 'pending',
     shipping_address: shippingAddress,
     notes: notes ?? null,

@@ -32,6 +32,7 @@ describe('orders', () => {
   let teacher: TestUser, parent: TestUser, otherParent: TestUser;
   let admin: TestUser, otherAdmin: TestUser, platformAdmin: TestUser;
   let otherSchoolParent: TestUser;
+  let twoSchoolParent: TestUser;
   let child: string, otherChild: string;
   let photoId: string, otherPhotoId: string;
 
@@ -58,6 +59,15 @@ describe('orders', () => {
     await linkParent(parent.id, child);
     await linkParent(otherParent.id, otherChild);
     await linkParent(otherSchoolParent.id, otherChild);
+
+    // A parent with one child at each school. Their profile carries `school`,
+    // because `mapParentToStudent` back-fills school_id only when it is empty,
+    // so the second link leaves the first school in place. Ordering a photo
+    // from the *other* school is therefore the case where attribution by
+    // profile and attribution by photo disagree.
+    twoSchoolParent = await createTestUser('parent', school);
+    await linkParent(twoSchoolParent.id, child);
+    await linkParent(twoSchoolParent.id, otherChild);
 
     // A photo the parent may order: tagged with their own child, and ready.
     photoId = await createTestPhoto({
@@ -455,6 +465,58 @@ describe('orders', () => {
       .set(bearer(parent.token));
     expect(res.status).toBe(403);
   });
+
+  /**
+   * A parent with children at two schools used to have every order filed under
+   * whichever school linked them first, because `createOrder` took the school
+   * from `req.user.schoolId`. The second school's admin never saw the order in
+   * their fulfilment queue, and the first school's admin saw an order for a
+   * photograph that was not theirs. Authorization was never wrong — it is by
+   * photo tag — only the attribution was.
+   */
+  it('files an order under the photo\'s school, not the buyer\'s profile', async () => {
+    const res = await placeOrder(twoSchoolParent, orderBody(otherPhotoId));
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.school_id).toBe(otherSchool);
+    expect(res.body.data.school_id).not.toBe(school);
+  }, 30_000);
+
+  it('shows that order to the photo school\'s admin and not the buyer school\'s', async () => {
+    const placed = await placeOrder(twoSchoolParent, orderBody(otherPhotoId));
+    expect(placed.status).toBe(201);
+    const id = placed.body.data.id;
+
+    const rival = await request(app)
+      .get('/api/v1/admin/orders?limit=50')
+      .set(bearer(otherAdmin.token));
+    expect(rival.status).toBe(200);
+    expect(rival.body.data.some((o: { id: string }) => o.id === id)).toBe(true);
+
+    const own = await request(app)
+      .get('/api/v1/admin/orders?limit=50')
+      .set(bearer(admin.token));
+    expect(own.status).toBe(200);
+    expect(own.body.data.some((o: { id: string }) => o.id === id)).toBe(false);
+  }, 30_000);
+
+  /**
+   * One order row carries one school_id, so a basket spanning two schools has
+   * no correct attribution. Refusing is the honest answer; silently picking one
+   * is the defect above wearing a different hat.
+   */
+  it('refuses a basket that spans two schools', async () => {
+    const res = await placeOrder(twoSchoolParent, {
+      items: [
+        { photoId, productType: 'print_4x6', quantity: 1 },
+        { photoId: otherPhotoId, productType: 'print_4x6', quantity: 1 },
+      ],
+      shippingAddress: '1 Test Street, Testville',
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('ORDER_SPANS_SCHOOLS');
+  }, 30_000);
 
   it('lists the school\'s orders for its admin', async () => {
     const mine = await placeOrder();

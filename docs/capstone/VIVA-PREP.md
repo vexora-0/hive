@@ -309,9 +309,17 @@ asked.
 and that is where seven defects were found, including one the browser could not
 expose: the root layout remounting 145 times into a blank screen. On iOS, no
 build has been launched, so the keychain session and the image picker are proven
-on one platform of two. Native `hive://` deep links are unverified on either —
-route groups were checked through a browser URL, which does not go through the
-operating system's linking path. Report §3.3.8 has the detail.
+on one platform of two — though the application was run on a physical iPhone
+through Expo Go on 16 August, with all three roles exercised and nothing
+captured, so treat that as an observed pass rather than evidence. Native
+`hive://` deep links **were closed on Android on 16 August**: with only Expo Go
+installed the scheme answered *No activity found*, so a standalone build was
+produced with `expo run:android` and installed, after which the operating system
+resolves `hive://` to `com.hive.app.MainActivity` and routes it both cold and
+warm, with an unauthenticated link correctly redirected to login. Two pieces are
+still open and worth volunteering: the authenticated-link target screen, which
+the automation could not type a clean sign-in to reach, and iOS. Report §3.3.8
+has the detail.
 
 **"You said 29 security checks passed — so it's secure?"** — 29 passed, 0 failed,
 **1 skipped** (16 August; 27/0/2 on 11 August, 26/0/3 on 1 August). The one skip

@@ -247,7 +247,7 @@ like an omission.
 |---|---|
 | **Not deployed** | No hosted URL, no app binary |
 | **No capacity figure** | k6 *has* run locally — smoke passes every threshold, feed page 3,908 B. But at 50 VU the limit hit was our own rate limiter, not the app, so there is no unconstrained number |
-| **iOS unverified; native deep links unverified** | Run end to end on a physical **Android** device — that is where seven defects were found (slide 8a). iOS not launched; `hive://` never opened through the OS |
+| **iOS evidence is thin; deep links partly closed** | Run end to end on a physical **Android** device — that is where seven defects were found (slide 8a). iOS ran on a physical iPhone via Expo Go on 16 Aug, all three roles, but nothing was captured, so it is an observed pass. `hive://` now routes through the OS on Android from a standalone build; the authenticated-link target screen and iOS remain open |
 
 **Say:** *"Deployment is the first item of future work, because it is the single
 step that unlocks the other four."*

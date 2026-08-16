@@ -148,11 +148,14 @@ is still unwired — `EXPO_PUBLIC_SENTRY_DSN` is unset — and the report says s
 repository and point at `hive-test`. 218 tests now block a merge alongside lint,
 typecheck and build.
 
-| Task | Blocks | Effort |
+**All three tasks that stood here are out of scope as of 16 August.** They were
+descoped, not completed, and the difference is kept visible below.
+
+| Descoped task | What it permanently leaves open | Why it is acceptable |
 |---|---|---|
-| **Deploy the backend** | CP-5; the 2 remaining skips in `verify-security.sh` (HTTPS, CORS); any real capacity figure | Plan 09 Step 6 |
-| **Build an APK** (`eas.json` does not exist) | CP-5 | Plan 09 |
-| **G-45 custom SMTP** | Supabase's default is rate-limited; OTP will fail mid-demo | Dashboard task, unowned |
+| ~~**Deploy the backend**~~ | CP-5 unmet; the HTTPS skip in `verify-security.sh` — so **29 passed, 0 failed, 1 skipped**, never 30/30; no unconstrained capacity figure | The rubric has no deployment criterion. The performance marks are already claimed from the local k6 run, labelled as local |
+| ~~**Build an APK**~~ (`eas.json` does not exist) | CP-5 unmet; no shareable binary; native `hive://` deep links unprovable without a standalone build | The demonstration runs from a development build on real hardware, which is what the figures in §4.3 are captures of |
+| ~~**G-45 custom SMTP**~~ | Supabase's default mailer stays rate-limited, so email sign-in would fail under any real load | No demonstrated path sends an OTP — every demo and test account signs in with a password. Retained as an accepted limitation in `docs/security.md`, not deleted |
 
 ### 3d. Known-open, documented, not blocking
 

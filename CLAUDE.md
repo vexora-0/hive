@@ -146,15 +146,20 @@ nothing runs; create them from the `.env.example` templates first.
 
 ### What is left
 
-1. **Nothing is deployed** — no hosted URL, no APK, no `eas.json` in the tree.
-   Bhargav, Plan 09 Step 6. This is the blocker on three verification items:
-   the HTTPS and CORS checks in `verify-security.sh`, and the k6 suite.
-2. **The CI test step is `continue-on-error: true`.** It does exist and does
-   run — `.github/workflows/ci.yml` has run `pnpm --filter @hive/backend test`
-   since 2 August — but it cannot go red until `TEST_SUPABASE_URL`,
-   `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` exist as repository
-   secrets. Until then 218 passing tests still guard nothing on a pull request.
-   Lint, typecheck and build are blocking.
+1. ~~**Nothing is deployed.**~~ **Out of scope, 16 August — a decision, not an
+   achievement.** No hosted URL, no APK, no `eas.json`, and none is now
+   planned. The project is demonstrated locally and on hardware over the LAN.
+   Three things follow and must be stated rather than quietly dropped: the
+   HTTPS check in `verify-security.sh` stays skipped, so the honest score is
+   **29 passed, 0 failed, 1 skipped** and never 30/30; the k6 figures are a
+   local measurement, labelled as such; and CP-5 is not met. None of this costs
+   marks — the rubric has no deployment criterion — but claiming otherwise
+   would.
+2. ~~**The CI test step is `continue-on-error: true`.**~~ **Done** — `68021c4`
+   removed it. No workflow step allows failure now: the `TEST_SUPABASE_*`
+   secrets exist and the suite went green in CI at **218 passed across 8 files
+   in 373.86 s**. Lint, typecheck, build and the tests all block a pull
+   request.
 3. ~~**Nothing has been seen on a device.**~~ **Done, 16 August — on a physical
    iPhone.** Expo Go, SDK 54, talking to the local backend over the LAN; all
    three roles signed in and their functionality driven across both demo
@@ -162,20 +167,35 @@ nothing runs; create them from the `.env.example` templates first.
    the keychain-backed session, the image picker and `AppState` transitions are
    no longer unverified where they ship. Two caveats, both real. **Nothing was
    captured** — no recording, no screenshots, no logs kept — so it is an
-   observed pass, and nothing fails if it regresses. And **deep links are still
-   unproven**: Expo Go serves under `exp://`, so the app's `hive://` scheme was
-   never exercised, and Plan 04's mobile deep-link checks remain unticked. That
-   needs `expo run:ios` or an EAS build. Setup notes: `EXPO_PUBLIC_API_URL`
-   must be the Mac's LAN IP, not `localhost` — on the phone `localhost` is the
-   phone.
+   observed pass, and nothing fails if it regresses. And **deep links were closed
+   separately, on Android only.** Expo Go serves under `exp://`, so neither
+   device run registered `hive://` — verified, not assumed: the scheme answered
+   *No activity found*. A standalone build via `expo run:android` (12m 16s) was
+   installed, after which the OS resolves `hive://` to
+   `com.hive.app.MainActivity` and routes it cold and warm, with an
+   unauthenticated link correctly bounced to login. Still open: the
+   authenticated-link target screen, and iOS. Setup notes:
+   `EXPO_PUBLIC_API_URL` must be the Mac's LAN IP, not `localhost` — on the
+   phone `localhost` is the phone. Two automation traps cost an hour — Gboard's
+   Google Translate mode silently rewrites injected text, and RN's controlled
+   `TextInput` drops characters under fast `adb input`; type one character at a
+   time.
 4. **The web file picker was never driven end to end.** The tagging gate and
    the class default were checked in the browser; an actual file upload through
    the web picker was not completed. The pipeline itself is covered by the API
    tests.
 5. ~~**`scripts/verify-security.sh` needs re-running.**~~ **Done, 11 August** —
    27 passed, 0 failed, 2 skipped. See the paragraph above.
-6. **Sentry has never received an error**, and **G-45 custom SMTP** is unowned.
-   Both are account signups rather than code changes.
+6. ~~**Sentry has never received an error**, and **G-45 custom SMTP** is
+   unowned.~~ **Both closed, 16 August, by different routes.** Sentry is
+   genuinely done — project created, `SENTRY_DSN` supplied, issue
+   `HIVE-BACKEND-1` / event `8a5130bf` delivered, and the `beforeSend` scrubber
+   exercised on a real transported event (`fce17b7`). **G-45 custom SMTP is out
+   of scope** — not done, decided against. Every demo and test account signs in
+   with a password; OTP is not on any path being demonstrated, so Supabase's
+   default rate limit cannot bite. It stays recorded as an accepted limitation
+   in `docs/security.md`, because descoping a known limitation is not the same
+   as it not existing.
 7. ~~**Redis has no timeout and no health check.**~~ **Fixed 9 August in
    `1f09cf8`.** The fault was `maxRetriesPerRequest: null`, left behind by the
    removed BullMQ: combined with ioredis's offline queue, a command issued while
