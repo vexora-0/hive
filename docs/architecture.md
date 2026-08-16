@@ -153,7 +153,7 @@ sequenceDiagram
 
     T->>API: POST /photos/:id/file
     API->>API: sharp — verify magic bytes
-    API->>API: AVIF → JPEG; HEVC HEIC refused (400)
+    API->>API: AVIF → JPEG, HEVC HEIC refused (400)
     API->>S: upload original
     API->>API: 400px thumbnail + blurhash
     API->>S: upload thumbnail
