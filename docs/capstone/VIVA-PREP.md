@@ -138,15 +138,45 @@ Reverse them and every parent notification silently disappears — the demo look
 fine and the feature is dead. That ordering bug was real, and it is now the
 thing the seed script comments most loudly about.
 
-### "Why integer cents?"
+### "Why integer minor units?"
 
 Because floats lose money. The concrete failure: columns were `decimal(10,2)`
-documented as USD, the API wrote cents into them, and the client priced in
-dollars and rendered `toFixed(2)`. A **$4.99 print stored `299.00` and displayed
-as $299.00** — a 100× error in the direction that overcharges the customer.
+documented as USD, the API wrote integer cents into them, and the client priced
+in dollars and rendered `toFixed(2)`. The **$2.99 digital download stored
+`299.00` and displayed as $299.00** — a 100× error in the direction that
+overcharges the customer.
 
-Now integer cents everywhere, converted to dollars exactly once, at render, in a
-single helper. There is a test asserting the mobile and backend catalogues agree.
+**If they quote "$4.99" back at you from migration `00017`:** that comment
+crosses two products, and you should say so rather than defend it. The July
+catalogue had `print_4x6` at 499 cents and `digital_download` at 299 — a $4.99
+print would have stored `499.00`, not `299.00`. Same mechanism, same hundredfold
+error, but the pair as written in that comment is not self-consistent. It is
+flagged in Report §2.4.2. Owning a wrong comment costs nothing; defending one
+you cannot reconcile costs the whole answer.
+
+Now integer minor units everywhere, converted to a display string exactly once,
+at render, in a single helper. There is a test asserting the mobile and backend
+catalogues agree.
+
+### "Your column is called `total_cents` but the app shows ₹. Which is it?"
+
+**Rupees.** The catalogue was re-priced for the Indian market during the
+interface revision of 13 August — a 4×6 print is ₹30, a photo book ₹499 — and
+money is stored as integer **paise**. So `total_cents: 6000` is ₹60.
+
+The column names were left alone deliberately. They hold whatever the minor unit
+of the current currency is; renaming them means a migration, a regenerated
+`supabase.ts` and a sweep through every service, for no behavioural gain. The
+same reasoning leaves `photos.s3_key` holding a Supabase Storage path.
+
+If pressed on whether that is good practice: no, and the honest answer is that
+a column named for a unit it no longer holds is a trap for the next reader. It
+is recorded in §2.4.2 rather than hidden, and the rename is cheap to do the next
+time the schema is touched for another reason.
+
+**Do not say the display helper is `formatCents`.** It is `formatRupees`, and it
+groups the Indian way — `12,34,567`, not `1,234,567` — hand-rolled because
+Hermes ships without full ICU on Android unless the build opts in.
 
 ### "Why is order creation a database function?"
 

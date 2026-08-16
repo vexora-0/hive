@@ -46,7 +46,7 @@ you have these.
 | Aspect | Marks | Evidence |
 |---|---|---|
 | Feature completeness | 10 | Three roles end to end; 40 endpoints; upload → tag → feed → order → notify |
-| Functional correctness | 10 | Report Table 3.3 — order 201 with correct cents, idempotency, atomicity, notifications, privacy scoping |
+| Functional correctness | 10 | Report Table 3.3 — order 201 with correct paise, idempotency, atomicity, notifications, privacy scoping |
 | Code quality | 5 | TypeScript strict, Zod at every boundary, `pnpm lint` 0 errors, CI on every push |
 | Tech stack | 5 | Report §2.2 — including what was *removed* and why |
 
@@ -117,7 +117,7 @@ than a missing one.
 | 2.6 | Parent feed — Rajesh, child switcher expanded | Two children — the many-to-many model |
 | — | Feed after switching child | Different photos — scoping is live |
 | — | Photo detail | Signed URL rendering, blurhash placeholder |
-| 2.7 | Order sheet + confirmation | **$9.98** for 2 × $4.99 — correct cents |
+| 2.7 | Order detail sheet | **2 × ₹30 → ₹60** and **1 × ₹99 → ₹99**, total **₹159** — per-line arithmetic *and* the total, plus per-item signed thumbnails. Captured on a physical Android device |
 | — | Order history with thumbnails | Signed per-item URLs |
 | — | Notifications list | "New photo of Diya Kumar" — trigger-generated |
 | 2.8 | Admin dashboard | Non-zero counts |
@@ -132,7 +132,7 @@ than a missing one.
 | 3.4 | **Rajesh's feed beside Vikram's** | 2 vs 1, zero overlap |
 | 3.5 | **Signed URL 200 beside stripped-token 400** | Private bucket |
 | — | Cross-school `curl` → **403** | G-08 |
-| — | Order POST → **201**, `total_cents: 998` | G-01 |
+| — | Order POST → **201**, `total_cents: 6000` — ₹60 | G-01 |
 | — | Same idempotency key → same order ID | Idempotency |
 | 4.1 | `/health` 200, then **503** with database stopped | Degradation detected |
 | 5.1 | Commit history — 376 commits | Version control evidence |
@@ -186,6 +186,13 @@ Items 1, 2 and 5 need nothing from anyone else.
 
 - **Invent a performance number.** One unsourced figure discredits every sourced
   one, and a viva will find it.
+- **Quote an order total in dollars.** The catalogue was re-priced in rupees on
+  13 August (`d08fa4a`). A 4×6 print is ₹30, so 2 of them is `total_cents: 6000`
+  = **₹60** — re-verified 16 Aug against a freshly built backend. Every graded
+  document said `$9.98` / `998` until then, which a screenshot of the order sheet
+  would have contradicted on the very figure that carries the correctness marks.
+  The columns are still named `*_cents` and hold paise; §2.4.2 and `VIVA-PREP.md`
+  both explain why, and a viva is likely to ask.
 - **Claim 29/29 on the security script.** It is 27 passed, 0 failed, **2
   skipped** (11 Aug; 26/0/3 on 1 Aug). One skip needs a deployment (HTTPS); the
   other needs `FORCE_500_PATH` **and** `NODE_ENV=production`.

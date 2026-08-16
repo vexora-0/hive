@@ -186,8 +186,8 @@ Open a photograph URL — **200**. Strip `?token=` — **400**. The bucket is
 private; only signed access works.
 
 **5 · Order (≈60 s)**
-Place an order → **201**, `total_cents: 998` for 2 × 499. Re-send the same
-idempotency key → **the same order**, not a duplicate.
+Place an order → **201**, `total_cents: 6000` for 2 × `print_4x6` at ₹30 —
+**₹60**. Re-send the same idempotency key → **the same order**, not a duplicate.
 
 **6 · Administration (≈45 s)**
 Dashboard with real counts.
@@ -203,7 +203,7 @@ Dashboard with real counts.
 | Automated tests | **218 / 218 passing** (115 s was timed on the preceding 178-test suite) |
 | Security verification | **27 passed · 0 failed · 2 skipped** — reproduced from cold |
 | Privacy: 6 photographs | Rajesh sees **2**, Vikram **1**, **zero overlap** |
-| Order placement | **201**, `total_cents: 998` — integer cents |
+| Order placement | **201**, `total_cents: 6000` — **₹60**, integer paise |
 | Idempotency | Same key twice → **the same order** |
 | Atomicity | Invalid item → rejected, **no orphaned order** |
 | Notifications | 16 generated, correct parents, correct child names |
@@ -231,9 +231,11 @@ like an omission.
 
 - **The ordering contract** — field naming, product vocabulary and currency unit
   each disagreed across three layers. Every layer was internally consistent, so
-  no unit test could have caught it. A **$4.99** print stored `299.00` and
-  displayed as **$299.00**. Fixed with one shared catalogue, server-side pricing,
-  and an integer-cent migration.
+  no unit test could have caught it. A **$2.99** digital download stored `299.00`
+  and displayed as **$299.00** — a hundredfold overcharge. Fixed with one shared
+  catalogue, server-side pricing, and an integer-minor-unit migration.
+  *(The catalogue was later re-priced in rupees, which is why the demonstration
+  shows ₹ — the columns are still named `*_cents` and now hold paise.)*
 - **A guard that failed open** — the suite truncates every table; the guard meant
   to stop it running against the demo database compared a variable that was never
   set. Its own comment called it "deliberately loud and unconditional". It was

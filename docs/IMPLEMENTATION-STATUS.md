@@ -138,7 +138,7 @@ file, so it must never be generated for a caller who is about to be refused.
 | **`pnpm test` with the new file** | **79 passed, 0 failed**, 5 files. T-23 now passes; the fixture fix landed in `2928b76` |
 | **`/health` with the database unreachable** | **503**, `"status":"degraded"`, `"checks":{"database":"error"}`. Supabase was stopped mid-run. Previously listed as untested |
 | **Rate limiter** | **429 at request 77** of the 100-per-15-minute window — the window was already partly consumed by the verification run, which is the interference the script now names explicitly |
-| **G-01 order placement** | **Confirmed fixed.** A parent placed a real order end to end: `POST /api/v1/orders` → 201 with `total_cents: 998` for 2 × `print_4x6` at 499. Integer cents, no float. Sending the same `x-idempotency-key` twice returned the **same order** rather than duplicating. Test orders removed afterwards; demo data is back to 0 orders |
+| **G-01 order placement** | **Confirmed fixed.** A parent placed a real order end to end: `POST /api/v1/orders` → 201 with `total_cents: 998` for 2 × `print_4x6` at 499. Integer minor units, no float. Sending the same `x-idempotency-key` twice returned the **same order** rather than duplicating. Test orders removed afterwards; demo data is back to 0 orders. **Re-verified 16 Aug against a freshly built backend, after the 13 Aug re-pricing (`d08fa4a`): 201 with `total_cents: 6000` for 2 × `print_4x6` at 3000 — ₹60, since the catalogue is now integer paise. Idempotency re-confirmed: the same key returned the same order id. The 998/499 figures above are the July observation in USD cents and no longer describe the running system** |
 
 ---
 
