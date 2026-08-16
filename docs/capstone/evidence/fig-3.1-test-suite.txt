@@ -4,10 +4,10 @@ $ pnpm --filter @hive/backend test
 
  Test Files  8 passed (8)
       Tests  218 passed (218)
-   Duration  245.00s
+   Duration  245.00s (transform 153ms, setup 201ms, import 1.86s, tests 242.33s, environment 0ms)
 
 $ pnpm --filter @hive/mobile test
 
  Test Files  6 passed (6)
       Tests  100 passed (100)
-   Duration  281ms
+   Duration  281ms (transform 201ms, setup 90ms, import 372ms, tests 33ms, environment 0ms)

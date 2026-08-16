@@ -1,11 +1,9 @@
-$ curl -s -w "HTTP %{http_code}" http://localhost:4000/health
+$ curl -s -w "\nHTTP %{http_code}\n" http://localhost:4000/health
+{"status":"ok","service":"hive-backend","version":"1.0.0","uptimeSeconds":9296,"timestamp":"2026-08-16T04:37:33.862Z","checks":{"database":"ok","cache":"ok"}}
 HTTP 200
-{"status":"ok","service":"hive-backend","version":"1.0.0",
- "checks":{"database":"ok","cache":"ok"}}
 
-$ # same build, database host made unreachable
+$ # same build, second instance, database host made unreachable:
 $ PORT=4100 SUPABASE_URL="https://hive-db-unreachable.invalid" node dist/index.js &
-$ curl -s -w "HTTP %{http_code}" http://localhost:4100/health
+$ curl -s -w "\nHTTP %{http_code}\n" http://localhost:4100/health
+{"status":"degraded","service":"hive-backend","version":"1.0.0","uptimeSeconds":8,"timestamp":"2026-08-16T04:37:33.889Z","checks":{"database":"error","cache":"ok"}}
 HTTP 503
-{"status":"degraded","service":"hive-backend","version":"1.0.0",
- "checks":{"database":"error","cache":"ok"}}

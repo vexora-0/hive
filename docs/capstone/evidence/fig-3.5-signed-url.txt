@@ -1,10 +1,7 @@
-$ # signed URL obtained from GET /api/v1/feed
+$ curl -s -o /dev/null -D - "$SIGNED_URL"
+HTTP/2 200 
+content-type: image/jpeg
+content-length: 42497
 
-$ curl -o /dev/null -w "%{http_code}" "<signed-url>?token=..."
-200 OK    content-type: image/jpeg    bytes: 42497
-
-$ curl -o /dev/null -w "%{http_code}" "<same URL, ?token= stripped>"
-400 Bad Request
-{"statusCode":"400","error":"Error",
- "message":"querystring must have required property 'token'",
- "code":"InvalidRequest"}
+$ curl -s "${SIGNED_URL%%\?*}"          # same URL, ?token= stripped
+{"statusCode":"400","error":"Error","message":"querystring must have required property 'token'","code":"InvalidRequest"}

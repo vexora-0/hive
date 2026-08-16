@@ -1,6 +1,10 @@
 $ eval "$(pnpm --filter @hive/backend verify:env | grep '^export')"
 $ RUN_RATE_LIMIT_CHECK=1 ./scripts/verify-security.sh
 
+  [excerpt — sections 4 to 10 of 10. Sections 1-3 (G-02 storage, G-04
+   photo detail, G-04b feed scoping) scrolled off; their 8 PASS lines are
+   included in the totals below.]
+
 4. G-08 — cross-school access
   PASS  teacher X listing school Y's classes -> 403 (got 403)
   PASS  teacher X listing photos for a class at school Y -> 403 (got 403)
