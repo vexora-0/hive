@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAppState } from '@/hooks/useAppState';
@@ -6,6 +6,24 @@ import { useAuthStore } from '../stores/authStore';
 import type { ProfileWithRole } from '../services/authService';
 import { getRoleRoute } from '@/types/navigation';
 import { logger } from '@/utils/logger';
+
+/**
+ * Whether the one-time auth bootstrap has already run in this JS context.
+ *
+ * **Module scope, deliberately — not a `useRef`.** `app/_layout.tsx` renders
+ * `null` while `isLoading` is true, and the root layout is itself a route
+ * component: returning `null` destroys the `<Stack>`, and with no navigator
+ * expo-router tears down and re-creates the root route. `RootLayout` therefore
+ * remounts as a *fresh instance* with fresh refs, so a `useRef` guard reset on
+ * every remount and let `initialize()` run again — setting `isLoading` true,
+ * rendering `null`, and remounting once more. That loop never settled: the app
+ * sat on a blank screen with no error, no crash and nothing in the logs but the
+ * bootstrap starting over. Observed at 145 remounts in a single session.
+ *
+ * The bootstrap is a once-per-process concern, so the flag has to outlive the
+ * component that triggers it.
+ */
+let hasBootstrapped = false;
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -34,13 +52,11 @@ export function useSession() {
     initialize,
   } = useAuthStore();
 
-  // Track whether we've already run the initial bootstrap.
-  const initializedRef = useRef(false);
 
   // ── Bootstrap on mount ───────────────────────────────────────────────
   useEffect(() => {
-    if (!initializedRef.current) {
-      initializedRef.current = true;
+    if (!hasBootstrapped) {
+      hasBootstrapped = true;
       initialize();
     }
   }, [initialize]);
