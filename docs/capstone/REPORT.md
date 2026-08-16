@@ -770,7 +770,27 @@ A passing suite proves nothing until it has been made to fail deliberately. One
 line — the uploader comparison in `assertPhotoAccess` — was deleted and the suite
 re-run.
 
-**Result:** exactly the three same-school ownership tests failed, as intended.
+**Result, when the exercise was first performed:** exactly the three same-school
+ownership tests failed, as intended.
+
+**Repeated on 16 August, it now fails five** — the guard has gained coverage
+since. `218 tests | 5 failed | 213 passed`:
+
+| File | Test | Expected | Got |
+|---|---|---|---|
+| `authorization.test.ts` | refuses confirming a colleague's photo | 403 | **200** |
+| `authorization.test.ts` | refuses tagging on a colleague's photo | 403 | **200** |
+| `authorization.test.ts` | refuses overwriting a colleague's photo file | 403 | **200** |
+| `photos.test.ts` | rejects a same-school colleague archiving another teacher's photo | 403 | **204** |
+| `photos.test.ts` | rejects a colleague untagging a student from another teacher's photo | 403 | **204** |
+
+The two additional failures are the archive and untag cases added on 2 August
+when the object lifecycles were completed. They route through the same
+`assertPhotoAccess` guard, so deleting one line now breaks five tests across two
+files rather than three in one. **Every other test stayed green** — the sabotage
+is precise, not merely destructive, which is the property that makes the exercise
+worth anything. The line was restored immediately afterwards and the working tree
+verified clean.
 
 **And it exposed a genuine problem.** A similarly-named test in `photos.test.ts`
 remained **green** — because both of its teachers belonged to *different* schools,

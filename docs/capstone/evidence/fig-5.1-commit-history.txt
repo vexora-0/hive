@@ -1,0 +1,21 @@
+$ git log --oneline | wc -l
+424
+
+$ git shortlog -sn --no-merges
+   140	Bhargav
+    99	Nagachaitanya
+    95	Ruthwik
+    82	Srujan
+
+$ git log --format=%ad --date=short | sort -u | wc -l    # active days
+151
+
+$ git log --oneline -8
+9c3276f docs: record what is left before submission
+689d9b9 docs(capstone): record the device verification and run the load tests
+4787aa5 fix(orders): notify admins in rupees, not dollars
+a1f455b fix(orders): say why the place-order button is disabled
+223dec1 fix(ui): stop the unread badge biting a hole in the tab puck
+4b0410c fix(ui): retry a photograph that fails to load
+65c6dee docs(ui): record how the revamp was actually landed
+1c5423f fix(admin): stop the dashboard counting what it should not
