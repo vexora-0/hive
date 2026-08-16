@@ -90,9 +90,8 @@ export default function OrdersScreen() {
     staleTime: STALE_TIME_MS,
   });
 
-  // The sheet only opens once the photo has loaded, so a failed lookup used to
-  // mean the parent tapped "Order a print", landed on this tab, and nothing at
-  // all happened — no sheet, no message.
+  // A failed lookup used to mean the parent tapped "Order a print", landed on
+  // this tab, and nothing at all happened — no sheet, no message.
   useEffect(() => {
     if (photoForOrderError && orderPhotoId) {
       toast.error("Couldn't load that photo. Please try again.");
@@ -246,10 +245,27 @@ export default function OrdersScreen() {
         <OrderDetailSheet orderId={selectedOrderId} onClose={handleDetailClose} />
 
         {/* Order creation bottom sheet */}
+        {/*
+          Opens on the tap, **not on the fetch.**
+
+          `isVisible` used to include `!!photoForOrder`, which meant the sheet
+          waited for `getPhotoDetails` to come back before it appeared. When
+          that request is warm — the photo viewer has already fetched the same
+          photo — it is instant and nobody notices. When it is cold, the parent
+          taps "Order a print", watches the app navigate to a list of their past
+          orders, and then a sheet arrives on top of it a moment later. It reads
+          as the button having gone to the wrong place.
+
+          The sheet now opens immediately and the thumbnail fills in behind it.
+          There is nothing to wait for: the product list, the prices and the
+          address field are all local, and the photograph is decoration in a
+          40px square. `HiveImage` shows its own placeholder for an empty uri,
+          so the gap is a soft rectangle rather than a broken image.
+        */}
         <OrderBottomSheet
           photoId={orderPhotoId ?? ''}
           photoUri={photoForOrder?.uri ?? ''}
-          isVisible={orderSheetVisible && !!orderPhotoId && !!photoForOrder}
+          isVisible={orderSheetVisible && !!orderPhotoId}
           onClose={handleOrderSheetClose}
         />
 
