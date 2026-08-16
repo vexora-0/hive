@@ -185,6 +185,15 @@ def main() -> int:
     # and their page column is filled once pagination is final.
     md = re.sub(r"\n# TABLE OF CONTENTS\n.*?(?=\n# LIST OF FIGURES\n)", "\n", md, flags=re.S)
 
+    # Strip the working note under the title. It is guidance to whoever is
+    # assembling the document — "«…» marks what I cannot supply" — and has no
+    # business in a submitted report. Also strip the FORMATTING CHECKLIST at the
+    # end, which is instructions to the typesetter, not content.
+    # `>.*` not `> .*` — the blockquote contains bare `>` separator lines, and
+    # requiring the space stops the match at the first one.
+    md = re.sub(r"(^# Hive — Capstone Report\n)\n(>.*\n)+", r"\1", md, flags=re.M)
+    md = re.sub(r"\n# FORMATTING CHECKLIST\n.*?(?=\n# |\Z)", "\n", md, flags=re.S)
+
     # Table captions -> a real Word caption style, so the LIST OF TABLES can be
     # generated from them. They are plain bold paragraphs in the markdown, which
     # Word cannot collect.

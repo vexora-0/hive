@@ -26,7 +26,7 @@
 
 **Academic Year:** 2025–2026
 
-**Internal Supervisor:** «Supervisor name»
+**Internal Supervisor:**
 
 ---
 
@@ -1148,37 +1148,37 @@ Supervisor remarks to be completed by the supervisor.)*
 
 | Week | Task planned | Task completed | Supervisor remark |
 |---|---|---|---|
-| 1 | Project foundations, first tables | Repository, tooling, `schools`, `profiles` | «» |
-| 2 | Core schema and privacy model | Classes, students, parent-student mapping | «» |
-| 3 | Data security, backend configuration | RLS policies, triggers, environment validation | «» |
-| 4 | Authentication, access control, storage | JWT middleware, role guard, storage bucket | «» |
-| 5 | Photograph, feed and notification services | Upload, tagging, scoped feed, notifications | «» |
-| 6 | Ordering, idempotency, seed data | Order service, Redis idempotency | «» |
-| 7 | Administration API, server assembly | Administration endpoints, application bootstrap | «» |
-| 8 | Client infrastructure, shared hooks | API client, query configuration, stores | «» |
-| 9 | Authentication UI, onboarding | Login, OTP entry, onboarding carousel | «» |
-| 10 | Navigation, media, animation | Tab bar, image components, animations | «» |
-| 11 | Teacher upload experience | Upload screen, student tagger, progress | «» |
-| 12 | Parent feed and ordering interface | Feed, child switcher, order sheets | «» |
-| 13 | Notifications, administration console | Notification centre, administration screens | «» |
-| 14 | Audit, planning, credential hygiene | 46-defect audit; credentials moved to environment | «» |
-| 15 | Private storage, image processing | Private bucket, signed URLs, thumbnails, blurhash | «» |
-| 16 | Feed query, upload ordering, type recovery | Query rewrite; tag-before-confirm; type regeneration | «» |
-| 17 | Observability, containerisation, load tests | Request IDs, structured logs, Dockerfile, k6 suite | «» |
-| 18 | API consistency, architecture documentation | Unified error surface; architecture chapter | «» |
-| 19 | Test harness and feed coverage | Vitest + Supertest harness; feed tests | «» |
-| 20 | Photograph tests, compile blocker | Photograph tests; 22 type errors addressed | «» |
-| 21 | Zero type errors | Both packages compile clean | «» |
-| 22 | Authorization | Cross-family, cross-school and ownership checks | «» |
-| 23 | The order contract | Shared catalogue, integer cents, atomic creation | «» |
-| 24 | Demonstration data and documentation | Seed script with photographs and orders | «» |
-| 25 | First real execution | Migrations applied; suite run; security script run | «» |
+| 1 | Project foundations, first tables | Repository, tooling, `schools`, `profiles` |  |
+| 2 | Core schema and privacy model | Classes, students, parent-student mapping |  |
+| 3 | Data security, backend configuration | RLS policies, triggers, environment validation |  |
+| 4 | Authentication, access control, storage | JWT middleware, role guard, storage bucket |  |
+| 5 | Photograph, feed and notification services | Upload, tagging, scoped feed, notifications |  |
+| 6 | Ordering, idempotency, seed data | Order service, Redis idempotency |  |
+| 7 | Administration API, server assembly | Administration endpoints, application bootstrap |  |
+| 8 | Client infrastructure, shared hooks | API client, query configuration, stores |  |
+| 9 | Authentication UI, onboarding | Login, OTP entry, onboarding carousel |  |
+| 10 | Navigation, media, animation | Tab bar, image components, animations |  |
+| 11 | Teacher upload experience | Upload screen, student tagger, progress |  |
+| 12 | Parent feed and ordering interface | Feed, child switcher, order sheets |  |
+| 13 | Notifications, administration console | Notification centre, administration screens |  |
+| 14 | Audit, planning, credential hygiene | 46-defect audit; credentials moved to environment |  |
+| 15 | Private storage, image processing | Private bucket, signed URLs, thumbnails, blurhash |  |
+| 16 | Feed query, upload ordering, type recovery | Query rewrite; tag-before-confirm; type regeneration |  |
+| 17 | Observability, containerisation, load tests | Request IDs, structured logs, Dockerfile, k6 suite |  |
+| 18 | API consistency, architecture documentation | Unified error surface; architecture chapter |  |
+| 19 | Test harness and feed coverage | Vitest + Supertest harness; feed tests |  |
+| 20 | Photograph tests, compile blocker | Photograph tests; 22 type errors addressed |  |
+| 21 | Zero type errors | Both packages compile clean |  |
+| 22 | Authorization | Cross-family, cross-school and ownership checks |  |
+| 23 | The order contract | Shared catalogue, integer cents, atomic creation |  |
+| 24 | Demonstration data and documentation | Seed script with photographs and orders |  |
+| 25 | First real execution | Migrations applied; suite run; security script run |  |
 
 ## 5.3 Supervisor interaction summary
 
 | Review date | Key feedback received | Action taken |
 |---|---|---|
-| «» | «» | «» |
+|  |  |  |
 
 *(Complete from your own records.)*
 
