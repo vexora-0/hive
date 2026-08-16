@@ -290,7 +290,18 @@ function Tab({
           size: ICON_SIZE,
         })}
         {badgeCount > 0 && (
-          <View style={styles.badge}>
+          <View
+            style={[
+              styles.badge,
+              // The ring separates the badge from whatever is behind it, so it
+              // has to be that thing's colour. It was always ink — right on the
+              // dark bar, wrong on the focused tab, where the badge sits on the
+              // marigold puck and an ink ring cut a visible bite out of it.
+              // Compare the notifications tab against any other while it is
+              // selected and carrying a count.
+              { borderColor: focused ? colors.primary.amber : colors.ink[900] },
+            ]}
+          >
             <Text variant="tiny" color={colors.white} style={styles.badgeText}>
               {badgeCount > 99 ? '99+' : String(badgeCount)}
             </Text>
