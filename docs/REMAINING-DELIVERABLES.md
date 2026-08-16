@@ -41,7 +41,7 @@ hand — a hand edit is lost the next time anyone runs the build.
 | Backend suite | **218 / 218 passed**, 8 files — **245 s** and again **122.63 s**; wall time is network-bound against a shared remote database, so it varies |
 | Mobile suite | **100 / 100 passed**, 6 files, **284 ms** |
 | k6 smoke, 1 VU / 30 s | 42/42 checks, **0.00% failures**, p95 **1.13 s**, feed page **3,908 B** |
-| `verify-security.sh` | **27 passed, 0 failed, 2 skipped** — full run, re-run 16 Aug |
+| `verify-security.sh` | **29 passed, 0 failed, 1 skipped** — full run, 16 Aug, against a production-mode target |
 | Endpoints | **40** — matches the claim exactly |
 | Repository | **429 commits** at `d691359` and moving, 4 contributors, 151 active days, 1 Feb – 16 Aug |
 
@@ -106,7 +106,7 @@ produced it.
 | Fig. | Source | Result captured |
 |---|---|---|
 | 3.1 | both test suites | 218 / 218 in 122.63 s · 100 / 100 in 284 ms |
-| 3.2 | `scripts/verify-security.sh` | 27 passed, 0 failed, 2 skipped — full 67-line run |
+| 3.2 | `scripts/verify-security.sh` | 29 passed, 0 failed, 1 skipped — full run; only HTTPS skips |
 | 3.3 | sabotage: delete the uploader comparison in `assertPhotoAccess` | **5 failed, 213 passed** — three G-17 cases plus archive and untag |
 | 3.4 | Rajesh's feed beside Vikram's | 2 photographs vs 1, zero overlap |
 | 3.5 | signed URL, then with `?token=` stripped | `HTTP/2 200` `image/jpeg` 42,497 B · `HTTP/2 400` |
@@ -226,7 +226,7 @@ the failing file alone before believing it.
 - **Do not say the app has never run on a device.** It has, on Android. The
   report said otherwise in five places while Figure 2.7 showed it running.
 - **Do not invent a performance number.** See §3d.
-- **Do not claim 29/29 on the security script.** It is 27 passed, 0 failed,
+- **Do not claim 30/30 on the security script.** It is 29 passed, 0 failed,
   **2 skipped**.
 - **Do not rewrite git history.** The commit log is graded evidence — Report
   Chapter 5, and 5 marks for attendance rest on 422 commits over 151 days.

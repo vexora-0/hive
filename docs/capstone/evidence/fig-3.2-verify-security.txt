@@ -1,9 +1,11 @@
 $ eval "$(pnpm --filter @hive/backend verify:env | grep '^export')"
-$ RUN_RATE_LIMIT_CHECK=1 ./scripts/verify-security.sh
+$ BASE_URL=http://localhost:4100 FORCE_500_PATH=/__verify/boom \
+    RUN_RATE_LIMIT_CHECK=1 ./scripts/verify-security.sh
+  (target booted with NODE_ENV=production, which section 7 requires)
 
 
 Hive security verification
-Target: http://localhost:4000
+Target: http://localhost:4100
 
 1. Reachability
   PASS  /health responds 200 (got 200)
@@ -41,7 +43,8 @@ Target: http://localhost:4000
      A triggered 500 must say 'Internal server error' and carry no stack.
      Only meaningful against NODE_ENV=production — in any other mode the
      error handler returns internal messages by design.
-  SKIP  500 response shape — set FORCE_500_PATH to a route that reliably 500s
+  PASS  500 response is generic
+  PASS  no stack trace in the body
 
 8. Transport and CORS
   SKIP  transport is HTTPS — target is loopback — re-run against the deployed URL
@@ -59,7 +62,7 @@ Target: http://localhost:4000
   PASS  no real .env file is tracked
 
 ---------------------------------------------
-passed 27   failed 0   skipped 2
+passed 29   failed 0   skipped 1
 ---------------------------------------------
 
 Skipped checks are NOT passes. A run with skips does not verify

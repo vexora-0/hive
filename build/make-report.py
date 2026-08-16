@@ -49,7 +49,7 @@ FIGURES = {
     "2.7": ("fig-2.7-order-confirm.png", "Order placement and confirmation"),
     "2.8": ("fig-2.8-admin-dashboard.png", "Administrator dashboard"),
     "3.1": ("fig-3.1-test-suite.png", "Test suite execution — 218 tests passing"),
-    "3.2": ("fig-3.2-verify-security.png", "Security verification output — 27/0/2"),
+    "3.2": ("fig-3.2-verify-security.png", "Security verification output — 29 passed, 0 failed, 1 skipped"),
     "3.3": ("fig-3.3-sabotage.png", "Sabotage exercise — targeted tests failing"),
     "3.5": ("fig-3.5-signed-url.png", "Signed URL 200 versus stripped-token 400"),
     "4.1": ("fig-4.1-health.png", "Health endpoint, healthy and degraded"),

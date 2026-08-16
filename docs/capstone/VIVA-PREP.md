@@ -313,11 +313,20 @@ on one platform of two. Native `hive://` deep links are unverified on either —
 route groups were checked through a browser URL, which does not go through the
 operating system's linking path. Report §3.3.8 has the detail.
 
-**"You said 27 security checks passed — so it's secure?"** — 27 passed, 0 failed,
-**2 skipped** (11 August; it was 26/0/3 on 1 August). One skip needs HTTPS and a
-deployed origin; the other needs `FORCE_500_PATH` pointed at a route that
-reliably 500s, alongside `NODE_ENV=production`. And passing 27 checks means those
-27 properties hold; it is not proof of the absence of vulnerabilities.
+**"You said 29 security checks passed — so it's secure?"** — 29 passed, 0 failed,
+**1 skipped** (16 August; 27/0/2 on 11 August, 26/0/3 on 1 August). The one skip
+is HTTPS, which needs a deployed origin and nothing else will close it. And
+passing 29 checks means those 29 properties hold; it is not proof of the absence
+of vulnerabilities. Say that sentence — it is the difference between reporting a
+result and overclaiming from one.
+
+If they ask what changed between 27 and 29: the error-handler check could never
+run, because nothing in the application returned a 500 on demand, so the one
+property that handler exists to guarantee was the one never verified over HTTP.
+A route that throws is now registered — but only when `FORCE_500_PATH` is set,
+and the operator chooses the path, so an ordinary deployment has no such
+endpoint. Against a production-mode target it returns
+`{"message":"Internal server error"}` with no stack trace.
 
 **"Why didn't you use [X]?"** — If you evaluated it, say what you compared and
 why. If you did not, say so. "We didn't evaluate that" is a complete answer;
@@ -334,8 +343,9 @@ the one to check tonight.
 - [ ] Re-run `pnpm test` **once**, alone, and note the result. Repeated runs
       exhaust the shared sign-in quota and produce timeouts that look like
       failures
-- [ ] Re-run `scripts/verify-security.sh`, confirm 27/0/2. It needs
-      `SUPABASE_ANON_KEY` in the backend env, or 13 checks skip silently
+- [ ] Re-run `scripts/verify-security.sh`, confirm 29/0/1. It needs
+      `SUPABASE_ANON_KEY` in the backend env, or 13 checks skip silently; and
+      `FORCE_500_PATH` against a `NODE_ENV=production` target, or §7 skips
 - [ ] Seed fresh demo data; confirm Rajesh sees 2 photos and Vikram 1
 - [ ] Record a screen capture of the full demo as insurance
 - [ ] Re-read §5.7 of the report — the limitations are what you will be pressed on

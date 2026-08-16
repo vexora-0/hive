@@ -127,7 +127,7 @@ than a missing one.
 | Fig. | Screenshot | Shows |
 |---|---|---|
 | 3.1 | **`pnpm test` — 218/218** | Headline test result |
-| 3.2 | **`verify-security.sh` — 27/0/2** | Security verification |
+| 3.2 | **`verify-security.sh` — 29/0/1** | Security verification |
 | 3.3 | **Sabotage run — 5 tests failing, 213 passing** | The suite detects regressions |
 | 3.4 | **Rajesh's feed beside Vikram's** | 2 vs 1, zero overlap |
 | 3.5 | **Signed URL 200 beside stripped-token 400** | Private bucket |
@@ -193,9 +193,9 @@ Items 1, 2 and 5 need nothing from anyone else.
   would have contradicted on the very figure that carries the correctness marks.
   The columns are still named `*_cents` and hold paise; §2.4.2 and `VIVA-PREP.md`
   both explain why, and a viva is likely to ask.
-- **Claim 29/29 on the security script.** It is 27 passed, 0 failed, **2
-  skipped** (11 Aug; 26/0/3 on 1 Aug). One skip needs a deployment (HTTPS); the
-  other needs `FORCE_500_PATH` **and** `NODE_ENV=production`.
+- **Claim 30/30 on the security script.** It is 29 passed, 0 failed, **1
+  skipped** (16 Aug; 27/0/2 on 11 Aug, 26/0/3 on 1 Aug). The remaining skip is
+  HTTPS, and it needs a deployment — nothing else will close it.
 - **Say "fully working".** It works locally and on a physical Android device.
   Nothing is deployed, and iOS has never been launched.
 - **Undersell the device testing.** It is no longer true that nothing has run on

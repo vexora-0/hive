@@ -201,7 +201,7 @@ Dashboard with real counts.
 | Measurement | Result |
 |---|---|
 | Automated tests | **218 / 218 passing** (115 s was timed on the preceding 178-test suite) |
-| Security verification | **27 passed · 0 failed · 2 skipped** — reproduced from cold |
+| Security verification | **29 passed · 0 failed · 1 skipped** — the one skip needs HTTPS |
 | Privacy: 6 photographs | Rajesh sees **2**, Vikram **1**, **zero overlap** |
 | Order placement | **201**, `total_cents: 6000` — **₹60**, integer paise |
 | Idempotency | Same key twice → **the same order** |

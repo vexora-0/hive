@@ -71,7 +71,7 @@ birth, and an entirely non-functional ordering flow.
 
 Validation used 218 automated integration tests executing against a real
 PostgreSQL instance, together with a scripted security
-verification returning 27 passed, 0 failed and 2 skipped, reproduced from a cold
+verification returning 29 passed, 0 failed and 1 skipped, reproduced from a cold
 start. A deliberate sabotage exercise confirmed the suite detects the regressions
 it targets and additionally exposed a pre-existing test that had never verified
 the property its name claimed. Privacy scoping was measured directly: of six
@@ -115,7 +115,7 @@ styles.)*
 | 2.7 | Order placement and confirmation | «» |
 | 2.8 | Administrator dashboard | «» |
 | 3.1 | Test suite execution — 218 tests passing | «» |
-| 3.2 | Security verification output — 27/0/2 | «» |
+| 3.2 | Security verification output — 29/0/1 | «» |
 | 3.3 | Sabotage exercise — targeted tests failing | «» |
 | 3.4 | Privacy comparison — two parents, zero overlap | «» |
 | 3.5 | Signed URL 200 versus stripped-token 400 | «» |
@@ -1212,7 +1212,7 @@ every resource accessed by identifier checked against the caller.
    preceded them; the larger suite has not been timed.
 3. **A sabotage exercise that validated the suite and found a defective test** —
    one that had never verified the property its name claimed.
-4. **27 of 27 attempted security checks passed**, 0 failed, 2 skipped —
+4. **29 of 29 attempted security checks passed**, 0 failed, 1 skipped —
    reproduced cold. One skip needs a deployment (HTTPS); the other needs
    `FORCE_500_PATH` set alongside `NODE_ENV=production`.
 5. **A previously non-functional ordering flow made to work**, with correct
