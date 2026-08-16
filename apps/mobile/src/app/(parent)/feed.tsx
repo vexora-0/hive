@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -20,6 +19,8 @@ import { Reveal } from '@/components/animation';
 import { ChildSwitcher, type ChildItem } from '@/components/forms';
 import { ScreenContainer } from '@/components/layout';
 import { EmptyState, OfflineBanner } from '@/components/feedback';
+import { PlayfulBackdrop } from '@/components/decor';
+import { BoLoader } from '@/components/mascot';
 import { HeaderBar } from '@/components/navigation';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
@@ -66,6 +67,37 @@ type FeedRow =
       key: string;
       left: FeedPhoto;
       right: FeedPhoto;
+      attribution: boolean;
+    }
+  /**
+   * A large print beside a smaller one, resting on a common baseline.
+   *
+   * `mirrored` puts the large print on the right, so two duos in one day are
+   * not the same picture twice.
+   *
+   * **This replaced a triptych** — one tall print beside two stacked squares —
+   * which could not be made to work. The two halves have to finish level or
+   * the spread reads as a mistake, and their heights are driven by different
+   * things: the tall print by one image and one caption, the column by two
+   * images, two captions and a gap. A fixed aspect ratio can only balance that
+   * for one caption configuration, and captions here are conditional — they
+   * appear only when a day had more than one teacher. Measured, the two halves
+   * finished 130px apart. Two single prints on a shared baseline cannot
+   * disagree about anything.
+   */
+  | {
+      kind: 'duo';
+      key: string;
+      big: FeedPhoto;
+      small: FeedPhoto;
+      mirrored: boolean;
+      attribution: boolean;
+    }
+  /** Three small prints in a row, pinned slightly askew. */
+  | {
+      kind: 'trio';
+      key: string;
+      photos: [FeedPhoto, FeedPhoto, FeedPhoto];
       attribution: boolean;
     };
 
@@ -149,9 +181,33 @@ function teacherLabel(names: string[]): string | undefined {
  * teacher**. Otherwise the day header already said who took them, and repeating
  * "by Priya" nine times is the noise the mount's caption band exists to avoid.
  */
+/**
+ * The spread cycle.
+ *
+ * Four entries, and the even pair sits between the two asymmetric duos on
+ * purpose: two lopsided spreads back to back both lean the same way and read
+ * as a drift. The mirrored duo closes the loop, so the pattern takes nine
+ * photographs to repeat — more than most days hold, which is the point.
+ */
+const SPREADS = ['duo', 'pair', 'trio', 'duoR'] as const;
+
+/**
+ * How much wider the big print is than the small one in a duo.
+ *
+ * 1.7 is enough that the two read as *deliberately* different sizes rather than
+ * as a pair that failed to line up — below about 1.4 the asymmetry looks like a
+ * rounding error.
+ */
+const DUO_BIG_FLEX = 1.7;
+
+/** A degree and a half, alternating. See the note at the call site. */
+const TRIO_TILT = ['-1.5deg', '1deg', '-0.8deg'] as const;
+
 function buildFeedLayout(photos: FeedPhoto[]): FeedLayout {
   const rows: FeedRow[] = [];
   const stickyIndices: number[] = [];
+  /** Advances across days, so two days running never open the same way. */
+  let spreadCursor = 0;
 
   const groups = new Map<string, FeedPhoto[]>();
   for (const photo of photos) {
@@ -200,28 +256,88 @@ function buildFeedLayout(photos: FeedPhoto[]): FeedLayout {
       attribution: attribution(dayPhotos[0]),
     });
 
-    // Then pairs, and a full-width print for an odd tail.
-    for (let i = 1; i < dayPhotos.length; i += 2) {
-      const left = dayPhotos[i];
-      const right = dayPhotos[i + 1];
+    // ── Then the spreads ────────────────────────────────────────────
+    //
+    // The wall used to be `hero` followed by pairs, forever. Every day in the
+    // feed therefore had exactly the same shape — one big print and then a
+    // column of twos — and a parent scrolling a fortnight of school saw the
+    // same page fourteen times. The photographs changed; the page did not.
+    //
+    // So the remainder of each day is laid out by **cycling a small set of
+    // spreads**, the way a photo book does: a triptych, a pair, a trio of
+    // small prints, a triptych flipped the other way. The cursor advances per
+    // spread rather than per photo, so the rhythm carries across a day rather
+    // than resetting, and two adjacent days do not land on the same template.
+    //
+    // Every branch consumes exactly what it claims and the loop always
+    // terminates on the tail cases — a template that cannot be filled is never
+    // chosen, so the wall can never end on a hole.
+    let i = 1;
+    let spread = spreadCursor;
 
-      if (right) {
-        rows.push({
-          kind: 'pair',
-          key: `${left.id}-${right.id}`,
-          left,
-          right,
-          attribution: multipleTeachers,
-        });
-      } else {
+    while (i < dayPhotos.length) {
+      const left = dayPhotos.length - i;
+
+      // Tails first. Three or fewer photographs left is not enough to choose
+      // between templates, so it is laid out the only way it fits.
+      if (left === 1) {
         rows.push({
           kind: 'hero',
-          key: left.id,
-          photo: left,
-          attribution: attribution(left),
+          key: dayPhotos[i].id,
+          photo: dayPhotos[i],
+          attribution: attribution(dayPhotos[i]),
         });
+        i += 1;
+        continue;
+      }
+
+      if (left === 2) {
+        rows.push({
+          kind: 'pair',
+          key: `${dayPhotos[i].id}-${dayPhotos[i + 1].id}`,
+          left: dayPhotos[i],
+          right: dayPhotos[i + 1],
+          attribution: multipleTeachers,
+        });
+        i += 2;
+        continue;
+      }
+
+      const template = SPREADS[spread % SPREADS.length];
+      spread += 1;
+
+      if (template === 'trio') {
+        rows.push({
+          kind: 'trio',
+          key: `trio-${dayPhotos[i].id}`,
+          photos: [dayPhotos[i], dayPhotos[i + 1], dayPhotos[i + 2]],
+          attribution: multipleTeachers,
+        });
+        i += 3;
+      } else if (template === 'pair') {
+        rows.push({
+          kind: 'pair',
+          key: `${dayPhotos[i].id}-${dayPhotos[i + 1].id}`,
+          left: dayPhotos[i],
+          right: dayPhotos[i + 1],
+          attribution: multipleTeachers,
+        });
+        i += 2;
+      } else {
+        rows.push({
+          kind: 'duo',
+          key: `duo-${dayPhotos[i].id}`,
+          big: dayPhotos[i],
+          small: dayPhotos[i + 1],
+          mirrored: template === 'duoR',
+          attribution: multipleTeachers,
+        });
+        i += 2;
       }
     }
+
+    // Carried into the next day, so consecutive days open on different spreads.
+    spreadCursor = spread;
   }
 
   return {
@@ -384,7 +500,9 @@ export default function FeedScreen() {
   const [stripDismissed, setStripDismissed] = useState(false);
 
   // ---- The wall ----------------------------------------------------------
-  const { rows, stickyIndices, todayCount, hasOlderDays } = useMemo(
+  // `stickyIndices` is deliberately not taken — see the note on <FlashList>
+  // below. `buildFeedLayout` still computes it and it is still correct.
+  const { rows, todayCount, hasOlderDays } = useMemo(
     () => buildFeedLayout(photos),
     [photos],
   );
@@ -465,24 +583,76 @@ export default function FeedScreen() {
         );
       }
 
+      // One print, wired up. Every template below is built from this, so the
+      // caption rule, the press handlers and the thumbnail fallback are
+      // written once rather than four times.
+      const print = (
+        photo: FeedPhoto,
+        attributed: boolean,
+        aspectRatio?: number,
+      ) => (
+        <PhotoMount
+          id={photo.id}
+          uri={photo.thumbnailUri ?? photo.uri}
+          blurhash={photo.blurhash ?? undefined}
+          width={aspectRatio ? undefined : photo.width}
+          height={aspectRatio ? undefined : photo.height}
+          aspectRatio={aspectRatio}
+          caption={
+            attributed && photo.uploadedBy.name
+              ? `by ${photo.uploadedBy.name}`
+              : undefined
+          }
+          onPress={() => handlePhotoPress(photo)}
+          onLongPress={() => handlePhotoLongPress(photo)}
+        />
+      );
+
+      if (item.kind === 'duo') {
+        // Both prints keep their own shape and rest on a shared baseline —
+        // `duoRow` aligns to `flex-end`, so however tall each one turns out,
+        // they finish on the same line like prints standing on a shelf. That
+        // is the whole reason this template replaced the triptych.
+        return (
+          <Reveal
+            index={staggerIndex}
+            style={[styles.duoRow, item.mirrored && styles.rowMirrored]}
+          >
+            <View style={styles.duoBig}>{print(item.big, item.attribution)}</View>
+            <View style={styles.duoSmall}>
+              {print(item.small, item.attribution)}
+            </View>
+          </Reveal>
+        );
+      }
+
+      if (item.kind === 'trio') {
+        return (
+          <Reveal index={staggerIndex} style={styles.trioRow}>
+            {item.photos.map((photo, cell) => (
+              <View
+                key={photo.id}
+                style={[
+                  styles.trioCell,
+                  // A hand pinned these, not a grid. The tilt is tiny — a
+                  // degree and a half — and alternates by position so it never
+                  // looks like a drift in one direction. Square prints, so a
+                  // rotated corner cannot collide with its neighbour's caption.
+                  { transform: [{ rotate: TRIO_TILT[cell] }] },
+                ]}
+              >
+                {print(photo, false, 1)}
+              </View>
+            ))}
+          </Reveal>
+        );
+      }
+
       return (
         <Reveal index={staggerIndex} style={styles.pairRow}>
           {[item.left, item.right].map((photo) => (
             <View key={photo.id} style={styles.pairCell}>
-              <PhotoMount
-                id={photo.id}
-                uri={photo.thumbnailUri ?? photo.uri}
-                blurhash={photo.blurhash ?? undefined}
-                width={photo.width}
-                height={photo.height}
-                caption={
-                  item.attribution && photo.uploadedBy.name
-                    ? `by ${photo.uploadedBy.name}`
-                    : undefined
-                }
-                onPress={() => handlePhotoPress(photo)}
-                onLongPress={() => handlePhotoLongPress(photo)}
-              />
+              {print(photo, item.attribution)}
             </View>
           ))}
         </Reveal>
@@ -534,7 +704,13 @@ export default function FeedScreen() {
     if (isFetchingNextPage) {
       return (
         <View style={styles.footer}>
-          <ActivityIndicator size="small" color={colors.primary.amberDark} />
+          {/* Bo flying a lap of a comb cell, in the slot a spinner used to
+              hold. It is a swap rather than an addition — this screen already
+              paid for a loading indicator here — and it is the one place in
+              the app where waiting is *for photographs of your child*, which
+              is a thing worth saying with the product's own character rather
+              than with a system arc. */}
+          <BoLoader size={84} label="Fetching more moments" />
         </View>
       );
     }
@@ -577,7 +753,8 @@ export default function FeedScreen() {
   if (isLoadingChildren || isLoadingFeed) {
     return (
       <ScreenContainer edges={['top', 'left', 'right']}>
-        <HeaderBar hero title="Moments" eyebrow={eyebrow} />
+        <PlayfulBackdrop level="quiet" />
+        <HeaderBar hero play translucent mascot="idle" title="Moments" eyebrow={eyebrow} />
         <View style={styles.loadingHeader}>{ListHeader}</View>
         <FeedSkeleton />
       </ScreenContainer>
@@ -586,7 +763,27 @@ export default function FeedScreen() {
 
   return (
     <ScreenContainer edges={['top', 'left', 'right']}>
-      <HeaderBar hero title="Moments" eyebrow={eyebrow} scrollY={scrollY} />
+      {/* `quiet` — light only, no comb and no pollen.
+          This is the one screen in the app that is *made of* photographs, and
+          every layer behind them is a layer competing with them. The wash alone
+          is enough to stop the page reading as a blank sheet; anything more and
+          the backdrop starts appearing in the gaps between mounts, which is
+          where a parent is looking at their child. */}
+      <PlayfulBackdrop level="quiet" />
+
+      {/* The one place per role the play voice appears. A parent opens this
+          screen more than every other screen in the app combined, so the
+          greeting belongs here and the rest of their day stays in the working
+          faces. */}
+      <HeaderBar
+        hero
+        play
+        translucent
+        mascot="idle"
+        title="Moments"
+        eyebrow={eyebrow}
+        scrollY={scrollY}
+      />
 
       {/**
        * The switcher sits **above** the list, not inside it as
@@ -612,7 +809,27 @@ export default function FeedScreen() {
         renderItem={renderRow}
         keyExtractor={rowKey}
         getItemType={rowType}
-        stickyHeaderIndices={stickyIndices}
+        // No `stickyHeaderIndices`, and it is not an oversight.
+        //
+        // FlashList pins a sticky row as soon as it becomes the current sticky
+        // index rather than when it reaches the top, so **the first day header
+        // is rendered twice** — once pinned, once in flow — for the whole
+        // stretch between scroll 0 and roughly 120px. At exactly 0 the two
+        // coincide and it looks fine; a flick apart and the in-flow copy's meta
+        // line appears about 19px under the pinned one, so the feed opens on
+        // "Today / 9 photos · Sarita / 9 photos · Sarita". Measured at deltas
+        // 0, 40, 80 and 120: two copies every time.
+        //
+        // The header is already opaque, which is the usual fix, and it does not
+        // help — the two copies are at different offsets, so the pinned one's
+        // background only covers the part of the other it happens to overlap.
+        //
+        // Pinning is worth something on a long day, but not at the cost of a
+        // doubled heading at the top of the screen every parent opens first.
+        // Day headers now scroll with their photographs.
+        //
+        // `stickyIndices` is still computed by `buildFeedLayout` and is still
+        // correct; if FlashList's pinning is fixed upstream, pass it again.
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.6}
         onScroll={onScroll}
@@ -737,6 +954,43 @@ const styles = StyleSheet.create({
     marginBottom: spacing.ms,
   },
   pairCell: {
+    flex: 1,
+  },
+  /** Flips a two-column row, so a mirrored triptych puts its tall print right. */
+  rowMirrored: {
+    flexDirection: 'row-reverse',
+  },
+  /**
+   * The asymmetric spread.
+   *
+   * `flex-end` rather than `flex-start`: the two prints are different sizes and
+   * different shapes, so aligning their tops leaves a ragged gap under the
+   * shorter one. Aligning their feet reads as two prints standing on a shelf,
+   * which is both tidier and the idiom the rest of this wall uses.
+   */
+  duoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: spacing.xs,
+    gap: spacing.sm,
+    marginBottom: spacing.ms,
+  },
+  duoBig: {
+    flex: DUO_BIG_FLEX,
+  },
+  duoSmall: {
+    flex: 1,
+  },
+  trioRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    // Wider than the other rows: the prints are tilted, and a rotated corner
+    // needs somewhere to go or it clips against the list's edge.
+    paddingHorizontal: spacing.sm,
+    gap: spacing.sm,
+    marginBottom: spacing.ms,
+  },
+  trioCell: {
     flex: 1,
   },
 
