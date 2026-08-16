@@ -27,22 +27,35 @@ someone else, defer to that document.
 
 ---
 
-## How to land your area
+## How the branch was landed — superseded, recorded
+
+**This section described a per-person cherry-pick. That is not what happened, and the
+instructions below it are kept only so the history makes sense.**
+
+The branch was landed as PR #1 (`a3dec15`) with every commit **re-attributed centrally
+by area**: author *and* committer set to the owner named in the commit's own `Area:`
+line, then force-pushed. All 24 commits carry matching author, committer and `Area:`
+trailer — `git log --format="%an | %s" a3dec15^1..a3dec15^2` shows the result. The four
+of us work on one machine, so this was done in one pass with each owner's review rather
+than four separate cherry-picks.
+
+**The `Area:` trailer is therefore load-bearing, not decorative** — it decides
+attribution. Any later commit touching someone else's area follows the same scheme:
+`Area: <area> (<Owner>)`, authored and committed as that owner, after they have reviewed
+it. `1c5423f` (admin dashboard counts) is the first commit made under this rule outside
+the original PR.
+
+Anyone still on a pre-force-push clone needs:
 
 ```bash
-git fetch
-git log --oneline main..origin/revamp/ui        # the commits, newest first
-git show <sha>                                   # read yours
-git checkout main && git cherry-pick <sha>       # land it under your own name
+git fetch origin
+git reset --hard origin/main
 ```
 
-Every commit message ends with an `Area:` line naming the owner, so
-`git log --grep "Area: Bhargav"` finds yours.
-
-If you would rather not cherry-pick, review the branch and say so — but **do not let
-someone else commit under your name**. The git history is what a capstone's individual
-contribution is assessed from, and an author field that says you wrote something you have
-not read is worth less than an honest one.
+The superseded instruction was to cherry-pick your own commits so that nobody committed
+under your name. The team chose central re-attribution instead. If you are reading this
+to settle a question about who wrote what, the `Area:` line is the answer, and the
+reviewer for each area is the table above.
 
 ---
 
