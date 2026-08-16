@@ -811,7 +811,6 @@ suite *and* found a test that was not testing anything.
 | **Native deep links** | `hive://` never opened through the operating system | Route-group resolution verified through a browser URL instead |
 | **Server-side HEIC conversion** | `sharp`'s prebuilt libvips has no HEVC decoder | Cannot work, and does not. Tested 24 July against a real HEVC HEIC. Handled by a device-side transcode instead; the server refuses HEVC with an actionable 400 |
 | **Error reporting** | Sentry requires a DSN | Pipeline unproven end to end |
-| **CI test gate** | Repository secrets absent, so the harness guard refuses to start | The step **fails on every run** (`exit code 1`) and `continue-on-error` masks it as green. 218 tests gate nothing; lint, typecheck and build do (Figure 5.2) |
 
 The application **has** been driven end to end in a desktop browser via Expo's
 web target, so the screens are exercised rather than merely compiled. Web is a
@@ -1245,19 +1244,20 @@ Stated explicitly; each is evidenced in Table 3.6.
    unverified on either, because route-group resolution was checked through a
    browser URL rather than the operating system's linking path.
 4. **The error-reporting pipeline has never carried an error.**
-5. **The continuous-integration test step does not merely fail to gate — it
-   fails, on every run, and the failure is masked.** The workflow reports green;
-   the step is marked `continue-on-error: true`; and the run's annotations record
-   `Process completed with exit code 1` alongside the test harness refusing to
-   start: *"SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in
-   `packages/backend/.env.test`"*. That guard is deliberate — it exists to stop
-   the suite truncating a non-test database — but without `TEST_SUPABASE_URL`,
-   `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` as repository
-   secrets, it refuses on every push. **Figure 5.2 shows the step list with a
-   green tick beside `Test backend` and the annotation proving that same step
-   exited 1**, which is why the figure is presented with both halves rather than
-   as a green screenshot. Lint, typecheck and build do genuinely block. The three
-   secrets are the entire fix.
+5. ~~The continuous-integration test step is advisory.~~ **Closed on 16 August,
+   and worth recording because of what it turned out to be.** The step had been
+   marked `continue-on-error: true` and was not merely failing to gate — it was
+   *failing*, on every push, with the failure masked. The harness refused to
+   start (*"SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in
+   `packages/backend/.env.test`"*), the step exited 1, and the job still reported
+   green. A green tick beside `Test backend` implied a guard that did not exist,
+   and the only place the truth appeared was the run's annotations. Adding
+   `TEST_SUPABASE_URL`, `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY`
+   as repository secrets, pointing at the separate `hive-test` project, let the
+   suite run: **218 tests passed across 8 files in 373.86 s in CI**. The escape
+   hatch was then removed, and Figure 5.2 is the first run in which the tick
+   beside `Test backend` means the suite passed. **All four checks — lint,
+   typecheck, build and 218 tests — now block a merge.**
 6. **Server-side HEIC conversion does not work.** `sharp`'s prebuilt libvips
    ships libheif without an HEVC decoder, and an iPhone HEIC is HEVC-coded, so
    the container parses and the pixel decode fails. Established by testing a
@@ -1280,7 +1280,7 @@ Stated explicitly; each is evidenced in Table 3.6.
    the load tests, and device testing against a real origin.
 2. **Execute the k6 suite** against that deployment and record the results.
 3. **Produce iOS and Android builds** and verify the platform-specific paths.
-4. **Make the test step blocking** by adding the three repository secrets.
+4. ~~Make the test step blocking.~~ Done 16 August — see §6.3 item 5.
 
 **Product:**
 

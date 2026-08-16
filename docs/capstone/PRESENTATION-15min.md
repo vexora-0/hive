@@ -249,7 +249,6 @@ like an omission.
 | **No capacity figure** | k6 *has* run locally — smoke passes every threshold, feed page 3,908 B. But at 50 VU the limit hit was our own rate limiter, not the app, so there is no unconstrained number |
 | **iOS unverified; native deep links unverified** | Run end to end on a physical **Android** device — that is where seven defects were found (slide 8a). iOS not launched; `hive://` never opened through the OS |
 | **Error reporting never carried an error** | Needs a DSN — an account signup |
-| **CI test step fails, masked green** | The harness refuses without repository secrets, the step exits 1, and `continue-on-error` hides it. Lint, typecheck and build genuinely block. Three secrets fix it |
 
 **Say:** *"Deployment is the first item of future work, because it is the single
 step that unlocks the other four."*
@@ -275,7 +274,7 @@ confirmed they detect the regressions they target.
    at once
 2. **Run the k6 suite** against that deployment
 3. **iOS and Android builds** — keychain sessions, image picker, deep links
-4. **Make the CI test step blocking** (three repository secrets)
+4. ~~Make the CI test step blocking~~ — done 16 Aug: 218 tests now gate a merge
 5. Payments · push notifications · photograph search · retention policy
 
 **Close on:** *"What is not proven is anything requiring a deployment, and I have

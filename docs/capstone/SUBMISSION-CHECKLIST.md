@@ -47,7 +47,7 @@ you have these.
 |---|---|---|
 | Feature completeness | 10 | Three roles end to end; 40 endpoints; upload → tag → feed → order → notify |
 | Functional correctness | 10 | Report Table 3.3 — order 201 with correct paise, idempotency, atomicity, notifications, privacy scoping |
-| Code quality | 5 | TypeScript strict, Zod at every boundary, `pnpm lint` 0 errors, CI on every push |
+| Code quality | 5 | TypeScript strict, Zod at every boundary, `pnpm lint` 0 errors, and CI that blocks on lint, typecheck, build **and 218 tests** |
 | Tech stack | 5 | Report §2.2 — including what was *removed* and why |
 
 **Strongest single talking point:** the BullMQ/S3 deletion. Removing ~1,500 lines
@@ -136,7 +136,7 @@ than a missing one.
 | — | Same idempotency key → same order ID | Idempotency |
 | 4.1 | `/health` 200, then **503** on a second instance with the database unreachable | Degradation detected |
 | 5.1 | Commit history | Version control evidence |
-| 5.2 | GitHub Actions run **with its annotations** | CI exists and runs — **and** that the test step exits 1 on every run while `continue-on-error` shows it green. Do not crop to the green ticks; the contradiction is the evidence |
+| 5.2 | GitHub Actions — all four checks green | Lint, typecheck, build and **218 tests** now block a merge. The tick beside `Test backend` means the suite passed, which it did not before 16 Aug |
 | 2.1 | Architecture diagram | Three tiers |
 | 2.3 | ER diagram | Schema |
 

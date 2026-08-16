@@ -1,16 +1,19 @@
-$ gh run list --limit 5
-completed  success  docs(capstone): capture the evidence transcripts ins push  1m33s
-completed  success  docs(capstone): generate the report as a formatted . push  1m43s
-completed  success  docs(capstone): re-run the evidence and record what  push  1m21s
-completed  success  docs: record what is left before submission          push  1m29s
-completed  success  docs(capstone): record the device verification and r push  1m30s
+$ gh secret list
+TEST_SUPABASE_ANON_KEY	2026-08-16T06:12:14Z
+TEST_SUPABASE_SERVICE_KEY	2026-08-16T06:12:12Z
+TEST_SUPABASE_URL	2026-08-16T06:12:12Z
 
-$ gh run view --job 95120346675
+$ gh run list --limit 4
+completed  success  ci: make the test suite actually gate a pull r push  8m25s
+completed  success  docs(capstone): give figure 2.6 its own subjec push  7m40s
+completed  success  docs(capstone): let Word build the figure and  push  1m37s
+completed  success  docs(capstone): capture the evidence transcrip push  1m33s
 
-✓ main CI · 31928762530
-Triggered via push about 8 minutes ago
+$ gh run view --job $(gh run view 31931245859 --json jobs -q '.jobs[0].databaseId')
+✓ main CI · 31931245859
+Triggered via push about 9 minutes ago
 
-✓ Lint, typecheck, build in 1m12s (ID 95120346675)
+✓ Lint, typecheck, build in 7m54s (ID 95126311224)
   ✓ Set up job
   ✓ Initialize containers
   ✓ Run actions/checkout@v4
@@ -25,10 +28,6 @@ Triggered via push about 8 minutes ago
   ✓ Post Run actions/setup-node@v4
   ✓ Post Run pnpm/action-setup@v4
   ✓ Post Run actions/checkout@v4
-  ✓ Stop containers
 
-  ... ANNOTATIONS on the same, green, run:
-X Process completed with exit code 1.
-Lint, typecheck, build: .github#105
-
-X Error: SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in packages/backend/.env.test.
+  no `continue-on-error` on the test step: the tick is the suite passing.
+  218 tests across 8 files, run against the hive-test project.

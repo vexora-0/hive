@@ -43,7 +43,7 @@ hand — a hand edit is lost the next time anyone runs the build.
 | k6 smoke, 1 VU / 30 s | 42/42 checks, **0.00% failures**, p95 **1.13 s**, feed page **3,908 B** |
 | `verify-security.sh` | **27 passed, 0 failed, 2 skipped** — full run, re-run 16 Aug |
 | Endpoints | **40** — matches the claim exactly |
-| Repository | **~428 commits** and moving, 4 contributors, 151 active days, 1 Feb – 16 Aug |
+| Repository | **429 commits** at `d691359` and moving, 4 contributors, 151 active days, 1 Feb – 16 Aug |
 
 **The commit count drifts every time anyone commits, including the commit that
 corrects it.** `make-report.py` compares §5.1's stated count against the
@@ -111,8 +111,8 @@ produced it.
 | 3.4 | Rajesh's feed beside Vikram's | 2 photographs vs 1, zero overlap |
 | 3.5 | signed URL, then with `?token=` stripped | `HTTP/2 200` `image/jpeg` 42,497 B · `HTTP/2 400` |
 | 4.1 | `/health` healthy, then a second instance with the database unreachable | 200 `ok` · 503 `degraded` |
-| 5.1 | `git rev-list` / `git shortlog` | 428 commits, 4 contributors, 151 active days |
-| 5.2 | `gh run list` / `gh run view --job` | green run **with its annotations** — see below |
+| 5.1 | `git rev-list` / `git shortlog` | 429 commits at `d691359`, 4 contributors, 151 active days |
+| 5.2 | `gh run list` / `gh run view --job` | all four checks green — **218 tests now block a merge** |
 
 **Capture transcripts, do not write them.** A review pass found two figures whose
 output could not have come from the commands printed above them — the facts were
@@ -125,21 +125,28 @@ Supabase stack. The project is on hosted Supabase, which cannot be stopped, so a
 second instance of the same build is booted on port 4100 with the database host
 made unreachable. Genuine degradation, and the running instance is untouched.
 
-**Figure 5.2 must keep its annotations.** The CI run reports green *and* its
-annotations record `exit code 1` on the test step, because the harness guard
-refuses without the `TEST_SUPABASE_*` repository secrets. Cropping to the green
-ticks would make the figure a lie. See Report §6.3 item 5.
+**Figure 5.2 is now a genuinely green run.** Until 16 August the CI test step
+was marked `continue-on-error: true` and was *failing* on every push — the
+harness refused without the `TEST_SUPABASE_*` secrets, the step exited 1, and
+the job still reported green. The three secrets now exist, the suite went green
+in CI (218 passed, 8 files, 373.86 s), and the escape hatch is gone. The tick
+beside `Test backend` means the suite passed. Report §6.3 item 5 records what it
+was, because the masked failure is a better story than a clean tick.
 
 **Do not run `verify-security.sh` within ~15 minutes of a k6 run** — the
 rate-limit window will still be consumed and that check fails spuriously.
 
 ### 3c. Needs an account, a dashboard or a card
 
+**Closed 16 August: the CI test gate.** `TEST_SUPABASE_URL`,
+`TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` are set on the
+repository and point at `hive-test`. 218 tests now block a merge alongside lint,
+typecheck and build.
+
 | Task | Blocks | Effort |
 |---|---|---|
 | **Deploy the backend** | CP-5; the 2 remaining skips in `verify-security.sh` (HTTPS, CORS); any real capacity figure | Plan 09 Step 6 |
 | **Build an APK** (`eas.json` does not exist) | CP-5 | Plan 09 |
-| **Add 3 CI repository secrets** — `TEST_SUPABASE_URL`, `TEST_SUPABASE_SERVICE_KEY`, `TEST_SUPABASE_ANON_KEY` | Worse than "ungated": without them the harness guard refuses, the step **exits 1 on every push**, and `continue-on-error: true` paints it green. Figure 5.2 shows both halves | **A settings page. Cheapest real win on this list, and it removes a limitation from the report** |
 | **Sentry DSN** | Error pipeline has never carried an error | Account signup |
 | **G-45 custom SMTP** | Supabase's default is rate-limited; OTP will fail mid-demo | Dashboard task, unowned |
 

@@ -55,8 +55,8 @@ FIGURES = {
     "4.1": ("fig-4.1-health.png", "Health endpoint, healthy and degraded"),
     "5.1": ("fig-5.1-commit-history.png", "Commit history"),
     "5.2": ("fig-5.2-ci-run.png",
-            "Continuous integration run — green, with the annotations showing "
-            "the test step exited 1"),
+            "Continuous integration run — lint, typecheck, build and 218 tests, "
+            "all blocking"),
 }
 
 # Portrait phone captures are 1240x2562. Left unconstrained they run over a
