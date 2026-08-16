@@ -70,7 +70,14 @@ DIAGRAM = {"2.1", "2.2", "2.3", "2.4"}
 # aspect of 1.643: at the 5.6in diagram width it renders 9.20in tall against an
 # A4 text area of 9.69in, so it fits but pushes its own caption to the next
 # page. 4.9in brings it to 8.05in and the caption stays with the figure.
-WIDTH_OVERRIDE = {"2.4": "4.9in"}
+#
+# 2.6 is no longer a full-length portrait capture. It was byte-identical to
+# 3.4a — the same screenshot serving "parent feed with child switcher" and
+# "Rajesh's feed" — so it is cropped to its own subject: the header, the child
+# switcher and the day header. That makes the two figures visibly different and
+# makes 2.6 a better illustration of what its caption promises. At 1240x1020 it
+# is no longer portrait, so the 2.6in portrait width would render it tiny.
+WIDTH_OVERRIDE = {"2.4": "4.9in", "2.6": "4.5in"}
 
 
 def fig_md(num: str) -> str:
