@@ -25,7 +25,7 @@ Munigonda Bhargav (2023ebcs724)
 
 **Program:** BSc Computer Science (Online Mode)
 
-**Institution:** «Institution name»
+**Institution:** Birla Institute of Technology and Science, Pilani (BITS Pilani)
 
 **Academic Year:** 2025–2026
 
