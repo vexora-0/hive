@@ -138,6 +138,11 @@ rate-limit window will still be consumed and that check fails spuriously.
 
 ### 3c. Needs an account, a dashboard or a card
 
+**Closed 16 August: Sentry.** Project `hive-n1/hive-backend` created,
+`SENTRY_DSN` in `packages/backend/.env`, backend logs "Sentry initialised", and
+a deliberate exception was delivered as issue `HIVE-BACKEND-1`. The mobile app
+is still unwired — `EXPO_PUBLIC_SENTRY_DSN` is unset — and the report says so.
+
 **Closed 16 August: the CI test gate.** `TEST_SUPABASE_URL`,
 `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` are set on the
 repository and point at `hive-test`. 218 tests now block a merge alongside lint,
@@ -147,7 +152,6 @@ typecheck and build.
 |---|---|---|
 | **Deploy the backend** | CP-5; the 2 remaining skips in `verify-security.sh` (HTTPS, CORS); any real capacity figure | Plan 09 Step 6 |
 | **Build an APK** (`eas.json` does not exist) | CP-5 | Plan 09 |
-| **Sentry DSN** | Error pipeline has never carried an error | Account signup |
 | **G-45 custom SMTP** | Supabase's default is rate-limited; OTP will fail mid-demo | Dashboard task, unowned |
 
 ### 3d. Known-open, documented, not blocking

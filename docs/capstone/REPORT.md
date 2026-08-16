@@ -813,7 +813,7 @@ suite *and* found a test that was not testing anything.
 | **iOS** | No iOS build launched | Keychain session and image picker proven on Android only (§3.3.8) |
 | **Native deep links** | `hive://` never opened through the operating system | Route-group resolution verified through a browser URL instead |
 | **Server-side HEIC conversion** | `sharp`'s prebuilt libvips has no HEVC decoder | Cannot work, and does not. Tested 24 July against a real HEVC HEIC. Handled by a device-side transcode instead; the server refuses HEVC with an actionable 400 |
-| **Error reporting** | Sentry requires a DSN | Pipeline unproven end to end |
+| **Mobile error reporting** | `EXPO_PUBLIC_SENTRY_DSN` unset | Server-side reporting is proven (§6.3 item 4); the client is not |
 
 The application **has** been driven end to end in a desktop browser via Expo's
 web target, so the screens are exercised rather than merely compiled. Web is a
@@ -924,8 +924,9 @@ thumbnails and placeholders for both orientations and serves them only through
 signed, expiring URLs.
 
 **What it does not support.** No performance characteristic has been measured.
-The error-reporting pipeline has never carried an error. Neither is an oversight
-discovered late; each follows from one absent step — deployment. Observation on
+Neither is an oversight discovered late; each follows from one absent step —
+deployment. The error-reporting pipeline, previously listed here, has since
+carried a real event; §6.3 item 4 records it. Observation on
 the shipping platform, previously listed here, is now partly closed: the
 application has been driven end to end on a physical Android device, and §3.3.8
 records both what that proved and what it did not.
@@ -1246,7 +1247,15 @@ Stated explicitly; each is evidenced in Table 3.6.
    platform behaviours hold for one platform of two; and `hive://` deep links are
    unverified on either, because route-group resolution was checked through a
    browser URL rather than the operating system's linking path.
-4. **The error-reporting pipeline has never carried an error.**
+4. ~~The error-reporting pipeline has never carried an error.~~ **Closed on
+   16 August.** A Sentry project was created, `SENTRY_DSN` supplied, and the
+   backend now logs *"Sentry initialised"* where it previously took its no-op
+   path. A deliberate exception was captured and delivered — issue
+   `HIVE-BACKEND-1`, event `8a5130bf`. The `beforeSend` scrubber therefore ran
+   against a real transported event rather than only the synthetic one it was
+   unit-tested with. **The mobile application is not wired to Sentry**: it reads
+   `EXPO_PUBLIC_SENTRY_DSN`, which is unset, so client-side reporting remains
+   unproven.
 5. ~~The continuous-integration test step is advisory.~~ **Closed on 16 August,
    and worth recording because of what it turned out to be.** The step had been
    marked `continue-on-error: true` and was not merely failing to gate — it was
