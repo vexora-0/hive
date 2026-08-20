@@ -17,6 +17,8 @@ const FIXTURE_JPEG = readFileSync(join(__dirname, 'fixtures', 'valid.jpg'));
 export interface TestUser {
   id: string;
   email: string;
+  /** The display name the profile trigger wrote, as the API will echo it. */
+  fullName: string;
   token: string;
   schoolId: string | null;
 }
@@ -35,12 +37,13 @@ export async function createTestUser(
   schoolId: string | null = null,
 ): Promise<TestUser> {
   const email = `${role}.${randomUUID().slice(0, 8)}@hive.test`;
+  const fullName = `Test ${role}`;
 
   const { data, error } = await supabaseTest.auth.admin.createUser({
     email,
     password: TEST_PASSWORD,
     email_confirm: true,
-    user_metadata: { role, full_name: `Test ${role}` },
+    user_metadata: { role, full_name: fullName },
   });
   if (error || !data.user) throw new Error(`createTestUser failed: ${error?.message}`);
 
@@ -62,7 +65,13 @@ export async function createTestUser(
     throw new Error(`Sign-in failed for ${email}: ${signInError?.message}`);
   }
 
-  return { id: data.user.id, email, token: session.session.access_token, schoolId };
+  return {
+    id: data.user.id,
+    email,
+    fullName,
+    token: session.session.access_token,
+    schoolId,
+  };
 }
 
 export async function createTestSchool(name = 'Test Preschool'): Promise<string> {
@@ -133,6 +142,16 @@ export async function createTestPhoto(opts: {
   classId: string;
   uploadedBy: string;
   status?: 'processing' | 'ready' | 'failed';
+  /**
+   * Override `created_at`.
+   *
+   * The diary buckets photographs into months and days, so its tests need rows
+   * at chosen instants rather than all at `now()`. Everything else leaves this
+   * alone and gets the default.
+   */
+  createdAt?: string;
+  /** The teacher's note on the photograph. */
+  caption?: string;
 }): Promise<string> {
   const id = randomUUID();
   const s3Key = `photos/${opts.schoolId}/${opts.classId}/${id}.jpg`;
@@ -155,6 +174,8 @@ export async function createTestPhoto(opts: {
     thumbnail_s3_key: thumbKey,
     mime_type: 'image/jpeg',
     status: opts.status ?? 'processing',
+    ...(opts.createdAt ? { created_at: opts.createdAt } : {}),
+    ...(opts.caption ? { caption: opts.caption } : {}),
   });
   if (error) throw new Error(`createTestPhoto: ${error.message}`);
   return id;

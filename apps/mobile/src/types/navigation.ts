@@ -21,6 +21,7 @@ export type TeacherTabParamList = {
 };
 
 export type ParentTabParamList = {
+  diary: undefined;
   feed: undefined;
   orders: undefined;
   notifications: undefined;
@@ -41,7 +42,9 @@ export function getRoleRoute(role: UserRole): string {
     case 'teacher':
       return '/(teacher)/dashboard';
     case 'parent':
-      return '/(parent)/feed';
+      // The diary, not the wall. A parent's home is their child's story so
+      // far; the wall is a tab away and answers a narrower question.
+      return '/(parent)/diary';
     case 'admin':
       return '/(admin)/dashboard';
   }
@@ -64,7 +67,7 @@ const ROLE_GROUP: Record<UserRole, string> = {
  */
 const GROUP_ROUTES: Record<UserRole, readonly string[]> = {
   teacher: ['dashboard', 'upload', 'notifications', 'profile'],
-  parent: ['feed', 'orders', 'notifications', 'profile'],
+  parent: ['diary', 'feed', 'orders', 'notifications', 'profile'],
   admin: [
     'dashboard',
     'orders',

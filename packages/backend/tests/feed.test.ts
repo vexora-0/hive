@@ -198,3 +198,260 @@ describe('parent feed', () => {
     expect(res.status).toBe(403);
   });
 });
+
+/**
+ * Diary tests — the same privacy boundary as the feed, plus the two things the
+ * diary adds that nothing else in the API does: it groups by **the parent's**
+ * calendar rather than the server's, and it is scoped to exactly one child.
+ *
+ * Its own school and family, deliberately separate from the feed's fixtures
+ * above: the assertions here count photographs per month, so they cannot share
+ * a roster with tests that add rows for other reasons.
+ */
+describe('parent diary', () => {
+  let school: string, otherSchool: string;
+  let klass: string, otherClass: string;
+  let teacher: TestUser, parent: TestUser, stranger: TestUser;
+  let child: string, sibling: string, otherChild: string;
+  /** A child with one photograph, taken half an hour past midnight UTC. */
+  let edgeChild: string;
+
+  // Fixed instants in the past, so "today" can never drift into them and the
+  // month buckets are the same on every run.
+  const MAR_4_MORNING = '2024-03-04T09:00:00.000Z';
+  const MAR_4_LATE = '2024-03-04T11:30:00.000Z';
+  const MAR_19 = '2024-03-19T08:15:00.000Z';
+  const MAY_2 = '2024-05-02T07:45:00.000Z';
+  /** 00:30 UTC on the 1st — the same instant is 31 March west of Greenwich. */
+  const APR_1_EDGE = '2024-04-01T00:30:00.000Z';
+
+  beforeAll(async () => {
+    school = await createTestSchool('Diary School');
+    otherSchool = await createTestSchool('Diary Other School');
+    klass = await createTestClass(school);
+    otherClass = await createTestClass(otherSchool);
+
+    teacher = await createTestUser('teacher', school);
+    parent = await createTestUser('parent', school);
+    stranger = await createTestUser('parent', otherSchool);
+
+    child = await createTestStudent(school, klass, 'Diary Child');
+    sibling = await createTestStudent(school, klass, 'Diary Sibling');
+    edgeChild = await createTestStudent(school, klass, 'Diary Edge Child');
+    otherChild = await createTestStudent(otherSchool, otherClass, 'Other Child');
+
+    await linkParent(parent.id, child);
+    await linkParent(parent.id, sibling);
+    await linkParent(parent.id, edgeChild);
+    await linkParent(stranger.id, otherChild);
+
+    // Three photographs in March across two days, one in May.
+    for (const [createdAt, caption] of [
+      [MAR_4_MORNING, 'First morning in the sandpit'],
+      [MAR_4_LATE, undefined],
+      [MAR_19, undefined],
+      [MAY_2, undefined],
+    ] as Array<[string, string | undefined]>) {
+      const id = await createTestPhoto({
+        schoolId: school,
+        classId: klass,
+        uploadedBy: teacher.id,
+        createdAt,
+        caption,
+      });
+      await tagStudent(id, child, teacher.id);
+      await setPhotoReady(id);
+    }
+
+    // The sibling's own photograph, in a month the first child has nothing in.
+    // Nothing of it may appear in the first child's diary.
+    const siblingPhoto = await createTestPhoto({
+      schoolId: school,
+      classId: klass,
+      uploadedBy: teacher.id,
+      createdAt: '2024-07-01T09:00:00.000Z',
+    });
+    await tagStudent(siblingPhoto, sibling, teacher.id);
+    await setPhotoReady(siblingPhoto);
+
+    const edgePhoto = await createTestPhoto({
+      schoolId: school,
+      classId: klass,
+      uploadedBy: teacher.id,
+      createdAt: APR_1_EDGE,
+    });
+    await tagStudent(edgePhoto, edgeChild, teacher.id);
+    await setPhotoReady(edgePhoto);
+  }, 60_000);
+
+  afterAll(cleanupUsers);
+
+  const diary = (token: string, studentId: string, tzOffset = 0) =>
+    request(app)
+      .get(`/api/v1/feed/diary?studentId=${studentId}&tzOffset=${tzOffset}`)
+      .set(bearer(token));
+
+  it('returns the whole journey as months, oldest first', async () => {
+    const res = await diary(parent.token, child);
+
+    expect(res.status).toBe(200);
+    const { chapters, summary, student } = res.body.data;
+
+    expect(student.id).toBe(child);
+    expect(chapters.map((c: { month: string }) => c.month)).toEqual([
+      '2024-03',
+      '2024-05',
+    ]);
+
+    // March: three photographs over two days. The distinction matters — the
+    // strand plots counts and the entries list days, and conflating them was
+    // the easiest thing in this service to get wrong.
+    expect(chapters[0].photoCount).toBe(3);
+    expect(chapters[0].dayCount).toBe(2);
+    expect(chapters[1].photoCount).toBe(1);
+    expect(chapters[1].dayCount).toBe(1);
+
+    expect(summary.totalPhotos).toBe(4);
+    expect(summary.totalDays).toBe(3);
+    // Compared as instants, not as strings. Postgres emits
+    // `2024-03-04T09:00:00+00:00` and the service passes it through verbatim —
+    // deliberately, for the same reason `utils/cursor` refuses to re-serialise
+    // a timestamp. Asserting the JS `…000Z` spelling would be testing
+    // `toISOString`, not the diary.
+    expect(Date.parse(summary.firstPhotoAt)).toBe(Date.parse(MAR_4_MORNING));
+    expect(summary.truncated).toBe(false);
+  });
+
+  it('gives every month a signed cover print', async () => {
+    const res = await diary(parent.token, child);
+
+    for (const chapter of res.body.data.chapters) {
+      expect(chapter.cover).not.toBeNull();
+      expect(chapter.cover.url).toContain('token=');
+    }
+  });
+
+  /**
+   * A diary is one child's. A sibling's photographs interleaved into it would
+   * make "Day 40" a claim about whichever of them started first.
+   */
+  it('never mixes a sibling into a child\'s diary', async () => {
+    const res = await diary(parent.token, child);
+
+    const months = res.body.data.chapters.map((c: { month: string }) => c.month);
+    expect(months).not.toContain('2024-07');
+  });
+
+  it('returns 404 for a child the caller is not a parent of', async () => {
+    const res = await diary(stranger.token, child);
+
+    // 404 rather than 403 — a 403 confirms the child exists.
+    expect(res.status).toBe(404);
+    expect(JSON.stringify(res.body)).not.toContain(child);
+  });
+
+  it('requires a studentId', async () => {
+    const res = await request(app)
+      .get('/api/v1/feed/diary')
+      .set(bearer(parent.token));
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects a malformed studentId with 400 rather than 500', async () => {
+    const res = await request(app)
+      .get('/api/v1/feed/diary?studentId=not-a-uuid')
+      .set(bearer(parent.token));
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects a teacher reading a diary', async () => {
+    const res = await diary(teacher.token, child);
+    expect(res.status).toBe(403);
+  });
+
+  /**
+   * The reason `tzOffset` exists.
+   *
+   * One photograph at 00:30 UTC on 1 April. Bucketed in UTC it is April; on a
+   * clock one hour behind UTC it is half eleven at night on 31 March, and the
+   * parent looking at it would be shown a March photograph filed under April.
+   */
+  it('buckets months in the viewer\'s calendar, not the server\'s', async () => {
+    const utc = await diary(parent.token, edgeChild, 0);
+    expect(utc.body.data.chapters.map((c: { month: string }) => c.month)).toEqual([
+      '2024-04',
+    ]);
+
+    // getTimezoneOffset() is UTC minus local, so +60 is one hour behind UTC.
+    const behind = await diary(parent.token, edgeChild, 60);
+    expect(behind.body.data.chapters.map((c: { month: string }) => c.month)).toEqual([
+      '2024-03',
+    ]);
+  });
+
+  describe('a chapter', () => {
+    it('groups a month into the days it happened on', async () => {
+      const res = await request(app)
+        .get(`/api/v1/feed/diary/2024-03?studentId=${child}&tzOffset=0`)
+        .set(bearer(parent.token));
+
+      expect(res.status).toBe(200);
+      const { entries, truncated } = res.body.data;
+
+      expect(truncated).toBe(false);
+      expect(entries.map((e: { date: string }) => e.date)).toEqual([
+        '2024-03-04',
+        '2024-03-19',
+      ]);
+
+      const [firstDay] = entries;
+      expect(firstDay.photoCount).toBe(2);
+      // Instants, not strings — see the note in the outline test above.
+      expect(Date.parse(firstDay.firstAt)).toBe(Date.parse(MAR_4_MORNING));
+      expect(Date.parse(firstDay.lastAt)).toBe(Date.parse(MAR_4_LATE));
+      expect(firstDay.teachers).toEqual([teacher.fullName]);
+      expect(firstDay.photos[0].caption).toBe('First morning in the sandpit');
+      expect(firstDay.photos[0].url).toContain('token=');
+    });
+
+    it('returns an empty month rather than failing', async () => {
+      const res = await request(app)
+        .get(`/api/v1/feed/diary/2024-04?studentId=${child}&tzOffset=0`)
+        .set(bearer(parent.token));
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.entries).toEqual([]);
+    });
+
+    it('returns 404 for a child the caller is not a parent of', async () => {
+      const res = await request(app)
+        .get(`/api/v1/feed/diary/2024-03?studentId=${child}&tzOffset=0`)
+        .set(bearer(stranger.token));
+
+      expect(res.status).toBe(404);
+    });
+
+    it('rejects a malformed month with 400 rather than 500', async () => {
+      for (const month of ['2024-13', 'March', '2024-3', '2024-03-04']) {
+        const res = await request(app)
+          .get(`/api/v1/feed/diary/${month}?studentId=${child}&tzOffset=0`)
+          .set(bearer(parent.token));
+
+        expect(res.status).toBe(400);
+      }
+    });
+
+    it('rejects a tzOffset outside any real timezone', async () => {
+      const res = await request(app)
+        .get(`/api/v1/feed/diary/2024-03?studentId=${child}&tzOffset=99999`)
+        .set(bearer(parent.token));
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('VALIDATION_ERROR');
+    });
+  });
+});

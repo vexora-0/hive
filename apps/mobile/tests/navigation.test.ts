@@ -63,6 +63,9 @@ describe('getRoleEquivalentRoute', () => {
       // `feed` is parent-only.
       expect(getRoleEquivalentRoute('teacher', ['(parent)', 'feed'])).toBeNull();
       expect(getRoleEquivalentRoute('admin', ['(parent)', 'feed'])).toBeNull();
+      // So is `diary`.
+      expect(getRoleEquivalentRoute('teacher', ['(parent)', 'diary'])).toBeNull();
+      expect(getRoleEquivalentRoute('admin', ['(parent)', 'diary'])).toBeNull();
       // `users`, `schools` and `class-detail` are admin-only.
       expect(getRoleEquivalentRoute('teacher', ['(admin)', 'users'])).toBeNull();
       expect(getRoleEquivalentRoute('parent', ['(admin)', 'schools'])).toBeNull();
@@ -106,7 +109,7 @@ describe('getRoleRoute', () => {
   // the thing the collision bug sent every parent to.
   it('sends each role to its own home screen', () => {
     expect(getRoleRoute('teacher')).toBe('/(teacher)/dashboard');
-    expect(getRoleRoute('parent')).toBe('/(parent)/feed');
+    expect(getRoleRoute('parent')).toBe('/(parent)/diary');
     expect(getRoleRoute('admin')).toBe('/(admin)/dashboard');
   });
 });

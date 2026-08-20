@@ -38,12 +38,18 @@ function tabIcon(
 /**
  * Parent tab layout.
  *
- * Four tabs:
- * 1. **Feed** — photo feed for the parent's children.
- * 2. **Orders** — order history.
- * 3. **Alerts** — notifications.
- * 4. **Profile** — account info and sign out.
+ * Five tabs:
+ * 1. **Diary** — the child's journey, read forwards. The parent's home.
+ * 2. **Moments** — the photo wall, newest first.
+ * 3. **Orders** — order history.
+ * 4. **Alerts** — notifications.
+ * 5. **Profile** — account info and sign out.
  * (photo/[id] is a stack screen, hidden from tab bar.)
+ *
+ * Diary leads, and Moments is no longer the landing screen. The wall answers
+ * "what arrived"; the diary answers "how has it gone", and the second is the
+ * question a family keeps the app for. Both are kept — the wall is still the
+ * fastest way to this afternoon, and the diary is deliberately not that.
  */
 export default function ParentLayout() {
   return (
@@ -57,9 +63,20 @@ export default function ParentLayout() {
       }}
     >
       <Tabs.Screen
+        name="diary"
+        options={{
+          title: 'Diary',
+          // A bound book rather than a clock or a chart: the screen is a
+          // keepsake being read, not an analytics view being consulted.
+          tabBarIcon: tabIcon('book', 'book-outline'),
+          tabBarAccessibilityLabel: 'Diary',
+        }}
+      />
+
+      <Tabs.Screen
         name="feed"
         options={{
-          title: 'Feed',
+          title: 'Moments',
           tabBarIcon: tabIcon('images', 'images-outline'),
           tabBarAccessibilityLabel: 'Photo Feed',
         }}
