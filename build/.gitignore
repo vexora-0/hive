@@ -5,3 +5,4 @@ ref-base.docx
 submitted*.md
 prepped.html
 REPORT.md.bak-*
+__pycache__/
