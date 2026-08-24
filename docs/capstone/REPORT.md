@@ -630,7 +630,6 @@ This is the most instructive result in the chapter: the exercise validated the s
 | Capacity under load | 50-VU run bound by the per-identity rate limiter, not the application | Smoke figures exist and pass; no unconstrained throughput or latency figure (§3.3.6) |
 | iOS | Run on a physical iPhone through Expo Go on 16 August, not as a standalone build; nothing captured | All three roles exercised, so the platform is no longer unexercised - but the evidence is an observed pass with no artefact, and the native paths ran under Expo Go's container rather than the application's own bundle identifier (§3.3.8) |
 | Native deep links | Largely closed on 16 August. The operating system now routes hive:// into the application on Android; what remains unshown is the post-authentication screen resolution | Measured against the connected handset, before and after installing a standalone build. Before: pm list packages showed host.exp.exponent but no com.hive.app, resolve-activity ... "hive://feed" answered *No activity found*, and the intent failed with *unable to resolve Intent* - the earlier device runs used Expo Go, which serves under exp://, so the scheme had never been registered. After expo run:android (BUILD SUCCESSFUL, 12m 16s): the scheme resolves to com.hive.app.MainActivity; a cold start from am start -a android.intent.action.VIEW -d "hive://feed" launches the app with that activity top-resumed; a second firing reports *intent has been delivered to currently running top-most instance*; and an unauthenticated link is correctly redirected to the login screen by the auth gate. Not shown: that an authenticated link resolves to the target screen - the sign-in could not be typed reliably under automation (Gboard's Google Translate mode rewrote the input, and the controlled TextInput drops injected characters), which is a harness limitation, not an application finding. iOS remains unexercised: Expo Go serves under exp:// there |
-| The diary on a device | Added 20 August, after the 16 August device runs | Its two endpoints and the calendar arithmetic carry 29 automated tests, but the screen itself has not been driven on hardware and no captured figure of it exists, so it contributes nothing to §4.3 |
 | Server-side HEIC conversion | sharp's prebuilt libvips has no HEVC decoder | Cannot work, and does not. Tested 24 July against a real HEVC HEIC. Handled by a device-side transcode instead; the server refuses HEVC with an actionable 400 |
 | Mobile error reporting | EXPO_PUBLIC_SENTRY_DSN unset | Server-side reporting is proven (§6.3 item 4); the client is not |
 
@@ -802,7 +801,7 @@ The path a deployment would take - a container platform for the API, with the da
 ## 4.3 Demonstration screenshots
 Capture conditions. Every application figure below was taken on a physical Android device (OnePlus CPH2487) running the application against the local API over adb reverse, not in a browser or an emulator. All are 1240 px wide, captured in light mode against the seeded demonstration dataset, and cropped uniformly to remove the operating-system status bar. Nothing is composed, retouched or recreated; where a figure shows a number, that number came from the database.
 
-They are dated, and the interface has moved since. Every figure below was captured on the afternoon of 16 August. The brand and play layer described in §2.3.8 landed the same evening, and the diary on 20 August. The figures are therefore an accurate record of the application as it stood when they were taken and not of the current build: the login screen, the onboarding carousel, the tab bar, the empty states and the feed's layout all changed afterwards, and the diary has no figure at all. Re-capturing them is the outstanding piece of evidence work, and it is listed as such in §6.3 rather than glossed here.
+Re-captured on 24 August against the current build. An earlier set was taken on 16 August, before the brand and play layer landed that evening and before the diary landed on 20 August, so those figures showed an interface the submission no longer describes. Every application figure below is now from the same 24 August session on the same handset, at 1240 px wide with the status bar cropped uniformly, and the diary - which previously had no figure at all - is captured in two.
 
 **Table 4.2 - Application figures**
 
@@ -811,8 +810,8 @@ They are dated, and the interface has moved since. Every figure below was captur
 | - | app-01-login.png | Entry point and role selection |
 | - | app-02-teacher-dashboard.png | Class-scoped teacher view |
 | 2.5 | fig-2.5-upload-tagger.png | The tagging gate - student tagger open during upload |
-| 2.5b | fig-2.5b-tagger-tagged.png | Children tagged; the upload control becomes enabled |
-| 2.5c | fig-2.5c-upload-sent.png | Upload completing with real per-file progress (G-27) |
+| 2.5b | fig-2.5b-tagger-tagged.png | Children tagged; the upload control becomes enabled. *16 August capture* |
+| 2.5c | fig-2.5c-upload-sent.png | Upload completing with real per-file progress (G-27). *16 August capture* |
 | 2.6 | fig-2.6-feed-child-switcher.png | The many-to-many model - Rajesh's switcher showing Aarav and Diya |
 | - | app-03-feed-switched-child.png | Feed after switching child - different photographs, scoping is live |
 | - | app-04-photo-detail.png | Signed-URL rendering with a blurhash placeholder |
@@ -822,6 +821,8 @@ They are dated, and the interface has moved since. Every figure below was captur
 | - | app-06-notifications.png | Trigger-generated notifications naming the correct child |
 | - | app-07-parent-profile.png | Parent profile |
 | - | app-08-upload-empty.png | Upload empty state |
+| - | app-09-diary.png | The parent diary, the landing tab since 20 August - the journey since the first photograph |
+| - | app-10-diary-month.png | A diary month expanded into day entries, with times and the teacher who posted |
 | 2.8 | fig-2.8-admin-dashboard.png | Administration - non-zero counts, totalPhotos excluding archived rows |
 
 **Table 4.3 - The privacy comparison (Figure 3.4)**
@@ -949,7 +950,7 @@ Stated explicitly; each is evidenced in Table 3.6.
 4.  The error-reporting pipeline has never carried an error. Closed on 16 August. A Sentry project was created, SENTRY_DSN supplied, and the backend now logs *"Sentry initialised"* where it previously took its no-op path. A deliberate exception was captured and delivered - issue HIVE-BACKEND-1, event 8a5130bf. The beforeSend scrubber therefore ran against a real transported event rather than only the synthetic one it was unit-tested with. The mobile application is not wired to Sentry: it reads EXPO_PUBLIC_SENTRY_DSN, which is unset, so client-side reporting remains unproven.
 5.  The continuous-integration test step is advisory. Closed on 16 August, and worth recording because of what it turned out to be. The step had been marked continue-on-error: true and was not merely failing to gate - it was *failing*, on every push, with the failure masked. The harness refused to start (*"SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in packages/backend/.env.test"*), the step exited 1, and the job still reported green. A green tick beside Test backend implied a guard that did not exist, and the only place the truth appeared was the run's annotations. Adding TEST_SUPABASE_URL, TEST_SUPABASE_SERVICE_KEY and TEST_SUPABASE_ANON_KEY as repository secrets, pointing at the separate hive-test project, let the suite run: 218 tests passed across 8 files in 373.86 s in CI. The escape hatch was then removed, and Figure 5.2 is the first run in which the tick beside Test backend means the suite passed. All four checks - lint, typecheck, build and the test suite - now block a merge, and the suite has since grown to 247.
 6.  Server-side HEIC conversion does not work. sharp's prebuilt libvips ships libheif without an HEVC decoder, and an iPhone HEIC is HEVC-coded, so the container parses and the pixel decode fails. Established by testing a real HEVC HEIC on 24 July 2026. The mobile client transcodes on the device instead, and the server refuses HEVC with an actionable 400. Magic-byte rejection, previously listed here alongside it, is covered - by photos.test.ts T-20.
-7.  The diary has not been seen on hardware, and has no figure. It landed on 20 August, after the device runs of 16 August. Its two endpoints and its calendar arithmetic are covered by 29 automated tests, 13 of them pure cases that need no database, and the screen compiles and typechecks - but nobody has opened it on a phone, and §4.3 contains no capture of it. The same applies to the brand and play layer landed the same week: it is the largest visual change since the design system was written, and every application figure in §4.3 still shows the interface as it was before it.
+7.  The diary was driven on hardware on 24 August and is captured in §4.3, closing what had been the largest gap in the evidence. Two defects found on that run are open and are recorded here rather than left for a reader to notice: the diary's three summary figures render as clipped glyph fragments on Android, because AnimatedCounter paints into a TextInput with no explicit line height and the diary does not override the inherited font size; and EXIF orientation is never applied anywhere in the image pipeline, so a photograph taken in portrait on a phone is displayed rotated a quarter turn in both the feed and the diary. The second is visible in the figures themselves. Neither is a design decision; both are defects with known causes and neither was fixed before submission.
 8.  A Redis outage is reported but does not change the health status code. /health surfaces "cache" alongside "database", but only the database determines 200 against 503. This is deliberate - losing the idempotency cache degrades deduplication rather than availability, so the instance should stay in rotation - with the consequence that an orchestrator probing only the status code will not restart or drain an instance whose Redis is unreachable.
 
 ## 6.4 Future enhancements
@@ -959,16 +960,14 @@ Immediate, in dependency order:
 2.  Execute the k6 suite against that deployment and record the results.
 3.  Produce iOS and Android builds and verify the platform-specific paths.
 4.  Make the test step blocking. Done 16 August - see §6.3 item 5.
-5.  Re-capture the application figures. Every figure in §4.3 predates the brand and play layer and the diary, so the submission's pictures and its current build no longer agree. This is the cheapest outstanding item and the most visible.
-6.  Open the diary on a device and capture it, so the newest feature has the same standard of evidence as the rest.
 
 Product:
 
-7.  Payment gateway integration for print orders.
-8.  Push notifications, replacing in-app only.
-9.  Bulk upload with client-side compression.
-10. Photograph search by child, class or date range.
-11. Data-retention policy and parent-initiated deletion, appropriate to a child-privacy product.
+5.  Payment gateway integration for print orders.
+6.  Push notifications, replacing in-app only.
+7.  Bulk upload with client-side compression.
+8.  Photograph search by child, class or date range.
+9.  Data-retention policy and parent-initiated deletion, appropriate to a child-privacy product.
 
 ------------------------------------------------------------------------
 
