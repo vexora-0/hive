@@ -40,22 +40,22 @@ STAGE = ROOT / "build/report-staged.md"
 # the source of truth for either the wording or the page numbers.
 FIGURES = {
     "2.1": ("fig-2.1-architecture.png", "High-level system architecture"),
-    "2.2": ("fig-2.2-dataflow.png", "Data flow — photograph upload to parent notification"),
+    "2.2": ("fig-2.2-dataflow.png", "Data flow - photograph upload to parent notification"),
     "2.3": ("fig-2.3-er-diagram.png", "Entity-relationship diagram"),
     "2.4": ("fig-2.4-authz-pipeline.png",
-            "Component interaction — authentication and the authorization pipeline"),
+            "Component interaction - authentication and the authorization pipeline"),
     "2.5": ("fig-2.5-upload-tagger.png", "Teacher upload screen with student tagger"),
     "2.6": ("fig-2.6-feed-child-switcher.png", "Parent feed with child switcher"),
     "2.7": ("fig-2.7-order-confirm.png", "Order placement and confirmation"),
     "2.8": ("fig-2.8-admin-dashboard.png", "Administrator dashboard"),
-    "3.1": ("fig-3.1-test-suite.png", "Test suite execution — 218 tests passing"),
-    "3.2": ("fig-3.2-verify-security.png", "Security verification output — 29 passed, 0 failed, 1 skipped"),
-    "3.3": ("fig-3.3-sabotage.png", "Sabotage exercise — targeted tests failing"),
+    "3.1": ("fig-3.1-test-suite.png", "Test suite execution - 218 tests passing"),
+    "3.2": ("fig-3.2-verify-security.png", "Security verification output - 29 passed, 0 failed, 1 skipped"),
+    "3.3": ("fig-3.3-sabotage.png", "Sabotage exercise - targeted tests failing"),
     "3.5": ("fig-3.5-signed-url.png", "Signed URL 200 versus stripped-token 400"),
     "4.1": ("fig-4.1-health.png", "Health endpoint, healthy and degraded"),
     "5.1": ("fig-5.1-commit-history.png", "Commit history"),
     "5.2": ("fig-5.2-ci-run.png",
-            "Continuous integration run — lint, typecheck, build and 218 tests, "
+            "Continuous integration run - lint, typecheck, build and 218 tests, "
             "all blocking"),
 }
 
@@ -85,12 +85,12 @@ def fig_md(num: str) -> str:
     name, caption = FIGURES[num]
     path = FIGDIR / name
     if not path.exists():
-        print(f"  !! missing {name} — figure {num} left as a placeholder")
-        return f"*(Figure {num} — {caption} — IMAGE MISSING)*"
+        print(f"  !! missing {name} - figure {num} left as a placeholder")
+        return f"*(Figure {num} - {caption} - IMAGE MISSING)*"
     kind = "portrait" if num in PORTRAIT else ("diagram" if num in DIAGRAM else "wide")
     width = WIDTH_OVERRIDE.get(num, WIDTH[kind])
     rel = path.relative_to(ROOT)
-    return f"![Figure {num} — {caption}]({rel}){{width={width}}}"
+    return f"![Figure {num} - {caption}]({rel}){{width={width}}}"
 
 
 def check_commit_stats(md: str) -> None:
@@ -135,13 +135,13 @@ def check_commit_stats(md: str) -> None:
         print(f"  !! §5.1 anchors to commit {sha}, which is not in this repository.")
     elif at_anchor != claimed:
         print(f"  !! §5.1 claims {claimed} commits at {sha}, but that commit has {at_anchor}.")
-        print(f"     The anchor is what makes the figure and the prose agree — fix one.")
+        print(f"     The anchor is what makes the figure and the prose agree - fix one.")
     else:
         drift = (head - at_anchor) if head is not None else 0
         note = f", {drift} commit(s) behind HEAD" if drift else ""
-        print(f"  §5.1: {claimed} commits at {sha} — verified{note}")
+        print(f"  §5.1: {claimed} commits at {sha} - verified{note}")
         if drift:
-            print(f"     That is fine — it is a dated snapshot, and Figure 5.1 shows the")
+            print(f"     That is fine - it is a dated snapshot, and Figure 5.1 shows the")
             print(f"     same commit. Re-snap both only if you want the latest number.")
 
 
@@ -191,14 +191,14 @@ def main() -> int:
     # end, which is instructions to the typesetter, not content.
     # `>.*` not `> .*` — the blockquote contains bare `>` separator lines, and
     # requiring the space stops the match at the first one.
-    md = re.sub(r"(^# Hive — Capstone Report\n)\n(>.*\n)+", r"\1", md, flags=re.M)
+    md = re.sub(r"(^# Hive - Capstone Report\n)\n(>.*\n)+", r"\1", md, flags=re.M)
     md = re.sub(r"\n# FORMATTING CHECKLIST\n.*?(?=\n# |\Z)", "\n", md, flags=re.S)
 
     # Table captions -> a real Word caption style, so the LIST OF TABLES can be
     # generated from them. They are plain bold paragraphs in the markdown, which
     # Word cannot collect.
     md = re.sub(
-        r"^\*\*(Table \d+\.\d+ —[^\n]*?)\*\*(\s*\*\([^\n]*\)\*)?$",
+        r"^\*\*(Table \d+\.\d+ -[^\n]*?)\*\*(\s*\*\([^\n]*\)\*)?$",
         lambda m: '::: {custom-style="TableCaption"}\n'
                   + m.group(1) + (m.group(2).strip() if m.group(2) else "")
                   + "\n:::",
@@ -220,17 +220,17 @@ def main() -> int:
     a = (FIGDIR / "fig-3.4a-rajesh-feed.png").relative_to(ROOT)
     b = (FIGDIR / "fig-3.4b-vikram-feed.png").relative_to(ROOT)
     pair = (
-        "| Rajesh — Bloom Preschool | Vikram — Little Stars Academy |\n"
+        "| Rajesh - Bloom Preschool | Vikram - Little Stars Academy |\n"
         "|:---:|:---:|\n"
         f"| ![]({a}){{width=2.4in}} | ![]({b}){{width=2.4in}} |\n\n"
-        "*Figure 3.4 — Privacy comparison: two parents, zero overlap.*\n"
+        "*Figure 3.4 - Privacy comparison: two parents, zero overlap.*\n"
     )
     md = md.replace("*(Figure 3.4)*", pair, 1)
 
     # Anchored single figures.
     for num in ["2.1", "2.2", "2.3", "2.4", "3.2", "3.3"]:
         for anchor in (f"*(Figure {num})*",
-                       f"*(Figure {num} — entity-relationship diagram)*"):
+                       f"*(Figure {num} - entity-relationship diagram)*"):
             if anchor in md:
                 md = md.replace(anchor, fig_md(num), 1)
                 break
@@ -238,14 +238,14 @@ def main() -> int:
             print(f"  .. no anchor found for figure {num}")
 
     # 2.5-2.8 share one anchor covering the application screenshots.
-    grouped = re.search(r"\*\(Figures 2\.5–2\.8[^)]*\)\*", md)
+    grouped = re.search(r"\*\(Figures 2\.5-2\.8[^)]*\)\*", md)
     if grouped:
         md = md.replace(grouped.group(0),
                         "\n\n".join(fig_md(n) for n in ["2.5", "2.6", "2.7", "2.8"]), 1)
 
     # 5.1 and 5.2 share one anchor.
     md = md.replace(
-        "*(Figure 5.1 — commit history. Figure 5.2 — continuous integration run.)*",
+        "*(Figure 5.1 - commit history. Figure 5.2 - continuous integration run.)*",
         fig_md("5.1") + "\n\n" + fig_md("5.2"),
         1)
 
@@ -263,7 +263,7 @@ def main() -> int:
 
     cmd = [
         "pandoc", str(STAGE),
-        "--from", "markdown+pipe_tables+implicit_figures+raw_attribute+fenced_divs",
+        "--from", "markdown-smart+pipe_tables+implicit_figures+raw_attribute+fenced_divs",
         "--to", "docx",
         "--reference-doc", str(REF),
         "--resource-path", f"{ROOT}:{FIGDIR}",
