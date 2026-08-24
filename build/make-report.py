@@ -102,7 +102,7 @@ def check_commit_stats(md: str) -> None:
     contradicts. Nothing here edits the document; it prints a warning loudly
     enough that the last build before submission cannot miss it.
     """
-    stated = re.search(r"^\| Commits \| (\d+) \|$", md, re.M)
+    stated = re.search(r"^\|\s*Commits\s*\|\s*(\d+)\s*\|", md, re.M)
     if not stated:
         return
     claimed = int(stated.group(1))
@@ -205,13 +205,13 @@ def main() -> int:
         md, flags=re.M)
 
     # Replace the two hand-written lists with fields Word populates itself.
-    md = re.sub(r"(# LIST OF FIGURES\n\n).*?(?=\n# LIST OF TABLES\n)",
-                lambda m: m.group(1) + toc_field(
+    md = re.sub(r"(# LIST OF FIGURES\n)\n*.*?(?=\n# LIST OF TABLES\n)",
+                lambda m: m.group(1) + "\n" + toc_field(
                     "ImageCaption",
                     "Update fields in Word (select all, then F9) to build this list."),
                 md, flags=re.S)
-    md = re.sub(r"(# LIST OF TABLES\n\n).*?(?=\n# LIST OF ABBREVIATIONS\n)",
-                lambda m: m.group(1) + toc_field(
+    md = re.sub(r"(# LIST OF TABLES\n)\n*.*?(?=\n# LIST OF ABBREVIATIONS\n)",
+                lambda m: m.group(1) + "\n" + toc_field(
                     "TableCaption",
                     "Update fields in Word (select all, then F9) to build this list."),
                 md, flags=re.S)
