@@ -1,24 +1,29 @@
 $ # deleted `photo.uploaded_by === user.id &&` from assertPhotoAccess
 $ pnpm --filter @hive/backend test
 
- × rejects a same-school colleague archiving another teacher's photo   1354ms
- × rejects a colleague untagging a student from another teacher's photo 1402ms
- × refuses confirming a colleague's photo                               574ms
- × refuses tagging on a colleague's photo                               975ms
- × refuses overwriting a colleague's photo file                         678ms
+     × rejects a same-school colleague archiving another teacher's photo 921ms
+     × rejects a colleague untagging a student from another teacher's photo 816ms
+       × refuses confirming a colleague's photo 336ms
+       × refuses tagging on a colleague's photo 483ms
+       × refuses overwriting a colleague's photo file 327ms
 
-FAIL tests/authorization.test.ts > G-17 > refuses confirming a colleague's photo
-  AssertionError: expected 200 to be 403
-FAIL tests/authorization.test.ts > G-17 > refuses tagging on a colleague's photo
-  AssertionError: expected 200 to be 403
-FAIL tests/authorization.test.ts > G-17 > refuses overwriting a colleague's photo file
-  AssertionError: expected 200 to be 403
-FAIL tests/photos.test.ts > rejects a same-school colleague archiving another teacher's photo
-  AssertionError: expected 204 to be 403
-FAIL tests/photos.test.ts > rejects a colleague untagging a student from another teacher's photo
-  AssertionError: expected 204 to be 403
 
- Test Files  2 failed | 6 passed (8)
-      Tests  5 failed | 213 passed (218)
+ FAIL  tests/authorization.test.ts > authorization > G-17 — a teacher cannot mutate a colleague's photo > refuses confirming a colleague's photo
+AssertionError: expected 200 to be 403 // Object.is equality
+
+ FAIL  tests/authorization.test.ts > authorization > G-17 — a teacher cannot mutate a colleague's photo > refuses tagging on a colleague's photo
+AssertionError: expected 200 to be 403 // Object.is equality
+
+ FAIL  tests/authorization.test.ts > authorization > G-17 — a teacher cannot mutate a colleague's photo > refuses overwriting a colleague's photo file
+AssertionError: expected 200 to be 403 // Object.is equality
+
+ FAIL  tests/photos.test.ts > archiving a photo and untagging a student > rejects a same-school colleague archiving another teacher's photo
+AssertionError: expected 204 to be 403 // Object.is equality
+
+ FAIL  tests/photos.test.ts > archiving a photo and untagging a student > rejects a colleague untagging a student from another teacher's photo
+AssertionError: expected 204 to be 403 // Object.is equality
+
+ Test Files  2 failed | 7 passed (9)
+      Tests  5 failed | 242 passed (247)
 
 $ git checkout -- packages/backend/src/services/photo.service.ts   # line restored

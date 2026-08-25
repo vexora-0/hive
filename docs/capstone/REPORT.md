@@ -545,7 +545,7 @@ This table covers the backend integration suite, which is the one that exercises
 ### 3.3.1 Automated suite
 247 of 247 passing across 9 files in 21.96 s, run on 20 August 2026 against the tree at 3b4145e, alongside 117 of 117 mobile unit tests in 429 ms. The static checks were re-run on the same tree: pnpm typecheck --force clean in both packages, pnpm lint 0 errors and 6 warnings - down from 27 earlier in August - and pnpm build:backend succeeding.  *(Figure 3.1)*
 
-The 21.96 s is not a speed-up in the code and must not be read as one. It is the test target moving from a hosted Supabase project to a local stack. The comparable earlier figures - 245 s and 122.63 s on 16 August, and 373.86 s in CI - were 218 tests against the remote hive-test project, where wall time is dominated by network latency to Postgres, GoTrue and Storage rather than by the code under test. CI still runs against hive-test, so the CI figure and the local figure measure different things and must not be quoted against each other.
+The 21.96 s is not a speed-up in the code and must not be read as one. It is the test target moving from a hosted Supabase project to a local stack. The comparable earlier figures - 245 s and 122.63 s on 16 August, and 373.86 s in CI - were 218 tests against the remote hive-test project, where wall time is dominated by network latency to Postgres, GoTrue and Storage rather than by the code under test. CI still runs against hive-test, so the CI figure and the local figure measure different things and must not be quoted against each other. Figure 3.1 shows a re-run on 25 August against the hosted project - the same 247 tests across 9 files, passing, in 150.85 s, alongside 117 mobile unit tests in 330 ms. It is reproduced against the hosted target rather than the local stack because that is what a reader can reach; the seven-fold spread between the two is the point of this paragraph, not a discrepancy.
 
 **Table 3.3 - Runtime functional verification**
 
@@ -606,7 +606,7 @@ A passing suite proves nothing until it has been made to fail deliberately. One 
 
 Result, when the exercise was first performed: exactly the three same-school ownership tests failed, as intended.
 
-Repeated on 16 August, it now fails five - the guard has gained coverage since. 218 tests \| 5 failed \| 213 passed:
+Repeated on 25 August against the current suite it fails five, the guard having gained coverage since: 247 tests \| 5 failed \| 242 passed. Nothing else moved, which is the property that matters - the sabotage is precise, not merely destructive:
 
 | **File** | **Test** | **Expected** | **Got** |
 |----|----|----|----|

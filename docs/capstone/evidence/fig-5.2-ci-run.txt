@@ -4,16 +4,16 @@ TEST_SUPABASE_SERVICE_KEY	2026-08-16T06:12:12Z
 TEST_SUPABASE_URL	2026-08-16T06:12:12Z
 
 $ gh run list --limit 4
-completed  success  ci: make the test suite actually gate a pull r push  8m25s
-completed  success  docs(capstone): give figure 2.6 its own subjec push  7m40s
-completed  success  docs(capstone): let Word build the figure and  push  1m37s
-completed  success  docs(capstone): capture the evidence transcrip push  1m33s
+completed  success  docs(capstone): re-capture the figures on  push  9m54s
+completed  success  docs(capstone): strip typographic dashes a push  9m3s
+completed  success  docs(capstone): port the submitted draft b push  9m24s
+completed  success  [FEAT] Dairy                               push  10m29s
 
-$ gh run view --job $(gh run view 31931245859 --json jobs -q '.jobs[0].databaseId')
-✓ main CI · 31931245859
-Triggered via push about 9 minutes ago
+$ gh run view --job 97533292160
+✓ main CI · 32759074416
+Triggered via push about 7 hours ago
 
-✓ Lint, typecheck, build in 7m54s (ID 95126311224)
+✓ Lint, typecheck, build in 9m22s (ID 97533292160)
   ✓ Set up job
   ✓ Initialize containers
   ✓ Run actions/checkout@v4
@@ -30,4 +30,6 @@ Triggered via push about 9 minutes ago
   ✓ Post Run actions/checkout@v4
 
   no `continue-on-error` on the test step: the tick is the suite passing.
-  218 tests across 8 files, run against the hive-test project.
+  Test Files  9 passed (9)
+  Tests  247 passed (247)
+  Duration  499.19s (transform 505ms, setup 646ms, import 5.75s, tests 491.55s, environment 1ms)
