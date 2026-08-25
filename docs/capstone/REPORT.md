@@ -849,14 +849,14 @@ The recording covers teacher upload and tagging, the parent feed, the privacy co
 ## 5.1 Version control evidence
 Repository: https://github.com/vexora-0/hive
 
-*Counted at commit `3b4145e`, 20 August 2026. Figure 5.1 is a capture of an earlier head and shows the corresponding earlier totals; the figures below are a dated snapshot re-counted on 20 August, not a live count, and any commit made after that point moves them.*
+*Counted at commit `3156632`, 25 August 2026. Figure 5.1 is a capture of an earlier head and shows the corresponding earlier totals; the figures below are a dated snapshot re-counted on 20 August, not a live count, and any commit made after that point moves them.*
 
 | **Metric**              | **Value**                                      |
 |-------------------------|------------------------------------------------|
-| Commits                 | 455                                            |
+| Commits                 | 461                                            |
 | Contributors            | 4                                              |
 | Period                  | 1 February - 20 August 2026                    |
-| Active development days | 152                                            |
+| Active development days | 154                                            |
 | Source files            | 245 TypeScript / TSX                           |
 | Lines of source         | ~44,350                                        |
 | Migrations              | 20                                             |
@@ -864,12 +864,12 @@ Repository: https://github.com/vexora-0/hive
 
 | **Contributor** | **Commits** |
 |-----------------|-------------|
-| Bhargav         | 155         |
-| Ruthwik         | 110         |
+| Bhargav         | 160         |
+| Ruthwik         | 111         |
 | Nagachaitanya   | 100         |
 | Srujan          | 82          |
 
-*Source files and lines count apps/mobile/src and packages/backend/src, excluding tests, the generated types/supabase.ts and configuration. Per-contributor counts exclude merges and are normalised through .mailmap, which folds four alternate author identities; they total 447, with a further 8 merge commits making 455.*
+*Source files and lines count apps/mobile/src and packages/backend/src, excluding tests, the generated types/supabase.ts and configuration. Per-contributor counts exclude merges and are normalised through .mailmap, which folds four alternate author identities; they total 453, with a further 8 merge commits making 461.*
 
 *(Figure 5.1 - commit history. Figure 5.2 - continuous integration run.)*
 
