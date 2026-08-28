@@ -138,7 +138,23 @@ def check_figures(docx_path: Path) -> None:
     that is what gets counted, and any figure whose caption is missing is named.
     """
     import zipfile
-    doc = zipfile.ZipFile(docx_path).read("word/document.xml").decode("utf8")
+    z = zipfile.ZipFile(docx_path)
+    doc = z.read("word/document.xml").decode("utf8")
+
+    # A field asks for a style by name; the paragraphs carry a styleId. When
+    # those disagree the list comes back empty in Word with nothing to see
+    # here - no error, no warning, just a heading over blank space.
+    styles = z.read("word/styles.xml").decode("utf8")
+    by_id = {}
+    for m in re.finditer(r'<w:style [^>]*w:styleId="([^"]*)"[^>]*>(.*?)</w:style>',
+                         styles, re.S):
+        nm = re.search(r'<w:name w:val="([^"]*)"', m.group(2))
+        by_id[m.group(1)] = nm.group(1) if nm else None
+    names = set(by_id.values())
+    for asked in re.findall(r'TOC \\h \\z \\t &?q?u?o?t?;?"?([^",]+)', doc):
+        if asked not in names:
+            print(f"  !! no style is named {asked!r}, so that list will build empty")
+            print(f"     styles present: {sorted(n for n in names if n and 'aption' in n)}")
     captions = [
         "".join(re.findall(r"<w:t[^>]*>(.*?)</w:t>", p, re.S))
         for p in re.findall(r"<w:p\b.*?</w:p>", doc, re.S)
@@ -222,6 +238,14 @@ def toc_field(style: str, placeholder: str) -> str:
     `w:dirty="true"` makes Word offer to update the field on open. If someone
     dismisses that prompt the placeholder text below is what they see, so it
     says what to do rather than being blank.
+
+    The `\t` switch names a style by its **display name**, not its styleId, and
+    the two differ in the reference doc: pandoc captions its figures in the
+    style whose id is `ImageCaption` but whose name is `Image Caption`. Asking
+    for "ImageCaption" therefore matches nothing at all, and the list comes back
+    empty however many captions are on the page - which is what it did. Pass the
+    name, and keep the fenced divs below passing the name too, so pandoc reuses
+    that same style rather than minting a near-duplicate beside it.
     """
     return (
         "```{=openxml}\n"
@@ -320,7 +344,7 @@ def main() -> int:
     # Word cannot collect.
     md = re.sub(
         r"^\*\*(Table \d+\.\d+ -[^\n]*?)\*\*(\s*\*\([^\n]*\)\*)?$",
-        lambda m: '::: {custom-style="TableCaption"}\n'
+        lambda m: '::: {custom-style="Table Caption"}\n'
                   # strip any residual bold markers: a caption that arrived from a
                   # Google Docs round-trip can carry split spans, and they render
                   # as literal asterisks in Word
@@ -331,12 +355,12 @@ def main() -> int:
     # Replace the two hand-written lists with fields Word populates itself.
     md = re.sub(r"(# LIST OF FIGURES\n)\n*.*?(?=\n# LIST OF TABLES\n)",
                 lambda m: m.group(1) + "\n" + toc_field(
-                    "ImageCaption",
+                    "Image Caption",
                     "Update fields in Word (select all, then F9) to build this list."),
                 md, flags=re.S)
     md = re.sub(r"(# LIST OF TABLES\n)\n*.*?(?=\n# LIST OF ABBREVIATIONS\n)",
                 lambda m: m.group(1) + "\n" + toc_field(
-                    "TableCaption",
+                    "Table Caption",
                     "Update fields in Word (select all, then F9) to build this list."),
                 md, flags=re.S)
 
@@ -351,7 +375,7 @@ def main() -> int:
         "| Rajesh - Bloom Preschool | Vikram - Little Stars Academy |\n"
         "|:---:|:---:|\n"
         f"| ![]({a}){{width=2.4in}} | ![]({b}){{width=2.4in}} |\n\n"
-        '::: {custom-style="ImageCaption"}\n'
+        '::: {custom-style="Image Caption"}\n'
         "Figure 3.4 - Privacy comparison - two parents, zero overlap\n"
         ":::\n"
     )
