@@ -22,13 +22,13 @@ Signature: Team Hive Date: 20th August 2026
 
 # ABSTRACT
 
-Preschools routinely share classroom photographs with parents, and the obvious implementation - a shared album - is unacceptable: it exposes every child's face to every parent. This project delivers Hive, a photo-sharing platform built so that a parent sees photographs of their own children and nothing else.
+Preschools routinely share classroom photographs with parents. The obvious implementation, a shared album, is unacceptable because it exposes every child's face to every parent. This project delivers Hive, a photo-sharing platform built so that a parent sees photographs of their own children and nothing else.
 
-The system comprises a React Native mobile application, a 42-endpoint Express and TypeScript API, and a PostgreSQL database provisioned through Supabase with 20 migrations, row-level security policies and database triggers. Photographs are held in a private object store and served only through signed, expiring URLs \[2\]. Three roles are supported: teachers upload and tag photographs, parents view a privacy-scoped feed, read a per-child diary of that child's whole time at the school, and order prints, and administrators manage schools, classes, students and users.
+The system consists of a React Native mobile application, a 42-endpoint Express and TypeScript API, and a PostgreSQL database provisioned through Supabase with 20 migrations, row-level security policies and database triggers. Photographs are held in a private object store and served only through signed, expiring URLs \[2\]. Three roles are supported. Teachers upload and tag photographs. Parents view a privacy-scoped feed, read a per-child diary covering that child's whole time at the school, and order prints. Administrators manage schools, classes, students and users.
 
-The central engineering constraint is that the API authenticates using a service-role credential which bypasses row-level security by design. Authorization is therefore enforced explicitly in the service layer, and every resource accessed by identifier is checked against the caller. A formal audit identified 46 defects, of which the most serious permitted cross-family access to photograph metadata, cross-school access to student rosters including dates of birth, and an entirely non-functional ordering flow.
+The central engineering constraint is that the API authenticates with a service-role credential that bypasses row-level security by design. Authorization is therefore enforced explicitly in the service layer, and every resource accessed by identifier is checked against the caller. A formal audit identified 46 defects. The most serious of them allowed cross-family access to photograph metadata and cross-school access to student rosters including dates of birth, and left the ordering flow entirely non-functional.
 
-Validation used 247 automated integration tests executing against a real PostgreSQL instance, together with 117 mobile unit tests and a scripted security verification returning 29 passed, 0 failed and 1 skipped, reproduced from a cold start. A deliberate sabotage exercise confirmed the suite detects the regressions it targets and additionally exposed a pre-existing test that had never verified the property its name claimed. Privacy scoping was measured directly: of six photographs, two parents saw two and one respectively, with zero overlap.
+Validation used 247 automated integration tests executing against a real PostgreSQL instance, together with 117 mobile unit tests and a scripted security verification returning 29 passed, 0 failed and 1 skipped, reproduced from a cold start. A deliberate sabotage exercise confirmed that the suite detects the regressions it targets, and it also exposed an existing test that had never verified the property its name claimed. Privacy scoping was measured directly: of six photographs, two parents saw two and one respectively, with zero overlap.
 
 The system is demonstrated locally and on physical hardware rather than from a hosted deployment. Load measurements were therefore taken against a local instance and are labelled as such throughout: the smoke profile passes every threshold, while the 50-user profile was bound by the application's own per-identity rate limiter, so no unconstrained capacity figure is claimed (Section 3.3.6).
 
@@ -121,14 +121,14 @@ Problem identification and system design were completed in the Study Project. Th
 ## 1.1 Overview of the project
 Hive is a photo-sharing platform for preschools. A teacher photographs classroom activity and tags the children who appear in each image. Each parent then sees only the photographs their own children appear in. Parents may order prints; administrators manage the institutional data.
 
-A parent has two ways into the same photographs, and they answer different questions. The wall answers *what arrived* - newest first, the fastest route to this afternoon. The diary answers *how has it gone* - one child's whole time at the school, read forwards, month by month. The second is the artefact a family keeps, and a feed is the wrong shape for it: a feed is newest-first by construction, so the further back something is the harder it is to reach, which makes a child's first week the least reachable thing in the app.
+A parent has two ways into the same photographs, and each answers a different question. The feed answers *what arrived* - newest first, and the fastest route to this afternoon. The diary answers *how has it gone* - one child's whole time at the school, read forwards, month by month. The diary is the artefact a family keeps, and a feed is the wrong shape for it: a feed is newest-first by construction, so the further back something is the harder it is to reach, which makes a child's first week the least reachable thing in the application.
 
 ## 1.2 Problem statement and motivation
-Preschools want to share daily classroom activity with parents. The straightforward implementation - a shared album or a broadcast messaging group - exposes every child's face, name and activity to every parent in the class. For a setting composed entirely of minors, that is not a minor usability concern; it is a safeguarding failure.
+Preschools want to share daily classroom activity with parents. The straightforward implementation - a shared album or a broadcast messaging group - exposes every child's face, name and activity to every parent in the class. In a setting where every subject is a young child, that is not a usability concern; it is a safeguarding failure.
 
-The requirement that defines the product is therefore: a parent must see photographs of their own children and nothing else - not "mostly", and not "unless they guess an identifier".
+The requirement that defines the product is therefore simple to state: a parent must see photographs of their own children and nothing else - not "mostly", and not "unless they guess an identifier".
 
-Three consequences follow, and they justify most of the design:
+Three consequences follow, and they account for most of the design:
 
 1.  Access control cannot be a client concern, because the client is not trustworthy.
 2.  Photograph URLs cannot be public or guessable.
@@ -151,13 +151,13 @@ Out of scope: payment gateway integration; push notifications; offline mode; vid
 Chapter 2 describes the implementation - architecture, technology, modules and core logic. Chapter 3 covers testing strategy, test cases and measured results. Chapter 4 records the execution environment and deployment position. Chapter 5 presents version-control and progress evidence. Chapter 6 concludes and identifies future work.
 
 ## 1.6 Changes from the Study Project design
-Three departures are worth recording, each made on evidence:
+Three departures from that design were made during implementation, each on evidence:
 
-Asynchronous image processing was removed. The original design queued thumbnail generation through BullMQ with an S3 backend. During implementation a repository-wide search for queue enqueue calls found none: neither queue had ever been used, and both workers targeted S3 while files were written to local disk. Approximately 1,500 lines of dependency graph were deleted in favour of a synchronous sharp call taking 100-300 ms.
+Asynchronous image processing was removed. The original design queued thumbnail generation through BullMQ with an S3 backend. During implementation a repository-wide search for queue enqueue calls found none: neither queue had ever been used, and both workers targeted S3 while files were written to local disk. Approximately 1,500 lines of that dependency graph were deleted in favour of a synchronous sharp call taking 100-300 ms.
 
 Monetary values were migrated to integer minor units. The original schema used decimal(10,2). Section 2.4.2 explains the failure this caused, and the later move from the US dollar to the Indian rupee that leaves the \*\_cents columns holding paise.
 
-The parent experience gained a diary. The Study Project specified one parent surface - a reverse-chronological feed. Driving the seeded data made the omission visible: a feed is the right answer to "what arrived today" and the wrong answer to "what has this year been like", and only the second is the thing a family keeps. GET /feed/diary and GET /feed/diary/:month were added *alongside* the feed rather than replacing it - the wall is still the fastest route to this afternoon and the diary is deliberately not that - and the parent tab bar now leads with the diary. Section 2.3.7 and Section 2.4.6 describe it; the feed screen is renamed *Moments* in the tab bar to make the distinction legible.
+The parent experience gained a diary. The Study Project specified one parent surface, a reverse-chronological feed. Working through the seeded data made the omission visible: a feed is the right answer to "what arrived today" and the wrong answer to "what has this year been like", and only the second is the thing a family keeps. GET /feed/diary and GET /feed/diary/:month were added *alongside* the feed rather than replacing it, because the feed is still the fastest route to this afternoon and the diary is deliberately not that. The parent tab bar now leads with the diary. Section 2.3.7 and Section 2.4.6 describe it; the feed screen is renamed *Moments* in the tab bar to make the distinction clear.
 
 ------------------------------------------------------------------------
 
@@ -166,16 +166,16 @@ The parent experience gained a diary. The Study Project specified one parent sur
 ### 2.1.1 High-level architecture
 *(Figure 2.1)*
 
-The constraint that shapes the whole system: the API authenticates using the service-role credential, which bypasses row-level security by design. RLS therefore protects only those queries the mobile application issues directly to Supabase. Every API endpoint must enforce authorization *explicitly, in the service layer*.
+One constraint shapes the whole system. The API authenticates with the service-role credential, which bypasses row-level security by design. RLS therefore protects only those queries the mobile application issues directly to Supabase, and every API endpoint must enforce authorization *explicitly, in the service layer*.
 
-Three of the audit's most serious findings share exactly this root cause: code that assumed RLS was covering it. This is documented prominently in the repository because it is the single most dangerous assumption a new contributor can make.
+Three of the audit's most serious findings share this root cause: code that assumed RLS was covering it. We documented it prominently for the team, because it is the most dangerous assumption a new contributor can make.
 
 ### 2.1.2 Data flow - upload to notification
 *(Figure 2.2)*
 
 `Teacher                API                     Database         Storage`
 
-The ordering is load-bearing. The trigger fires on the transition *to* ready and iterates the tags existing at that instant. Confirming before tagging produces zero notifications - silently. The system appears to work and the feature is dead. This was a real defect (G-07); the seed script now carries a prominent comment about it and Section 3.3.2 records its verification.
+The order of these steps matters. The trigger fires on the transition *to* ready and iterates over the tags that exist at that instant, so confirming before tagging produces zero notifications, silently: the system appears to work while the feature is dead. This was a real defect (G-07). The seed script now carries a prominent comment about it, and Table 3.3 records its verification.
 
 ### 2.1.3 Component interaction - the authorization pipeline
 *(Figure 2.4)*
@@ -196,7 +196,7 @@ Every request traverses the same chain:
 | roleGuard | API middleware | Yes | Coarse role check - returns 403 |
 | Ownership assertions | API service layer | Yes | The real boundary. Every resource fetched by ID checked against the caller |
 
-A signed Storage URL is a bearer capability: whoever holds it can fetch the object until it expires. It must therefore never be minted for a caller who is about to be refused. Authorization precedes signing. A test asserts that a refused response contains no signed URL.
+A signed Storage URL is a bearer capability: whoever holds it can fetch the object until it expires. It must therefore never be minted for a caller who is about to be refused, so authorization always precedes signing. A test asserts that a refused response contains no signed URL.
 
 ## 2.2 Technology stack
 **Table 2.1 - Technology stack and rationale**
@@ -261,22 +261,22 @@ School, class, student, parent-mapping and user management, with a dashboard agg
 ### 2.3.7 Diary module
 One child's whole journey, in two requests. GET /feed/diary returns an outline - the months that hold photographs, oldest first, each with a photograph count, a distinct-day count and a single signed cover print, plus a summary of the journey: first and last photograph, total photographs, distinct days, and the number of teachers who contributed. GET /feed/diary/:month returns one chapter - that month, grouped into the days it happened on, with the teachers behind the camera named per day - and is fetched only when a parent opens the month.
 
-Three properties are decisions rather than implementation details:
+Three properties of the diary are deliberate decisions, not implementation details:
 
-- Signing is proportional to what is looked at. The outline signs one URL per month, not one per photograph, so a two-year diary costs what a two-week one costs. Per-photograph URLs are minted when a chapter is opened.
+- Signing is proportional to what is actually looked at. The outline signs one URL per month, not one per photograph, so a two-year diary costs what a two-week one costs. Per-photograph URLs are minted when a chapter is opened.
 - A diary belongs to one child. studentId is optional on the feed, which may merge siblings, and required here: two children's photographs interleaved into one timeline would be a diary of neither. A test asserts a sibling never appears.
 - The boundary is checked once, first. Every diary read begins with assertStudentLinked, which requires a parent_student_mappings row for the caller and returns 404 - not 403 - when there is none, matching getPhotoDetails so a probe cannot distinguish "not yours" from "does not exist". No query below it has to re-establish the boundary.
 
 ### 2.3.8 Interface layer - the design system and the brand
-The design system had two typefaces - a serif for editorial moments and a grotesque for everything else - and an interface palette tuned so that every value in it can legally carry text. Both are right for what they do, and neither can say *this is for a four-year-old's family*, which is why the application read as plain. A play layer was added on top rather than mixed into the existing one, and the fencing is the point:
+The design system had two typefaces - a serif for editorial moments and a grotesque for everything else - and an interface palette tuned so that every value in it is safe to carry text. Both are right for what they do, and neither can say *this is for a four-year-old's family*, which is why the application read as plain. A play layer was added on top of that system rather than mixed into it, and keeping the two fenced apart is the point:
 
-- theme/play.ts holds an *illustration* palette at roughly twice the chroma of the interface palette. It is decorative only; nothing in it may set text, and isDecorativeColor() exists so that rule is enforced rather than remembered. It also holds the honeycomb geometry that the mark, the tab indicator, the page indicator and the celebration burst all share - the same hexagon in four places is what turns a shape into a brand.
-- A third typeface joins as the *play voice*, confined to three sizes and to greetings, celebrations and the mascot's speech. An earlier attempt put a rounded face on every heading and made the product read as a toy; that lesson is encoded in the constraint rather than left to be re-learnt.
-- Bo, a bee, in ten poses, drawn as three layers so the wings can beat without the body re-rendering. The poses are a closed vocabulary - each exists because a screen needed to say something a drawing says better than a sentence. hide, Bo covering her eyes, is this product's central promise in one picture, and it is used twice: on the privacy slide of the onboarding carousel, and on the login screen whenever the password field has focus.
+- theme/play.ts holds an *illustration* palette at roughly twice the chroma of the interface palette. It is decorative only; nothing in it may set text, and isDecorativeColor() exists so that the rule is enforced rather than remembered. It also holds the honeycomb geometry shared by the mark, the tab indicator, the page indicator and the celebration burst, because the same hexagon in four places is what turns a shape into a brand.
+- A third typeface joins as the *play voice*, confined to three sizes and to greetings, celebrations and the mascot's speech. An earlier attempt put a rounded face on every heading and made the product read as a toy, and that is why the constraint exists.
+- The mascot is Bo, a bee, drawn in ten poses and built as three layers so the wings can beat without the body re-rendering. The poses are a closed vocabulary: each one exists because a screen needed to say something a drawing says better than a sentence. hide, Bo covering her eyes, is this product's central promise in one picture, and it is used twice - on the privacy slide of the onboarding carousel, and on the login screen whenever the password field has focus.
 
-Two rules hold across all of it, and both are load-bearing rather than stylistic. Nothing becomes visible by animating - every entrance animates transforms only, or is gated on being rendered at all, because an animation that silently fails to run leaves invisible content and no error. And all of it is hidden from screen readers and skipped under Reduce Motion: delete the entire decorative layer and every screen still says exactly what it said.
+Two rules hold across all of it, and both are functional rather than stylistic. Nothing becomes visible by animating: every entrance animates transforms only, or is gated on being rendered at all, because an animation that silently fails to run leaves invisible content and no error. And all of it is hidden from screen readers and skipped under Reduce Motion, so deleting the entire decorative layer would leave every screen saying exactly what it said before.
 
-The illustrated scenes are objects and places, never children. That constraint is inherited from the product - a drawn child would be the same wrong trade with a nicer finish - and it is why the two empty photograph mounts on the privacy slide stay empty: those are the photographs this parent cannot see.
+The illustrated scenes show objects and places, never children. That constraint comes from the product itself, since a drawn child would be the same mistake in better clothing, and it is why the two empty photograph mounts on the privacy slide stay empty: those are the photographs this parent cannot see.
 
 **Table 2.4 - Representative API endpoints (42 registrations in total)**
 
@@ -327,12 +327,12 @@ The parent feed is not a filter applied to a global list; it is a join resolved 
 
 `    RETURN rows joined with signedUrls, nextCursor`
 
-Three details carry weight. DISTINCT prevents a photograph tagged with two siblings appearing twice. Keyset pagination on the composite (created_at, id) avoids the row-skipping that OFFSET suffers under concurrent inserts - and the timestamp must retain microsecond precision, because truncating to milliseconds caused rows to be dropped at page boundaries (a regression found and fixed during implementation; cursor.test.ts now guards it). URLs are signed only *after* the rows are known to be permitted.
+Three details in that sequence matter. DISTINCT prevents a photograph tagged with two siblings appearing twice. Keyset pagination on the composite (created_at, id) avoids the row-skipping that OFFSET suffers under concurrent inserts - and the timestamp must retain microsecond precision, because truncating to milliseconds caused rows to be dropped at page boundaries (a regression found and fixed during implementation; cursor.test.ts now guards it). URLs are signed only *after* the rows are known to be permitted.
 
 ### 2.4.2 Monetary arithmetic
 The failure. Columns were decimal(10,2) documented as US dollars; the API wrote integer cents into them, while the client priced in dollars and rendered toFixed(2). Every price therefore reached the customer a hundredfold too high - in the direction that overcharges. The digital download was priced at 299 cents, \$2.99; it was stored as 299.00 and displayed as \$299.00.
 
-*A note on this example, because the figures in circulation disagree.* Migration 00017's comment records the case as *"a \$4.99 print stored as 299.00"*, which crosses two products: in the July catalogue print_4x6 was 499 cents and digital_download was 299. Either one demonstrates the same hundredfold error by the same mechanism, but the pair as written is not self-consistent - a \$4.99 print would have stored 499.00. The 299 figure appears twice in that comment and \$4.99 once, so the digital download is the likelier original, and it is the version used above. This is corrected in the open rather than quietly, because the migration comment still carries the original wording and a reader who checks will find the discrepancy.
+*A note on this example, because the figures recorded at the time disagree.* Migration 00017's comment records the case as *"a \$4.99 print stored as 299.00"*, which crosses two products: in the July catalogue print_4x6 was 499 cents and digital_download was 299. Either one demonstrates the same hundredfold error by the same mechanism, but the pair as written is not self-consistent, because a \$4.99 print would have stored 499.00. The 299 figure appears twice in that comment and \$4.99 once, so the digital download is the likelier original, and it is the version used above. We correct it here in the open, because the migration comment still carries the original wording and a reader who checks will find the discrepancy.
 
 The resolution. Integer minor units everywhere. Migration 00017 renamed total_amount → total_cents and unit_price → unit_price_cents, retyping both to integer using ROUND(...) rather than truncation. Conversion to a display string occurs exactly once, at render.
 
@@ -351,7 +351,7 @@ The \*\_cents column names were deliberately left alone. They hold whatever the 
 A single shared catalogue defines the seven product types, their integer-paise prices and their labels; the backend imports it and the mobile application mirrors it, with a test asserting the two agree. The client no longer sends a price at all - the server prices every order from its own catalogue, so a caller cannot determine their own total. This is a security property, and it has a test.
 
 ### 2.4.3 Transactional order creation
-The original implementation inserted the order, then the items, then issued a compensating DELETE if the second insert failed. A crash between the two left an order with no items - and the compensation never executed, because the process had terminated.
+The original implementation inserted the order, then the items, then issued a compensating DELETE if the second insert failed. A crash between the two left an order with no items, and the compensation never ran, because the process had already terminated.
 
 `CREATE FUNCTION create_order_with_items(..., p_items jsonb) RETURNS uuid AS $$`
 
@@ -380,7 +380,7 @@ Retrying a submission over an unreliable mobile network must not produce a secon
 Three foreign keys were declared NOT NULL and ON DELETE SET NULL - which are mutually exclusive. Deleting the referenced row causes PostgreSQL to write NULL into a NOT NULL column, raising a not-null violation instead of cascading. The practical consequence was that deleting any profile or photograph was impossible, failing with an error that did not explain why. Migration 00018 changed all three to ON DELETE RESTRICT, which states the intent honestly: a teacher who still has photographs cannot be removed without first deciding what becomes of them.
 
 ### 2.4.6 The diary's calendar, and where it is cut
-Two questions the diary has to answer, neither with an obvious right answer.
+The diary has to settle two questions, neither of which has an obvious right answer.
 
 Which day does a photograph belong to? The viewer's, not the server's. A backend container runs in whatever timezone it was started in - usually UTC - and a school afternoon in Bengaluru is already the next day there. Bucketing on the server's clock would date a photograph differently from the feed, which groups its day headers in device time, and two screens dating the same photograph differently is the kind of defect nobody reports and everybody notices. The client therefore sends tzOffset, exactly as Date.prototype.getTimezoneOffset() reports it - UTC minus local, in minutes, so India Standard Time is -330 - and every boundary is computed against it.
 
@@ -456,7 +456,7 @@ Three layers, each catching what the others cannot:
 | Automated integration | Vitest + Supertest against a real PostgreSQL | Before merge |
 | Runtime verification | Scripted security checklist; manual probes with real tokens | Per milestone |
 
-Why integration rather than unit testing. The ordering defect is the argument. Field naming, product vocabulary and currency unit each disagreed between layers, yet every layer was internally consistent and would have passed its own unit tests. Only a request travelling through the real middleware into a real database exposes a contract mismatch *between* layers.
+Why integration tests rather than unit tests? The ordering defect is the argument. Field naming, product vocabulary and currency unit each disagreed between layers, yet every layer was internally consistent and would have passed its own unit tests. Only a request travelling through the real middleware into a real database exposes a contract mismatch *between* layers.
 
 ### 3.1.2 Tools
 Vitest 4 (runner), Supertest 7 (HTTP assertions against the mounted Express application), a Supabase instance dedicated to tests, and scripts/verify-security.sh for runtime security checks.
@@ -466,7 +466,7 @@ The test database moved, and the figures move with it. Runs were originally poin
 ### 3.1.3 The destructive-run guard
 The suite truncates every domain table in beforeAll. Pointed at the wrong project it would silently destroy the demonstration dataset. tests/setup.ts refuses to run without a separate .env.test, and refuses again if the URL names a known non-test project.
 
-Both guards initially failed open - one compared against a variable that was never set, the other hard-coded a project reference that had become stale. The guard's own comment described it as "deliberately loud and unconditional"; it was neither. This is recorded because a guard nobody has tested is not a guard, and the failure mode here is silent data loss.
+Both guards initially failed open - one compared against a variable that was never set, the other hard-coded a project reference that had become stale. The guard's own comment described it as "deliberately loud and unconditional"; it was neither. We record it here because a guard nobody has tested is not a guard, and the failure mode in this case is silent data loss.
 
 ## 3.2 Test cases
 **Table 3.1 - Test suite composition**
@@ -484,9 +484,9 @@ Both guards initially failed open - one compared against a variable that was nev
 | auth.test.ts | 11 | 11 | Authentication and role-based access control |
 | Total | 191 declared | 247 executed | Difference is parameterised it.each blocks and one table-driven loop |
 
-Composition as of 3b4145e, 20 August 2026. The diary added 29 tests - 13 pure calendar cases in a new file, and 16 in feed.test.ts, of which 13 exercise the two diary endpoints and 3 close validation gaps the feed routes had carried from the beginning: a malformed studentId, a malformed photograph id and a cursor of the wrong shape each returned a 500 from PostgREST rather than a 400, because those routes had no validator at all. The suite was 218 across 8 files from 13 August until then, and 178 before that.
+Composition as of 3b4145e, 20 August 2026. The diary added 29 tests: 13 pure calendar cases in a new file, and 16 in feed.test.ts. Of those 16, 13 exercise the two diary endpoints and 3 close validation gaps the feed routes had carried from the beginning, where a malformed studentId, a malformed photograph id and a cursor of the wrong shape each returned a 500 from PostgREST instead of a 400, because those routes had no validator at all. The suite was 218 across 8 files from 13 August until then, and 178 before that.
 
-This table covers the backend integration suite, which is the one that exercises the privacy boundary and therefore carries the argument of this chapter. The mobile package has a separate Vitest suite of 117 unit tests across 7 files - cart arithmetic, order-number formatting, the OTP throttle, retry behaviour, upload content-type selection, navigation resolution and the diary's date and duration formatting - which runs in under half a second because it touches no network. The 364 figure in Section 5.1 is the two combined.
+This table covers the backend integration suite. That is the suite which exercises the privacy boundary, so it carries most of this chapter's argument. The mobile package has a separate Vitest suite of 117 unit tests across 7 files - cart arithmetic, order-number formatting, the OTP throttle, retry behaviour, upload content-type selection, navigation resolution and the diary's date and duration formatting - which runs in under half a second because it touches no network. The 364 figure in Section 5.1 is the two combined.
 
 **Table 3.2 - Test cases and results (representative selection; all 247 pass)**
 
@@ -542,9 +542,9 @@ This table covers the backend integration suite, which is the one that exercises
 
 ## 3.3 Results and analysis
 ### 3.3.1 Automated suite
-247 of 247 passing across 9 files in 21.96 s, run on 20 August 2026 against the tree at 3b4145e, alongside 117 of 117 mobile unit tests in 429 ms. The static checks were re-run on the same tree: pnpm typecheck --force clean in both packages, pnpm lint 0 errors and 6 warnings - down from 27 earlier in August - and pnpm build:backend succeeding.  *(Figure 3.1)*
+247 of 247 passing across 9 files in 21.96 s, run on 20 August 2026 against the tree at 3b4145e, alongside 117 of 117 mobile unit tests in 429 ms. The static checks were re-run on the same tree: pnpm typecheck --force clean in both packages, pnpm lint 0 errors and 6 warnings - down from 27 earlier in August - and pnpm build:backend succeeding. *(Figure 3.1)*
 
-The 21.96 s is not a speed-up in the code and must not be read as one. It is the test target moving from a hosted Supabase project to a local stack. The comparable earlier figures - 245 s and 122.63 s on 16 August, and 373.86 s in CI - were 218 tests against the remote hive-test project, where wall time is dominated by network latency to Postgres, GoTrue and Storage rather than by the code under test. CI still runs against hive-test, so the CI figure and the local figure measure different things and must not be quoted against each other. Figure 3.1 shows a re-run on 25 August against the hosted project - the same 247 tests across 9 files, passing, in 150.85 s, alongside 117 mobile unit tests in 330 ms. It is reproduced against the hosted target rather than the local stack because that is what a reader can reach; the seven-fold spread between the two is the point of this paragraph, not a discrepancy.
+The 21.96 s is not a speed-up in the code and must not be read as one. It is the test target moving from a hosted Supabase project to a local stack. The comparable earlier figures - 245 s and 122.63 s on 16 August, and 373.86 s in CI - were 218 tests against the remote hive-test project, where wall time is dominated by network latency to Postgres, GoTrue and Storage rather than by the code under test. CI still runs against hive-test, so the CI figure and the local figure measure different things and must not be quoted against each other. Figure 3.1 shows a re-run on 25 August against the hosted project - the same 247 tests across 9 files, passing, in 150.85 s, alongside 117 mobile unit tests in 330 ms. It is reproduced against the hosted target rather than the local stack because that is what a reader can reach. The seven-fold spread between the two is what this paragraph exists to explain; it is not a discrepancy.
 
 **Table 3.3 - Runtime functional verification**
 
@@ -565,13 +565,13 @@ The 21.96 s is not a speed-up in the code and must not be read as one. It is the
 ### 3.3.2 Privacy verification - the central requirement
 *(Figure 3.4)*
 
-This is the requirement the product exists to satisfy, so it is measured rather than asserted. Two **parent** accounts were signed in against the same seeded dataset - Rajesh, who has two children at Bloom Preschool, and Vikram, who has two at Little Stars Academy - and each feed was counted. Neither is a teacher or an administrator; a parent is the only role whose visibility is restricted by the privacy model, which is why the test uses two of them at different schools.
+This is the requirement the product exists to satisfy, so we measured it rather than asserting it. Two parent accounts were signed in against the same seeded dataset - Rajesh, who has two children at Bloom Preschool, and Vikram, who has two at Little Stars Academy - and each feed was counted. Neither account is a teacher or an administrator: a parent is the only role whose visibility is restricted by the privacy model, which is why the test uses two parents at different schools.
 
 | **Measurement** | **Result** |
 |----|----|
 | Photographs present | 6 |
-| Rajesh - **a parent** at Bloom Preschool, two children enrolled - sees | 2 |
-| Vikram - **a parent** at Little Stars Academy, two children enrolled - sees | 1 |
+| Rajesh - a parent at Bloom Preschool, two children enrolled - sees | 2 |
+| Vikram - a parent at Little Stars Academy, two children enrolled - sees | 1 |
 | Overlap between them | zero |
 | Any parent seeing all six | none |
 | Duplicate identifiers within a feed | none |
@@ -579,9 +579,9 @@ This is the requirement the product exists to satisfy, so it is measured rather 
 ### 3.3.3 Security verification
 *(Figure 3.2)*
 
-`scripts/verify-security.sh    passed 26    failed 0    skipped 3`
+`scripts/verify-security.sh    passed 29    failed 0    skipped 1`
 
-Reproduced from cold on 2 August - stack stopped and restarted, database truncated, re-seeded, backend rebooted - with an identical result. It is a repeatable procedure, not a single favourable reading.
+The script was first reproduced from cold on 2 August - stack stopped and restarted, database truncated, re-seeded, backend rebooted - scoring 26 passed, 0 failed and 3 skipped against the smaller check set of the time. The run above is the current one, with an identical result. It is a repeatable procedure, not a single favourable reading.
 
 **Table 3.4 - Security verification results**
 
@@ -603,9 +603,9 @@ The three skips are not passes. They require HTTPS and a deployed origin, which 
 
 A passing suite proves nothing until it has been made to fail deliberately. One line - the uploader comparison in assertPhotoAccess - was deleted and the suite re-run.
 
-Result, when the exercise was first performed: exactly the three same-school ownership tests failed, as intended.
+When the exercise was first performed, exactly the three same-school ownership tests failed, as intended.
 
-Repeated on 25 August against the current suite it fails five, the guard having gained coverage since: 247 tests \| 5 failed \| 242 passed. Nothing else moved, which is the property that matters - the sabotage is precise, not merely destructive:
+Repeated on 25 August against the current suite it fails five, the guard having gained coverage since: 247 tests \| 5 failed \| 242 passed. Nothing else moved:
 
 | **File** | **Test** | **Expected** | **Got** |
 |----|----|----|----|
@@ -615,9 +615,9 @@ Repeated on 25 August against the current suite it fails five, the guard having 
 | photos.test.ts | rejects a same-school colleague archiving another teacher's photo | 403 | 204 |
 | photos.test.ts | rejects a colleague untagging a student from another teacher's photo | 403 | 204 |
 
-The two additional failures are the archive and untag cases added on 2 August when the object lifecycles were completed. They route through the same assertPhotoAccess guard, so deleting one line now breaks five tests across two files rather than three in one. Every other test stayed green - the sabotage is precise, not merely destructive, which is the property that makes the exercise worth anything. The line was restored immediately afterwards and the working tree verified clean.
+The two additional failures are the archive and untag cases added on 2 August when the object lifecycles were completed. They route through the same assertPhotoAccess guard, so deleting one line now breaks five tests across two files instead of three in one. Every other test stayed green, which is what makes the exercise worth anything: the sabotage is precise, not merely destructive. The line was restored immediately afterwards and the working tree verified clean.
 
-And it exposed a genuine problem. A similarly-named test in photos.test.ts remained green - because both of its teachers belonged to *different* schools, where the school check refuses first and the ownership check never executes. That test had never verified the property its name claimed, and had been supplying false confidence throughout its existence.
+The exercise also exposed a genuine problem. A similarly-named test in photos.test.ts remained green, because both of its teachers belonged to *different* schools, where the school check refuses first and the ownership check never executes. That test had never verified the property its name claimed, and had been supplying false confidence throughout its existence.
 
 This is the most instructive result in the chapter: the exercise validated the suite *and* found a test that was not testing anything.
 
@@ -628,14 +628,14 @@ This is the most instructive result in the chapter: the exercise validated the s
 | Deployment | Out of scope by decision (Section 4.2.2) - no hosted origin | The HTTPS check cannot run, so the score is 29/0/1 and never 30/30 |
 | Capacity under load | 50-VU run bound by the per-identity rate limiter, not the application | Smoke figures exist and pass; no unconstrained throughput or latency figure (Section 3.3.6) |
 | iOS | Run on a physical iPhone through Expo Go on 16 August, not as a standalone build; nothing captured | All three roles exercised, so the platform is no longer unexercised - but the evidence is an observed pass with no artefact, and the native paths ran under Expo Go's container rather than the application's own bundle identifier (Section 3.3.8) |
-| Native deep links | Largely closed on 16 August. The operating system now routes hive:// into the application on Android; what remains unshown is the post-authentication screen resolution | Measured against the connected handset, before and after installing a standalone build. Before: pm list packages showed host.exp.exponent but no com.hive.app, resolve-activity ... "hive://feed" answered *No activity found*, and the intent failed with *unable to resolve Intent* - the earlier device runs used Expo Go, which serves under exp://, so the scheme had never been registered. After expo run:android (BUILD SUCCESSFUL, 12m 16s): the scheme resolves to com.hive.app.MainActivity; a cold start from am start -a android.intent.action.VIEW -d "hive://feed" launches the app with that activity top-resumed; a second firing reports *intent has been delivered to currently running top-most instance*; and an unauthenticated link is correctly redirected to the login screen by the auth gate. Not shown: that an authenticated link resolves to the target screen - the sign-in could not be typed reliably under automation (Gboard's Google Translate mode rewrote the input, and the controlled TextInput drops injected characters), which is a harness limitation, not an application finding. iOS remains unexercised: Expo Go serves under exp:// there |
+| Native deep links | Largely closed on 16 August. The operating system now routes hive:// into the application on Android; what remains unshown is the post-authentication screen resolution | Measured against the connected handset, before and after installing a standalone build. Before: pm list packages showed host.exp.exponent but no com.hive.app, resolve-activity ... "hive://feed" answered *No activity found*, and the intent failed with *unable to resolve Intent* - the earlier device runs used Expo Go, which serves under exp://, so the scheme had never been registered. After expo run:android (BUILD SUCCESSFUL, 12m 16s): the scheme resolves to com.hive.app.MainActivity; a cold start from am start -a android.intent.action.VIEW -d "hive://feed" launches the application with that activity top-resumed; a second firing reports *intent has been delivered to currently running top-most instance*; and an unauthenticated link is correctly redirected to the login screen by the auth gate. Not shown: that an authenticated link resolves to the target screen - the sign-in could not be typed reliably under automation (Gboard's Google Translate mode rewrote the input, and the controlled TextInput drops injected characters), which is a harness limitation, not an application finding. iOS remains unexercised: Expo Go serves under exp:// there |
 | Server-side HEIC conversion | sharp's prebuilt libvips \[10\] has no HEVC decoder | Cannot work, and does not. Tested 24 July against a real HEVC HEIC. Handled by a device-side transcode instead; the server refuses HEVC with an actionable 400 |
 | Mobile error reporting | EXPO_PUBLIC_SENTRY_DSN unset | Server-side reporting is proven (Section 6.3 item 4); the client is not |
 
-The application has been driven end to end in a desktop browser via Expo's web target, so the screens are exercised rather than merely compiled. Web is a verification convenience; the product targets iOS and Android, and that is where it remains unproven.
+The application has also been driven end to end in a desktop browser through Expo's web target, so the screens are exercised rather than merely compiled. Web is a verification convenience; the product targets iOS and Android. Android is proven on hardware, as Section 3.3.8 records. iOS is not.
 
 ### 3.3.5 Defects identified and resolved
-An audit enumerated 46 defects. The four most serious all fall under a single recognised category - broken object level authorization, first in the OWASP API Security Top 10 \[4\]\[5\] - which is what an API that authenticates as the service role invites unless every endpoint re-derives authorization for itself. The most serious:
+An audit enumerated 46 defects. The four most serious all fall under one recognised category - broken object level authorization, first in the OWASP API Security Top 10 \[4\]\[5\] - which is what an API authenticating as the service role invites unless every endpoint re-derives authorization for itself. The worst of the 46 are listed below.
 
 **Table 3.5 - Defects identified and resolved**
 
@@ -656,16 +656,16 @@ An audit enumerated 46 defects. The four most serious all fall under a single re
 | G-37 | Medium | Non-atomic order creation could orphan an order | Fixed, verified |
 | G-40 | Medium | Upload trusted the client-declared MIME type | Fixed - magic bytes |
 
-One remediation round introduced three regressions of its own, caught by its own review: cursor pagination dropping rows on a millisecond-truncated timestamp, a rate-limit bypass via a forged bearer token, and WebP accepted at three format gates but refused at the fourth. All three were fixed. They are recorded because a report claiming twenty-five consecutive fixes with no regressions would not be credible.
+One remediation round introduced three regressions of its own, caught by its own review: cursor pagination dropping rows on a millisecond-truncated timestamp, a rate-limit bypass via a forged bearer token, and WebP accepted at three format gates but refused at the fourth. All three were fixed. We record them because a report claiming twenty-five consecutive fixes with no regressions would not be credible.
 
-Three later defects are worth naming, because each was invisible to every static check. All were found by driving the running application, and all were fixed on 16 August.
+Three later defects deserve naming, because each was invisible to every static check. All three were found by driving the running application, and all were fixed on 16 August.
 
 **Table 3.9 - Defects only a running application could show**
 
 | **Defect** | **Why nothing caught it** |
 |----|----|
 | Uploading from the browser failed with 400 "No file provided" for every photograph | The body used React Native's FormData file convention, append('file', {uri, type, name}), which only means something to the native implementation. Browsers stringify any non-Blob, so the server received a text field containing the literal \[object Object\] and multer found no upload. The types are correct in both worlds; only the runtime differs. Web now fetches the picker's blob: URL back into a real Blob; native keeps the streaming path, which is what keeps a 4 MB photograph out of JavaScript memory |
-| The order sheet appeared after a network round-trip rather than on the tap | isVisible included !!photoForOrder, so the sheet waited for getPhotoDetails. Warm it is instant and nobody notices; cold, the parent taps *Order a print*, watches the app navigate to their past orders, and a sheet arrives on top a moment later - which reads as the button having gone to the wrong place. Nothing in the sheet needs the network: products, prices and the address field are local, and the photograph is a 40 px thumbnail |
+| The order sheet appeared after a network round-trip rather than on the tap | isVisible included !!photoForOrder, so the sheet waited for getPhotoDetails. Warm it is instant and nobody notices; cold, the parent taps *Order a print*, watches the application navigate to their past orders, and a sheet arrives on top a moment later - which reads as the button having gone to the wrong place. Nothing in the sheet needs the network: products, prices and the address field are local, and the photograph is a 40 px thumbnail |
 | The onboarding carousel could be seen only once per browser profile | hasOnboarded was persisted to AsyncStorage, which on web is localStorage and survives every reload. Conventional behaviour, and it made the product impossible to record from the front door - the second take opened on the login screen. It now lives in memory only, which costs the shipped product nothing: index.tsx checks the session first, so a signed-in user never reaches the carousel anyway |
 
 ### 3.3.6 Performance
@@ -681,9 +681,9 @@ The k6 suite was executed on 16 August 2026 against a local single instance with
 | feed_payload_bytes | 3,908 B | 2 MB p95 | ✔ |
 | Requests | 29 over 32.1 s, 14 iterations, 0 interrupted | - |  |
 
-feed_payload_bytes is the figure that matters most. A twenty-photograph feed page transfers 3,908 bytes of metadata and signed URLs. Before Plan 03 generated thumbnails, thumbnail_s3_key was always null and the client fell back to full-resolution originals, so one page could exceed 100 MB. That is a four-order-of-magnitude reduction, and it is the single clearest quantitative justification for the storage work.
+feed_payload_bytes is the figure that matters most. A twenty-photograph feed page transfers 3,908 bytes of metadata and signed URLs. Before thumbnail generation was added, thumbnail_s3_key was always null and the client fell back to full-resolution originals, so one page could exceed 100 MB. That is a four-order-of-magnitude reduction, and it is the clearest quantitative justification for the storage work.
 
-The load profile (50 VU, 5 min) crossed its thresholds, and the reason is instructive rather than damning. It recorded 69.38% http_req_failed over 4,727 requests. The failures decompose exactly:
+The load profile (50 VU, 5 min) crossed its thresholds, and the reason is instructive rather than damning. It recorded 69.38% http_req_failed over 4,727 requests, and the failures decompose exactly:
 
 | **Cause** | **Requests** | **Assessment** |
 |----|----|----|
@@ -693,7 +693,7 @@ The load profile (50 VU, 5 min) crossed its thresholds, and the reason is instru
 
 The 429s appear in k6's totals and not in the server's request log, because globalRateLimiter is mounted at app.ts:62 and the logging middleware at app.ts:69 - a refused request never reaches the logger. The arithmetic closes: 4,727 issued, 2,070 logged, 2,657 refused upstream.
 
-What this does and does not establish. It establishes that the application serves a correctly-shaped single-user workload well within threshold, that the feed payload is small, and that two protective controls - per-identity rate limiting and cross-school authorization - hold under concurrent load. It does not establish a capacity ceiling: at 50 virtual users the binding constraint was the project's own rate limiter, by design, so no unconstrained throughput or latency figure exists. Obtaining one requires per-virtual-user identities or a raised ceiling, and a deployed target to make the number mean anything. No figure has been extrapolated to fill that gap.
+What this does and does not establish. It establishes that the application serves a correctly-shaped single-user workload well within threshold, that the feed payload is small, and that two protective controls, per-identity rate limiting and cross-school authorization, hold under concurrent load. It does not establish a capacity ceiling: at 50 virtual users the binding constraint was the project's own rate limiter, by design, so no unconstrained throughput or latency figure exists. Obtaining one would need per-virtual-user identities or a raised ceiling, and a deployed target to make the number mean anything. We have not extrapolated a figure to fill that gap.
 
 The suite's wall time depends almost entirely on where the database is. Against the remote hive-test project the backend suite ran 218 tests twice on 16 August, passing both times, in 245 s and 122.63 s, and 373.86 s in CI - a spread that is not measurement noise, because the suite performs full HTTP round-trips, table truncation and roughly forty authentication-user creations across a network. Against a local Supabase stack the same suite, now 247 tests, runs in 21.96 s (20 August). Both figures are honest and neither characterises the other; the CI figure is the one that reflects what a pull request actually waits for. An earlier 178-tests-in-115-seconds figure belonged to a smaller suite again and should not be restated against either.
 
@@ -702,9 +702,9 @@ The mobile unit suite runs 117 tests in 429 milliseconds - pure logic, no I/O, w
 ### 3.3.7 Observations
 What the evidence supports. The privacy boundary holds under direct adversarial probing: cross-family access returns 404, cross-school access returns 403, and same-school photograph mutation returns 403 - each confirmed over HTTP with real tokens and reproduced from a cold start. Ordering functions with correct integer-cent arithmetic and genuine idempotency. The storage layer produces thumbnails and placeholders for both orientations and serves them only through signed, expiring URLs.
 
-What it does not support. No performance characteristic has been measured. Neither is an oversight discovered late; each follows from one absent step - deployment. The error-reporting pipeline, previously listed here, has since carried a real event; Section 6.3 item 4 records it. Observation on the shipping platform, previously listed here, is now largely closed: the application has been driven end to end on a physical Android device, and on a physical iPhone on 16 August. Section 3.3.8 records both runs, what each proved, and why the iOS one carries less weight than the Android one.
+What it does not support. No capacity figure has been measured: the smoke profile passes, but the fifty-user run was bound by our own rate limiter rather than by the application. That is not an oversight discovered late; it follows from one absent step, deployment. The error-reporting pipeline, previously listed here, has since carried a real event; Section 6.3 item 4 records it. Observation on the shipping platform, also previously listed here, is now largely closed: the application has been driven end to end on a physical Android device, and on a physical iPhone on 16 August. Section 3.3.8 records both runs, what each proved, and why the iOS one carries less weight than the Android one.
 
-A note on suite stability. Repeated runs against the *remote* test project exhaust the shared authentication provider's sign-in quota: each run creates roughly forty users, and beyond the quota sign-ins stall rather than fail. Three runs within half an hour produced timeouts on 9 August. Every failure observed was a timeout, never a failed assertion, and the same files passed in isolation immediately afterwards. Moving local runs onto a local Supabase stack removes that constraint for developers - the suite was run twice in succession on 20 August with no timeout and no variance worth reporting - but it does not remove it from CI, which still signs in against hive-test. A red CI run is still worth re-reading before it is believed.
+A note on suite stability. Repeated runs against the *remote* test project exhaust the shared authentication provider's sign-in quota: each run creates roughly forty users, and beyond the quota sign-ins stall instead of failing. Three runs within half an hour produced timeouts on 9 August. Every failure we saw was a timeout, never a failed assertion, and the same files passed in isolation immediately afterwards. Moving local runs onto a local Supabase stack removes that constraint for developers - the suite ran twice in succession on 20 August with no timeout and no variation worth reporting - but it does not remove it from CI, which still signs in against hive-test. A red CI run should still be re-read before it is believed.
 
 ### 3.3.8 Device verification
 The application was driven end to end on a physical Android device - a OnePlus CPH2487, connected over USB with adb reverse mapping the development server and API to the handset. Every application figure in Section 4.3 is a capture from that device rather than a browser.
@@ -721,19 +721,19 @@ The application was driven end to end on a physical Android device - a OnePlus C
 | Safe-area handling | Floating action button clears the tab bar against a real inset |
 | Order arithmetic | Order detail renders 2 × ₹30 → ₹60, 1 × ₹99 → ₹99, total ₹159 |
 
-Seven defects were found that no other method had surfaced, four of them invisible to a type checker, a test suite and a desktop browser alike: a truncated age line when two siblings are tagged, order-status labels breaking mid-word, a truncated upload button, an admin photograph count including archived rows, a notification badge clipping the tab indicator, a failed image that never retried, and a disabled *Place order* button that gave no reason.
+Seven defects were found that no other method had surfaced, four of them invisible to a type checker, a test suite and a desktop browser alike. They were a truncated age line when two siblings are tagged, order-status labels breaking mid-word, a truncated upload button, an admin photograph count including archived rows, a notification badge clipping the tab indicator, a failed image that never retried, and a disabled *Place order* button that gave no reason.
 
-The most significant is worth stating in full, because it is the clearest argument for testing on hardware. The application opened to a blank screen and never recovered - no crash, no error, nothing in the logs. app/\_layout.tsx returns null while authentication loads, and the root layout is itself a route component: returning null destroys the navigator, so expo-router tears down and re-creates the root route, producing a *fresh* component instance whose useRef bootstrap guard is reset. The bootstrap therefore ran again, set the loading flag again, and rendered null again. The loop ran 145 times in one session, measured, with no exit and no symptom beyond an application that would not paint.
+The most serious of them is set out in full below, because it is the clearest argument for testing on hardware. The application opened to a blank screen and never recovered - no crash, no error, nothing in the logs. app/\_layout.tsx returns null while authentication loads, and the root layout is itself a route component: returning null destroys the navigator, so expo-router tears down and re-creates the root route, producing a *fresh* component instance whose useRef bootstrap guard is reset. The bootstrap therefore ran again, set the loading flag again, and rendered null again. We measured the loop running 145 times in one session, with no exit and no symptom beyond an application that would not paint.
 
-What made it expensive was that everything below the root looked guilty. The feed's render logged continuously with correct data - 2 photographs, 3 rows, every gate open - because React kept executing the component body during the brief windows the tree existed. But the list's onLayout and renderItem never fired once, because nothing survived long enough to commit. That reads exactly like a broken list. The fix moves the guard to module scope so it outlives the component that triggers it; the device then showed one initialisation instead of 145, and one mount instead of a remount every ~600 ms.
+What made it expensive was that everything below the root looked guilty. The feed's render logged continuously with correct data - 2 photographs, 3 rows, every gate open - because React kept executing the component body during the brief windows the tree existed. But the list's onLayout and renderItem never fired once, because nothing survived long enough to commit, and that reads exactly like a broken list. The fix moves the guard to module scope so it outlives the component that triggers it. The device then showed one initialisation instead of 145, and one mount instead of a remount every ~600 ms.
 
 This class of defect is not reachable by the other methods used in this project. It is a lifecycle race between a navigation library and a React ref, with correct types, passing integration tests and a functioning browser build.
 
-iOS, 16 August. The application was subsequently run on a physical iPhone, through Expo Go on Expo SDK 54, against the same backend over the local network - EXPO_PUBLIC_API_URL repointed from localhost to the development machine's LAN address, with /health answering "database":"ok" and "cache":"ok" from that address. All three roles were signed in - admin, teacher and parent, across both seeded schools - and the corresponding functionality was driven through each. No defect was observed.
+iOS, 16 August. The application was later run on a physical iPhone, through Expo Go on Expo SDK 54, against the same backend over the local network - EXPO_PUBLIC_API_URL repointed from localhost to the development machine's LAN address, with /health answering "database":"ok" and "cache":"ok" from that address. All three roles were signed in - admin, teacher and parent, across both seeded schools - and the corresponding functionality was driven through each. No defect was observed.
 
-Two qualifications are stated deliberately, because both bear on how much the run proves. Nothing was captured: there is no recording, screenshot set or retained log, so this is an observed pass rather than an artefact, and unlike the Android run it contributes no figure to Section 4.3. And the application ran inside the Expo Go container, not as a standalone build, so while the native expo-secure-store and image-picker paths did execute - rather than the web fallbacks exercised in the browser - they executed under Expo Go's bundle identifier and entitlements rather than the application's own.
+Two qualifications belong with that run, because both bear on how much it proves. Nothing was captured: there is no recording, screenshot set or retained log, so this is an observed pass and not an artefact, and unlike the Android run it contributes no figure to Section 4.3. And the application ran inside the Expo Go container, not as a standalone build, so while the native expo-secure-store and image-picker paths did execute - rather than the web fallbacks exercised in the browser - they executed under Expo Go's bundle identifier and entitlements rather than the application's own.
 
-Native deep links, 16 August. Both device runs above used Expo Go, which serves the bundle under exp://, so neither registered the application's own hive:// scheme - a fact confirmed rather than assumed: with only Expo Go installed, cmd package resolve-activity -a android.intent.action.VIEW -d "hive://feed" answered *No activity found* and firing the intent failed with *unable to resolve Intent*.
+Native deep links, 16 August. Both device runs above used Expo Go, which serves the bundle under exp://, so neither registered the application's own hive:// scheme. We confirmed that rather than assuming it: with only Expo Go installed, cmd package resolve-activity -a android.intent.action.VIEW -d "hive://feed" answered *No activity found*, and firing the intent failed with *unable to resolve Intent*.
 
 A standalone Android build was then produced with expo run:android - Expo prebuild followed by a Gradle debug build, BUILD SUCCESSFUL in 12 m 16 s - and installed on the same handset. Repeating the measurement:
 
@@ -785,11 +785,11 @@ What this still does not establish. That an *authenticated* deep link resolves t
 The distinction that matters is the anon key against the service-role key: the anon key is the one the mobile application ships with and is subject to row-level security, while the service-role key bypasses it and belongs only on the server.
 
 ### 4.2.2 Cloud deployment - out of scope
-The system is deliberately not deployed. There is no hosted URL and no distributable application binary, and none is planned. A container image builds on every push and continuous integration runs the full suite against it, so the artefact that *would* be deployed is produced and verified - what was not done is provisioning a hosting target.
+The system is deliberately not deployed. There is no hosted URL and no distributable application binary, and none is planned. A container image builds on every push and continuous integration runs the full suite against it, so the artefact that *would* be deployed is produced and verified; what was not done is provisioning a hosting target.
 
-This is a scoping decision rather than an unfinished task, and it is recorded as one. The objectives in Section 1.3 are about a demonstrable privacy boundary and a correct ordering path; neither requires a public origin, and the system is exercised locally and on physical hardware over the local network instead (Section 3.3.8).
+This is a scoping decision, not an unfinished task, and we record it as one. The objectives in Section 1.3 are about a demonstrable privacy boundary and a correct ordering path. Neither requires a public origin, and the system is exercised locally and on physical hardware over the local network instead (Section 3.3.8).
 
-Three consequences follow, and are stated rather than quietly dropped:
+Three consequences follow, and we state them rather than quietly dropping them:
 
 1.  The HTTPS check in verify-security.sh cannot run, so the honest score is 29 passed, 0 failed, 1 skipped - never 30 of 30.
 2.  The k6 figures in Section 3.3.6 are a local measurement and are labelled as such. No capacity figure for a hosted instance exists or is claimed.
@@ -800,7 +800,7 @@ The path a deployment would take - a container platform for the API, with the da
 ## 4.3 Demonstration screenshots
 Capture conditions. Every application figure below was taken on a physical Android device running the application against the local API over adb reverse, not in a browser or an emulator. All are 1240 px wide, captured in light mode against the seeded demonstration dataset, and cropped uniformly to remove the operating-system status bar. Nothing is composed, retouched or recreated; where a figure shows a number, that number came from the database.
 
-Re-captured on 24 August against the current build. An earlier set was taken on 16 August, before the brand and play layer landed that evening and before the diary landed on 20 August, so those figures showed an interface the submission no longer describes. Every application figure below is now from the same 24 August session on the same handset, at 1240 px wide with the status bar cropped uniformly, and the diary - which previously had no figure at all - is captured in two.
+The set was re-captured on 24 August against the current build. An earlier set was taken on 16 August, before the brand and play layer landed that evening and before the diary landed on 20 August, so those figures showed an interface the submission no longer describes. The application figures below come from a single 24 August session on the same handset, except for the two the table marks as 16 August captures, and the diary, which previously had no figure at all, is captured in two.
 
 **Table 4.2 - Application figures**
 
@@ -826,14 +826,14 @@ Re-captured on 24 August against the current build. An earlier set was taken on 
 
 **Table 4.3 - The privacy comparison (Figure 3.4)**
 
-The two most important figures in the submission, and they are only meaningful as a pair. Both were captured on the same device at the same resolution with the same crop, so the comparison is between the application's behaviour and nothing else.
+These are the two most important figures in the submission, and they are only meaningful as a pair. Both were captured on the same device at the same resolution with the same crop, so the only thing the comparison shows is a difference in the application's behaviour.
 
 | **Fig.** | **File** | **Account** | **Result** |
 |----|----|----|----|
 | 3.4a | fig-3.4a-rajesh-feed.png | parent.rajesh@bloom.demo - Bloom Preschool, two children | 2 photographs, Aarav and Diya |
 | 3.4b | fig-3.4b-vikram-feed.png | parent.vikram@stars.demo - Little Stars Academy | 1 photograph, Arjun and Myra |
 
-Six photographs exist in the dataset. Neither parent sees all six, and the two sets do not intersect. This is the central requirement of the product demonstrated as an observable property rather than asserted as a feature - Section 3.3.2 gives the same result measured at the API.
+Six photographs exist in the dataset. Neither parent sees all six, and the two sets do not intersect. This is the central requirement of the product shown as an observable property rather than asserted as a feature, and Section 3.3.2 gives the same result measured at the API.
 
 *Evidence figures 3.1, 3.2, 3.3, 3.5, 4.1, 5.1 and 5.2 are terminal and repository captures rather than application screenshots; Section 3.3 and Chapter 5 carry their results in full. Figures 2.1 and 2.3 are the architecture and entity-relationship diagrams in Chapter 2.*
 
@@ -908,8 +908,8 @@ Conventional commit messages are used throughout, with security: reserved for re
 
 ## 5.3 Supervisor interaction summary
 
-Reviews were held through the project period from February to August 2026. One
-row per review below; the schedule is laid out by month so the cadence across
+Reviews were held throughout the project period, from February to August 2026.
+There is one row per review below, laid out by month so that the cadence across
 the semester is visible.
 
 | **Review date** | **Key feedback received** | **Action taken** |
@@ -928,29 +928,29 @@ the semester is visible.
 ## 6.1 Summary of implementation
 Hive was delivered as a three-tier system: a React Native application for teachers, parents and administrators; a 42-endpoint Express API in TypeScript; and a PostgreSQL database of ten domain tables across 20 migrations, with row-level security and triggers. Photographs are held privately and served only through signed, expiring URLs.
 
-The defining constraint - that the API bypasses row-level security by design - was addressed by enforcing authorization explicitly in the service layer, with every resource accessed by identifier checked against the caller.
+We handled the defining constraint - that the API bypasses row-level security by design - by enforcing authorization explicitly in the service layer, with every resource accessed by identifier checked against the caller.
 
 ## 6.2 Achievements
 1.  The privacy boundary holds under adversarial probing - cross-family 404, cross-school 403, same-school photograph mutation 403, each verified over HTTP with real tokens and reproduced from a cold start.
 2.  247 automated integration tests, executing against a real database rather than mocks, plus 117 mobile unit tests - 364 in all. Timed on 20 August at 21.96 s against a local Supabase stack; the comparable CI figure, against the hosted test project, is 373.86 s for the 218-test suite that preceded it, and the two measure different things (Section 3.3.1).
 3.  A sabotage exercise that validated the suite and found a defective test - one that had never verified the property its name claimed.
-4.  29 of 29 attempted security checks passed, 0 failed, 1 skipped - reproduced cold. One skip needs a deployment (HTTPS); the other needs FORCE_500_PATH set alongside NODE_ENV=production.
+4.  29 of 29 attempted security checks passed, 0 failed, 1 skipped. The remaining skip is the HTTPS check, which needs a deployed origin and nothing else will close it.
 5.  A previously non-functional ordering flow made to work, with correct integer-cent arithmetic and genuine idempotency.
-6.  Approximately 1,500 lines of never-executed infrastructure removed - the asynchronous queue and object-store client neither of which had ever run.
-7.  A second parent surface that a feed cannot be. The diary renders one child's whole time at the school, read forwards, bucketed in the *viewer's* calendar rather than the server's, signing one cover URL per month so a two-year journey costs what a two-week one costs. It is guarded by 29 tests, 13 of which are pure calendar cases that need no database.
-8.  An optional dependency stopped being able to take out the critical flow. With Redis unreachable, POST /orders did not fail - it hung, for over two minutes. maxRetriesPerRequest: null, left behind by the removed queue, combined with the client's offline queue to produce a command that retried forever and never settled, so the idempotency middleware's existing failure path never ran. Commands now fail after two retries with the offline queue disabled; order submission answered in 485 ms with Redis stopped.
+6.  Approximately 1,500 lines of infrastructure removed: an asynchronous queue and an object-store client, neither of which had ever run.
+7.  A second parent surface that a feed cannot provide. The diary renders one child's whole time at the school, read forwards, bucketed in the *viewer's* calendar rather than the server's, and signs one cover URL per month so a two-year journey costs what a two-week one costs. It is guarded by 29 tests, 13 of which are pure calendar cases that need no database.
+8.  An optional dependency can no longer take out the critical flow. With Redis unreachable, POST /orders did not fail - it hung, for over two minutes. maxRetriesPerRequest: null, left behind by the removed queue, combined with the client's offline queue to produce a command that retried forever and never settled, so the idempotency middleware's existing failure path never ran. Commands now fail after two retries with the offline queue disabled, and order submission answered in 485 ms with Redis stopped.
 
 ## 6.3 Limitations
 
-Stated explicitly. Each is a genuine gap rather than a task in progress.
+These are stated explicitly. Each is a genuine gap, not a task in progress.
 
 1.  There is no hosted backend. The Android application is a real build and runs on a handset, but it reaches the API over the local network, so the system is demonstrable rather than distributable. The container image is built and tested on every push; provisioning a host is a configuration step, not development work.
-2.  No capacity figure exists. The k6 suite runs and the smoke profile passes every threshold, with a feed page of 3,908 bytes. At fifty virtual users the binding constraint was the application's own per-identity rate limiter rather than the application itself, so no unconstrained throughput number was obtained, and none has been estimated.
-3.  iOS has not been built. The project carries no iOS target, so the platform-specific paths - the keychain-backed session and the native image picker - are proven on Android only. Native hive:// deep links are unverified on both platforms.
+2.  No capacity figure exists. The k6 suite runs and the smoke profile passes every threshold, with a feed page of 3,908 bytes. At fifty virtual users the binding constraint was the application's own per-identity rate limiter rather than the application itself, so no unconstrained throughput number was obtained, and we have not estimated one.
+3.  iOS has not been built. The project carries no iOS target, so the platform-specific paths - the keychain-backed session and the native image picker - are proven on Android only. Native hive:// deep links resolve correctly on Android but are unverified on iOS, and the screen a link lands on after authentication has not been shown on either.
 4.  Photographs do not respect EXIF orientation. Nothing in the image pipeline applies rotation, so a photograph taken in portrait on a phone is displayed a quarter turn out in both the feed and the diary. It is visible in the figures. The correction is a single call on each processing chain and is not in this submission.
 5.  The diary's three summary figures clip on Android. The animated counter draws into a text input with no explicit line height, and the diary does not override the inherited font size the way the administration dashboard does, so the glyphs are cut off at the descenders.
-6.  Server-side HEIC conversion does not work. sharp's prebuilt libvips ships libheif without an HEVC decoder and an iPhone HEIC is HEVC-coded, so the container parses and only the pixel decode fails. The client transcodes on the device instead, and the server refuses an HEVC HEIC that arrives anyway with an actionable 400.
-7.  A Redis outage is reported but does not change the health status code. The health endpoint surfaces the cache alongside the database, but only the database determines 200 against 503. This is deliberate - losing the idempotency cache degrades deduplication rather than availability - with the consequence that an orchestrator probing only the status code will not drain an instance whose Redis is unreachable.
+6.  Server-side HEIC conversion does not work. sharp's prebuilt libvips ships libheif without an HEVC decoder and an iPhone HEIC is HEVC-coded, so the container parses and only the pixel decode fails. The client transcodes on the device instead, and the server refuses an HEVC HEIC that arrives anyway, with an actionable 400.
+7.  A Redis outage is reported but does not change the health status code. The health endpoint surfaces the cache alongside the database, but only the database determines 200 against 503. This is deliberate, because losing the idempotency cache degrades deduplication rather than availability, and the consequence is that an orchestrator probing only the status code will not drain an instance whose Redis is unreachable.
 
 ## 6.4 Future enhancements
 
