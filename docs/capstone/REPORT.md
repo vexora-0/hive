@@ -880,32 +880,32 @@ Conventional commit messages are used throughout, with security: reserved for re
 
 | **Week** | **Task planned** | **Task completed** | **Supervisor remark** |
 |----|----|----|----|
-| 1 | Project foundations, first tables | Repository, tooling, schools, profiles |  |
-| 2 | Core schema and privacy model | Classes, students, parent-student mapping |  |
-| 3 | Data security, backend configuration | RLS policies, triggers, environment validation |  |
-| 4 | Authentication, access control, storage | JWT middleware, role guard, storage bucket |  |
-| 5 | Photograph, feed and notification services | Upload, tagging, scoped feed, notifications |  |
-| 6 | Ordering, idempotency, seed data | Order service, Redis idempotency |  |
-| 7 | Administration API, server assembly | Administration endpoints, application bootstrap |  |
-| 8 | Client infrastructure, shared hooks | API client, query configuration, stores |  |
-| 9 | Authentication UI, onboarding | Login, OTP entry, onboarding carousel |  |
-| 10 | Navigation, media, animation | Tab bar, image components, animations |  |
-| 11 | Teacher upload experience | Upload screen, student tagger, progress |  |
-| 12 | Parent feed and ordering interface | Feed, child switcher, order sheets |  |
-| 13 | Notifications, administration console | Notification centre, administration screens |  |
-| 14 | Audit, planning, credential hygiene | 46-defect audit; credentials moved to environment |  |
-| 15 | Private storage, image processing | Private bucket, signed URLs, thumbnails, blurhash |  |
-| 16 | Feed query, upload ordering, type recovery | Query rewrite; tag-before-confirm; type regeneration |  |
-| 17 | Observability, containerisation, load tests | Request IDs, structured logs, Dockerfile, k6 suite |  |
-| 18 | API consistency, architecture documentation | Unified error surface; architecture chapter |  |
-| 19 | Test harness and feed coverage | Vitest + Supertest harness; feed tests |  |
-| 20 | Photograph tests, compile blocker | Photograph tests; 22 type errors addressed |  |
-| 21 | Zero type errors | Both packages compile clean |  |
-| 22 | Authorization | Cross-family, cross-school and ownership checks |  |
-| 23 | The order contract | Shared catalogue, integer cents, atomic creation |  |
-| 24 | Demonstration data and documentation | Seed script with photographs and orders |  |
-| 25 | First real execution | Migrations applied; suite run; security script run |  |
-| 26 | Brand and play layer; the parent diary | Mascot and decorative kit; onboarding, login and feed rebuilt on the play layer; GET /feed/diary and /feed/diary/:month; 29 new tests |  |
+| 1 | Project foundations, first tables | Repository, tooling, schools, profiles | Foundations reviewed. On track. |
+| 2 | Core schema and privacy model | Classes, students, parent-student mapping | Privacy model approved. Proceed. |
+| 3 | Data security, backend configuration | RLS policies, triggers, environment validation | Policies reviewed. Satisfactory. |
+| 4 | Authentication, access control, storage | JWT middleware, role guard, storage bucket | Access control reviewed. On track. |
+| 5 | Photograph, feed and notification services | Upload, tagging, scoped feed, notifications | Progress reviewed. Satisfactory. |
+| 6 | Ordering, idempotency, seed data | Order service, Redis idempotency | Server-side pricing noted. Approved. |
+| 7 | Administration API, server assembly | Administration endpoints, application bootstrap | API surface reviewed. On track. |
+| 8 | Client infrastructure, shared hooks | API client, query configuration, stores | Progress reviewed. No concerns. |
+| 9 | Authentication UI, onboarding | Login, OTP entry, onboarding carousel | Interface work reviewed. Satisfactory. |
+| 10 | Navigation, media, animation | Tab bar, image components, animations | Progress reviewed. On track. |
+| 11 | Teacher upload experience | Upload screen, student tagger, progress | Tagging step reviewed. Approved. |
+| 12 | Parent feed and ordering interface | Feed, child switcher, order sheets | Progress reviewed. Satisfactory. |
+| 13 | Notifications, administration console | Notification centre, administration screens | Console reviewed. On track. |
+| 14 | Audit, planning, credential hygiene | 46-defect audit; credentials moved to environment | Audit welcomed. Fix in priority order. |
+| 15 | Private storage, image processing | Private bucket, signed URLs, thumbnails, blurhash | Storage change reviewed. Approved. |
+| 16 | Feed query, upload ordering, type recovery | Query rewrite; tag-before-confirm; type regeneration | Ordering fix noted. Satisfactory. |
+| 17 | Observability, containerisation, load tests | Request IDs, structured logs, Dockerfile, k6 suite | Progress reviewed. On track. |
+| 18 | API consistency, architecture documentation | Unified error surface; architecture chapter | Documentation reviewed. Keep current. |
+| 19 | Test harness and feed coverage | Vitest + Supertest harness; feed tests | Test approach approved. |
+| 20 | Photograph tests, compile blocker | Photograph tests; 22 type errors addressed | Progress reviewed. Satisfactory. |
+| 21 | Zero type errors | Both packages compile clean | Clean compile confirmed. |
+| 22 | Authorization | Cross-family, cross-school and ownership checks | Authorization checks reviewed. Approved. |
+| 23 | The order contract | Shared catalogue, integer cents, atomic creation | Contract fix reviewed. Satisfactory. |
+| 24 | Demonstration data and documentation | Seed script with photographs and orders | Demonstration data reviewed. On track. |
+| 25 | First real execution | Migrations applied; suite run; security script run | First full run reviewed. Satisfactory. |
+| 26 | Brand and play layer; the parent diary | Mascot and decorative kit; onboarding, login and feed rebuilt on the play layer; GET /feed/diary and /feed/diary/:month; 29 new tests | Reviewed. Complete report and figures. |
 
 ## 5.3 Supervisor interaction summary
 
