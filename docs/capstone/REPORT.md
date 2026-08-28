@@ -21,17 +21,16 @@ Signature: Team Hive Date: 20th August 2026
 ------------------------------------------------------------------------
 
 # ABSTRACT
-*(338 words)*
 
 Preschools routinely share classroom photographs with parents, and the obvious implementation - a shared album - is unacceptable: it exposes every child's face to every parent. This project delivers Hive, a photo-sharing platform built so that a parent sees photographs of their own children and nothing else.
 
-The system comprises a React Native mobile application, a 42-endpoint Express and TypeScript API, and a PostgreSQL database provisioned through Supabase with 20 migrations, row-level security policies and database triggers. Photographs are held in a private object store and served only through signed, expiring URLs. Three roles are supported: teachers upload and tag photographs, parents view a privacy-scoped feed, read a per-child diary of that child's whole time at the school, and order prints, and administrators manage schools, classes, students and users.
+The system comprises a React Native mobile application, a 42-endpoint Express and TypeScript API, and a PostgreSQL database provisioned through Supabase with 20 migrations, row-level security policies and database triggers. Photographs are held in a private object store and served only through signed, expiring URLs \[2\]. Three roles are supported: teachers upload and tag photographs, parents view a privacy-scoped feed, read a per-child diary of that child's whole time at the school, and order prints, and administrators manage schools, classes, students and users.
 
 The central engineering constraint is that the API authenticates using a service-role credential which bypasses row-level security by design. Authorization is therefore enforced explicitly in the service layer, and every resource accessed by identifier is checked against the caller. A formal audit identified 46 defects, of which the most serious permitted cross-family access to photograph metadata, cross-school access to student rosters including dates of birth, and an entirely non-functional ordering flow.
 
 Validation used 247 automated integration tests executing against a real PostgreSQL instance, together with 117 mobile unit tests and a scripted security verification returning 29 passed, 0 failed and 1 skipped, reproduced from a cold start. A deliberate sabotage exercise confirmed the suite detects the regressions it targets and additionally exposed a pre-existing test that had never verified the property its name claimed. Privacy scoping was measured directly: of six photographs, two parents saw two and one respectively, with zero overlap.
 
-The system is demonstrated locally and on physical hardware rather than from a hosted deployment. Load measurements were therefore taken against a local instance and are labelled as such throughout: the smoke profile passes every threshold, while the 50-user profile was bound by the application's own per-identity rate limiter, so no unconstrained capacity figure is claimed (§3.3.6).
+The system is demonstrated locally and on physical hardware rather than from a hosted deployment. Load measurements were therefore taken against a local instance and are labelled as such throughout: the smoke profile passes every threshold, while the 50-user profile was bound by the application's own per-identity rate limiter, so no unconstrained capacity figure is claimed (Section 3.3.6).
 
 Keywords: privacy by design, access control, REST API, React Native, PostgreSQL, integration testing
 
@@ -66,7 +65,7 @@ Keywords: privacy by design, access control, REST API, React Native, PostgreSQL,
 | 2.6 | Parent feed with child switcher | «» |
 | 2.7 | Order placement and confirmation | «» |
 | 2.8 | Administrator dashboard | «» |
-| 3.1 | Test suite execution - the 218-test suite, 16 August; §3.3.1 carries the current 247 | «» |
+| 3.1 | Test suite execution - the 218-test suite, 16 August; Section 3.3.1 carries the current 247 | «» |
 | 3.2 | Security verification output - 29/0/1 | «» |
 | 3.3 | Sabotage exercise - targeted tests failing | «» |
 | 3.4 | Privacy comparison - two parents, zero overlap | «» |
@@ -106,7 +105,7 @@ Keywords: privacy by design, access control, REST API, React Native, PostgreSQL,
 | DSN      | Data Source Name                      |
 | HEIC     | High Efficiency Image Container       |
 | IDOR     | Insecure Direct Object Reference      |
-| JWT      | JSON Web Token                        |
+| JWT      | JSON Web Token \[13\]                        |
 | MIME     | Multipurpose Internet Mail Extensions |
 | ORM      | Object-Relational Mapping             |
 | REST     | Representational State Transfer       |
@@ -117,7 +116,7 @@ Keywords: privacy by design, access control, REST API, React Native, PostgreSQL,
 ------------------------------------------------------------------------
 
 # CHAPTER 1: INTRODUCTION
-Problem identification and system design were completed in the Study Project. This chapter summarises them; §1.6 records what changed during implementation.
+Problem identification and system design were completed in the Study Project. This chapter summarises them; Section 1.6 records what changed during implementation.
 
 ## 1.1 Overview of the project
 Hive is a photo-sharing platform for preschools. A teacher photographs classroom activity and tags the children who appear in each image. Each parent then sees only the photographs their own children appear in. Parents may order prints; administrators manage the institutional data.
@@ -156,9 +155,9 @@ Three departures are worth recording, each made on evidence:
 
 Asynchronous image processing was removed. The original design queued thumbnail generation through BullMQ with an S3 backend. During implementation a repository-wide search for queue enqueue calls found none: neither queue had ever been used, and both workers targeted S3 while files were written to local disk. Approximately 1,500 lines of dependency graph were deleted in favour of a synchronous sharp call taking 100-300 ms.
 
-Monetary values were migrated to integer minor units. The original schema used decimal(10,2). §2.4.2 explains the failure this caused, and the later move from the US dollar to the Indian rupee that leaves the \*\_cents columns holding paise.
+Monetary values were migrated to integer minor units. The original schema used decimal(10,2). Section 2.4.2 explains the failure this caused, and the later move from the US dollar to the Indian rupee that leaves the \*\_cents columns holding paise.
 
-The parent experience gained a diary. The Study Project specified one parent surface - a reverse-chronological feed. Driving the seeded data made the omission visible: a feed is the right answer to "what arrived today" and the wrong answer to "what has this year been like", and only the second is the thing a family keeps. GET /feed/diary and GET /feed/diary/:month were added *alongside* the feed rather than replacing it - the wall is still the fastest route to this afternoon and the diary is deliberately not that - and the parent tab bar now leads with the diary. §2.3.7 and §2.4.6 describe it; the feed screen is renamed *Moments* in the tab bar to make the distinction legible.
+The parent experience gained a diary. The Study Project specified one parent surface - a reverse-chronological feed. Driving the seeded data made the omission visible: a feed is the right answer to "what arrived today" and the wrong answer to "what has this year been like", and only the second is the thing a family keeps. GET /feed/diary and GET /feed/diary/:month were added *alongside* the feed rather than replacing it - the wall is still the fastest route to this afternoon and the diary is deliberately not that - and the parent tab bar now leads with the diary. Section 2.3.7 and Section 2.4.6 describe it; the feed screen is renamed *Moments* in the tab bar to make the distinction legible.
 
 ------------------------------------------------------------------------
 
@@ -176,7 +175,7 @@ Three of the audit's most serious findings share exactly this root cause: code t
 
 `Teacher                API                     Database         Storage`
 
-The ordering is load-bearing. The trigger fires on the transition *to* ready and iterates the tags existing at that instant. Confirming before tagging produces zero notifications - silently. The system appears to work and the feature is dead. This was a real defect (G-07); the seed script now carries a prominent comment about it and §3.3.2 records its verification.
+The ordering is load-bearing. The trigger fires on the transition *to* ready and iterates the tags existing at that instant. Confirming before tagging produces zero notifications - silently. The system appears to work and the feature is dead. This was a real defect (G-07); the seed script now carries a prominent comment about it and Section 3.3.2 records its verification.
 
 ### 2.1.3 Component interaction - the authorization pipeline
 *(Figure 2.4)*
@@ -219,7 +218,7 @@ A signed Storage URL is a bearer capability: whoever holds it can fetch the obje
 | Idempotency | Redis (ioredis) | 7 | Deduplicates retried order submissions |
 | Logging | Winston | 3.13 | Structured logs with request correlation |
 | Testing | Vitest + Supertest | 4.x / 7.x | Executes the real application against a real database |
-| Load testing | k6 | - | Written; not executed (§3.3.4) |
+| Load testing | k6 | - | Written; not executed (Section 3.3.4) |
 | CI | GitHub Actions | - | Lint, typecheck and build on every push |
 | Monorepo | pnpm workspaces + Turborepo | 9.1.0 | Shared tooling, cached task graph |
 
@@ -235,7 +234,7 @@ A signed Storage URL is a bearer capability: whoever holds it can fetch the obje
 | parent_student_mappings | Many-to-many. The privacy rule lives here |
 | photos | Metadata; s3_key holds a Supabase Storage path (name is historical) |
 | photo_student_tags | Which children appear in which photograph |
-| orders | Print orders; totals in integer paise, priced server-side (total_cents is historical - see §2.4.2) |
+| orders | Print orders; totals in integer paise, priced server-side (total_cents is historical - see Section 2.4.2) |
 | order_items | Line items; photo_id is ON DELETE RESTRICT |
 | notifications | In-app, generated by triggers |
 
@@ -372,10 +371,10 @@ The original implementation inserted the order, then the items, then issued a co
 
 `END; $$ LANGUAGE plpgsql;`
 
-A function body is a single transaction: either both inserts land or neither does. Verified in §3.3.1 by deliberately failing the item insert.
+A function body is a single transaction: either both inserts land or neither does. Verified in Section 3.3.1 by deliberately failing the item insert.
 
 ### 2.4.4 Idempotent submission
-Retrying a submission over an unreliable mobile network must not produce a second order. The client generates a UUID and sends it as x-idempotency-key; middleware records the key in Redis with the resulting order identifier. A repeated key returns the original order rather than creating another. Verified in §3.3.1.
+Retrying a submission over an unreliable mobile network must not produce a second order. The client generates a UUID and sends it as x-idempotency-key; middleware records the key in Redis with the resulting order identifier. A repeated key returns the original order rather than creating another. Verified in Section 3.3.1.
 
 ### 2.4.5 Referential integrity
 Three foreign keys were declared NOT NULL and ON DELETE SET NULL - which are mutually exclusive. Deleting the referenced row causes PostgreSQL to write NULL into a NOT NULL column, raising a not-null violation instead of cascading. The practical consequence was that deleting any profile or photograph was impossible, failing with an error that did not explain why. Migration 00018 changed all three to ON DELETE RESTRICT, which states the intent honestly: a teacher who still has photographs cannot be removed without first deciding what becomes of them.
@@ -462,7 +461,7 @@ Why integration rather than unit testing. The ordering defect is the argument. F
 ### 3.1.2 Tools
 Vitest 4 (runner), Supertest 7 (HTTP assertions against the mounted Express application), a Supabase instance dedicated to tests, and scripts/verify-security.sh for runtime security checks.
 
-The test database moved, and the figures move with it. Runs were originally pointed at a separate hosted project, hive-test; local runs now target a local Supabase stack on 127.0.0.1:54321, while CI still targets hive-test through the TEST_SUPABASE\_\* secrets. Nothing about the tests themselves changed - they still perform real HTTP round-trips, real sign-ins and real object writes, with no mocking layer - but the wall time and the failure modes did, by an order of magnitude in both cases. §3.3.1 records the numbers and §3.3.7 what stopped happening.
+The test database moved, and the figures move with it. Runs were originally pointed at a separate hosted project, hive-test; local runs now target a local Supabase stack on 127.0.0.1:54321, while CI still targets hive-test through the TEST_SUPABASE\_\* secrets. Nothing about the tests themselves changed - they still perform real HTTP round-trips, real sign-ins and real object writes, with no mocking layer - but the wall time and the failure modes did, by an order of magnitude in both cases. Section 3.3.1 records the numbers and Section 3.3.7 what stopped happening.
 
 ### 3.1.3 The destructive-run guard
 The suite truncates every domain table in beforeAll. Pointed at the wrong project it would silently destroy the demonstration dataset. tests/setup.ts refuses to run without a separate .env.test, and refuses again if the URL names a known non-test project.
@@ -487,9 +486,9 @@ Both guards initially failed open - one compared against a variable that was nev
 
 Composition as of 3b4145e, 20 August 2026. The diary added 29 tests - 13 pure calendar cases in a new file, and 16 in feed.test.ts, of which 13 exercise the two diary endpoints and 3 close validation gaps the feed routes had carried from the beginning: a malformed studentId, a malformed photograph id and a cursor of the wrong shape each returned a 500 from PostgREST rather than a 400, because those routes had no validator at all. The suite was 218 across 8 files from 13 August until then, and 178 before that.
 
-This table covers the backend integration suite, which is the one that exercises the privacy boundary and therefore carries the argument of this chapter. The mobile package has a separate Vitest suite of 117 unit tests across 7 files - cart arithmetic, order-number formatting, the OTP throttle, retry behaviour, upload content-type selection, navigation resolution and the diary's date and duration formatting - which runs in under half a second because it touches no network. The 364 figure in §5.1 is the two combined.
+This table covers the backend integration suite, which is the one that exercises the privacy boundary and therefore carries the argument of this chapter. The mobile package has a separate Vitest suite of 117 unit tests across 7 files - cart arithmetic, order-number formatting, the OTP throttle, retry behaviour, upload content-type selection, navigation resolution and the diary's date and duration formatting - which runs in under half a second because it touches no network. The 364 figure in Section 5.1 is the two combined.
 
-**Table 3.2 - Test cases and results (representative selection; all 247** **pass****)**
+**Table 3.2 - Test cases and results (representative selection; all 247 pass)**
 
 | **ID** | **Description** | **Input** | **Expected output** | **Status** |
 |----|----|----|----|----|
@@ -597,7 +596,7 @@ Reproduced from cold on 2 August - stack stopped and restarted, database truncat
 | CORS | Origin: https://evil.example | Not reflected, not \* |
 | Secret scan | Repository | Clean |
 
-The three skips are not passes. They require HTTPS and a deployed origin, which do not exist (§3.3.4).
+The three skips are not passes. They require HTTPS and a deployed origin, which do not exist (Section 3.3.4).
 
 ### 3.3.4 The sabotage exercise
 *(Figure 3.3)*
@@ -626,19 +625,19 @@ This is the most instructive result in the chapter: the exercise validated the s
 
 | **Not verified** | **Reason** | **Consequence** |
 |----|----|----|
-| Deployment | Out of scope by decision (§4.2.2) - no hosted origin | The HTTPS check cannot run, so the score is 29/0/1 and never 30/30 |
-| Capacity under load | 50-VU run bound by the per-identity rate limiter, not the application | Smoke figures exist and pass; no unconstrained throughput or latency figure (§3.3.6) |
-| iOS | Run on a physical iPhone through Expo Go on 16 August, not as a standalone build; nothing captured | All three roles exercised, so the platform is no longer unexercised - but the evidence is an observed pass with no artefact, and the native paths ran under Expo Go's container rather than the application's own bundle identifier (§3.3.8) |
+| Deployment | Out of scope by decision (Section 4.2.2) - no hosted origin | The HTTPS check cannot run, so the score is 29/0/1 and never 30/30 |
+| Capacity under load | 50-VU run bound by the per-identity rate limiter, not the application | Smoke figures exist and pass; no unconstrained throughput or latency figure (Section 3.3.6) |
+| iOS | Run on a physical iPhone through Expo Go on 16 August, not as a standalone build; nothing captured | All three roles exercised, so the platform is no longer unexercised - but the evidence is an observed pass with no artefact, and the native paths ran under Expo Go's container rather than the application's own bundle identifier (Section 3.3.8) |
 | Native deep links | Largely closed on 16 August. The operating system now routes hive:// into the application on Android; what remains unshown is the post-authentication screen resolution | Measured against the connected handset, before and after installing a standalone build. Before: pm list packages showed host.exp.exponent but no com.hive.app, resolve-activity ... "hive://feed" answered *No activity found*, and the intent failed with *unable to resolve Intent* - the earlier device runs used Expo Go, which serves under exp://, so the scheme had never been registered. After expo run:android (BUILD SUCCESSFUL, 12m 16s): the scheme resolves to com.hive.app.MainActivity; a cold start from am start -a android.intent.action.VIEW -d "hive://feed" launches the app with that activity top-resumed; a second firing reports *intent has been delivered to currently running top-most instance*; and an unauthenticated link is correctly redirected to the login screen by the auth gate. Not shown: that an authenticated link resolves to the target screen - the sign-in could not be typed reliably under automation (Gboard's Google Translate mode rewrote the input, and the controlled TextInput drops injected characters), which is a harness limitation, not an application finding. iOS remains unexercised: Expo Go serves under exp:// there |
-| Server-side HEIC conversion | sharp's prebuilt libvips has no HEVC decoder | Cannot work, and does not. Tested 24 July against a real HEVC HEIC. Handled by a device-side transcode instead; the server refuses HEVC with an actionable 400 |
-| Mobile error reporting | EXPO_PUBLIC_SENTRY_DSN unset | Server-side reporting is proven (§6.3 item 4); the client is not |
+| Server-side HEIC conversion | sharp's prebuilt libvips \[10\] has no HEVC decoder | Cannot work, and does not. Tested 24 July against a real HEVC HEIC. Handled by a device-side transcode instead; the server refuses HEVC with an actionable 400 |
+| Mobile error reporting | EXPO_PUBLIC_SENTRY_DSN unset | Server-side reporting is proven (Section 6.3 item 4); the client is not |
 
 The application has been driven end to end in a desktop browser via Expo's web target, so the screens are exercised rather than merely compiled. Web is a verification convenience; the product targets iOS and Android, and that is where it remains unproven.
 
 ### 3.3.5 Defects identified and resolved
-An audit enumerated 46 defects. The most serious:
+An audit enumerated 46 defects. The four most serious all fall under a single recognised category - broken object level authorization, first in the OWASP API Security Top 10 \[4\]\[5\] - which is what an API that authenticates as the service role invites unless every endpoint re-derives authorization for itself. The most serious:
 
-**Table 3.5 - Defects identified and** **resolved**
+**Table 3.5 - Defects identified and resolved**
 
 | **ID** | **Severity** | **Defect** | **Status** |
 |----|----|----|----|
@@ -703,12 +702,12 @@ The mobile unit suite runs 117 tests in 429 milliseconds - pure logic, no I/O, w
 ### 3.3.7 Observations
 What the evidence supports. The privacy boundary holds under direct adversarial probing: cross-family access returns 404, cross-school access returns 403, and same-school photograph mutation returns 403 - each confirmed over HTTP with real tokens and reproduced from a cold start. Ordering functions with correct integer-cent arithmetic and genuine idempotency. The storage layer produces thumbnails and placeholders for both orientations and serves them only through signed, expiring URLs.
 
-What it does not support. No performance characteristic has been measured. Neither is an oversight discovered late; each follows from one absent step - deployment. The error-reporting pipeline, previously listed here, has since carried a real event; §6.3 item 4 records it. Observation on the shipping platform, previously listed here, is now largely closed: the application has been driven end to end on a physical Android device, and on a physical iPhone on 16 August. §3.3.8 records both runs, what each proved, and why the iOS one carries less weight than the Android one.
+What it does not support. No performance characteristic has been measured. Neither is an oversight discovered late; each follows from one absent step - deployment. The error-reporting pipeline, previously listed here, has since carried a real event; Section 6.3 item 4 records it. Observation on the shipping platform, previously listed here, is now largely closed: the application has been driven end to end on a physical Android device, and on a physical iPhone on 16 August. Section 3.3.8 records both runs, what each proved, and why the iOS one carries less weight than the Android one.
 
 A note on suite stability. Repeated runs against the *remote* test project exhaust the shared authentication provider's sign-in quota: each run creates roughly forty users, and beyond the quota sign-ins stall rather than fail. Three runs within half an hour produced timeouts on 9 August. Every failure observed was a timeout, never a failed assertion, and the same files passed in isolation immediately afterwards. Moving local runs onto a local Supabase stack removes that constraint for developers - the suite was run twice in succession on 20 August with no timeout and no variance worth reporting - but it does not remove it from CI, which still signs in against hive-test. A red CI run is still worth re-reading before it is believed.
 
 ### 3.3.8 Device verification
-The application was driven end to end on a physical Android device - a OnePlus CPH2487, connected over USB with adb reverse mapping the development server and API to the handset. Every application figure in §4.3 is a capture from that device rather than a browser.
+The application was driven end to end on a physical Android device - a OnePlus CPH2487, connected over USB with adb reverse mapping the development server and API to the handset. Every application figure in Section 4.3 is a capture from that device rather than a browser.
 
 **Table 3.7 - Behaviour verified on the device**
 
@@ -732,7 +731,7 @@ This class of defect is not reachable by the other methods used in this project.
 
 iOS, 16 August. The application was subsequently run on a physical iPhone, through Expo Go on Expo SDK 54, against the same backend over the local network - EXPO_PUBLIC_API_URL repointed from localhost to the development machine's LAN address, with /health answering "database":"ok" and "cache":"ok" from that address. All three roles were signed in - admin, teacher and parent, across both seeded schools - and the corresponding functionality was driven through each. No defect was observed.
 
-Two qualifications are stated deliberately, because both bear on how much the run proves. Nothing was captured: there is no recording, screenshot set or retained log, so this is an observed pass rather than an artefact, and unlike the Android run it contributes no figure to §4.3. And the application ran inside the Expo Go container, not as a standalone build, so while the native expo-secure-store and image-picker paths did execute - rather than the web fallbacks exercised in the browser - they executed under Expo Go's bundle identifier and entitlements rather than the application's own.
+Two qualifications are stated deliberately, because both bear on how much the run proves. Nothing was captured: there is no recording, screenshot set or retained log, so this is an observed pass rather than an artefact, and unlike the Android run it contributes no figure to Section 4.3. And the application ran inside the Expo Go container, not as a standalone build, so while the native expo-secure-store and image-picker paths did execute - rather than the web fallbacks exercised in the browser - they executed under Expo Go's bundle identifier and entitlements rather than the application's own.
 
 Native deep links, 16 August. Both device runs above used Expo Go, which serves the bundle under exp://, so neither registered the application's own hive:// scheme - a fact confirmed rather than assumed: with only Expo Go installed, cmd package resolve-activity -a android.intent.action.VIEW -d "hive://feed" answered *No activity found* and firing the intent failed with *unable to resolve Intent*.
 
@@ -788,18 +787,18 @@ The distinction that matters is the anon key against the service-role key: the a
 ### 4.2.2 Cloud deployment - out of scope
 The system is deliberately not deployed. There is no hosted URL and no distributable application binary, and none is planned. A container image builds on every push and continuous integration runs the full suite against it, so the artefact that *would* be deployed is produced and verified - what was not done is provisioning a hosting target.
 
-This is a scoping decision rather than an unfinished task, and it is recorded as one. The objectives in §1.3 are about a demonstrable privacy boundary and a correct ordering path; neither requires a public origin, and the system is exercised locally and on physical hardware over the local network instead (§3.3.8).
+This is a scoping decision rather than an unfinished task, and it is recorded as one. The objectives in Section 1.3 are about a demonstrable privacy boundary and a correct ordering path; neither requires a public origin, and the system is exercised locally and on physical hardware over the local network instead (Section 3.3.8).
 
 Three consequences follow, and are stated rather than quietly dropped:
 
 1.  The HTTPS check in verify-security.sh cannot run, so the honest score is 29 passed, 0 failed, 1 skipped - never 30 of 30.
-2.  The k6 figures in §3.3.6 are a local measurement and are labelled as such. No capacity figure for a hosted instance exists or is claimed.
+2.  The k6 figures in Section 3.3.6 are a local measurement and are labelled as such. No capacity figure for a hosted instance exists or is claimed.
 3.  Checkpoint CP-5 is not met.
 
-The path a deployment would take - a container platform for the API, with the database, auth and storage already hosted, and Expo Application Services for mobile binaries - is described in §6.4 as future work.
+The path a deployment would take - a container platform for the API, with the database, auth and storage already hosted, and Expo Application Services for mobile binaries - is described in Section 6.4 as future work.
 
 ## 4.3 Demonstration screenshots
-Capture conditions. Every application figure below was taken on a physical Android device (OnePlus CPH2487) running the application against the local API over adb reverse, not in a browser or an emulator. All are 1240 px wide, captured in light mode against the seeded demonstration dataset, and cropped uniformly to remove the operating-system status bar. Nothing is composed, retouched or recreated; where a figure shows a number, that number came from the database.
+Capture conditions. Every application figure below was taken on a physical Android device running the application against the local API over adb reverse, not in a browser or an emulator. All are 1240 px wide, captured in light mode against the seeded demonstration dataset, and cropped uniformly to remove the operating-system status bar. Nothing is composed, retouched or recreated; where a figure shows a number, that number came from the database.
 
 Re-captured on 24 August against the current build. An earlier set was taken on 16 August, before the brand and play layer landed that evening and before the diary landed on 20 August, so those figures showed an interface the submission no longer describes. Every application figure below is now from the same 24 August session on the same handset, at 1240 px wide with the status bar cropped uniformly, and the diary - which previously had no figure at all - is captured in two.
 
@@ -834,9 +833,9 @@ The two most important figures in the submission, and they are only meaningful a
 | 3.4a | fig-3.4a-rajesh-feed.png | parent.rajesh@bloom.demo - Bloom Preschool, two children | 2 photographs, Aarav and Diya |
 | 3.4b | fig-3.4b-vikram-feed.png | parent.vikram@stars.demo - Little Stars Academy | 1 photograph, Arjun and Myra |
 
-Six photographs exist in the dataset. Neither parent sees all six, and the two sets do not intersect. This is the central requirement of the product demonstrated as an observable property rather than asserted as a feature - §3.3.2 gives the same result measured at the API.
+Six photographs exist in the dataset. Neither parent sees all six, and the two sets do not intersect. This is the central requirement of the product demonstrated as an observable property rather than asserted as a feature - Section 3.3.2 gives the same result measured at the API.
 
-*Evidence figures 3.1, 3.2, 3.3, 3.5, 4.1, 5.1 and 5.2 are terminal and repository captures rather than application screenshots; §3.3 and Chapter 5 carry their results in full. Figures 2.1 and 2.3 are the architecture and entity-relationship diagrams in Chapter 2.*
+*Evidence figures 3.1, 3.2, 3.3, 3.5, 4.1, 5.1 and 5.2 are terminal and repository captures rather than application screenshots; Section 3.3 and Chapter 5 carry their results in full. Figures 2.1 and 2.3 are the architecture and entity-relationship diagrams in Chapter 2.*
 
 ## 4.4 Demonstration video
 https://youtu.be/_kvid-1KXxA
@@ -933,7 +932,7 @@ The defining constraint - that the API bypasses row-level security by design - w
 
 ## 6.2 Achievements
 1.  The privacy boundary holds under adversarial probing - cross-family 404, cross-school 403, same-school photograph mutation 403, each verified over HTTP with real tokens and reproduced from a cold start.
-2.  247 automated integration tests, executing against a real database rather than mocks, plus 117 mobile unit tests - 364 in all. Timed on 20 August at 21.96 s against a local Supabase stack; the comparable CI figure, against the hosted test project, is 373.86 s for the 218-test suite that preceded it, and the two measure different things (§3.3.1).
+2.  247 automated integration tests, executing against a real database rather than mocks, plus 117 mobile unit tests - 364 in all. Timed on 20 August at 21.96 s against a local Supabase stack; the comparable CI figure, against the hosted test project, is 373.86 s for the 218-test suite that preceded it, and the two measure different things (Section 3.3.1).
 3.  A sabotage exercise that validated the suite and found a defective test - one that had never verified the property its name claimed.
 4.  29 of 29 attempted security checks passed, 0 failed, 1 skipped - reproduced cold. One skip needs a deployment (HTTPS); the other needs FORCE_500_PATH set alongside NODE_ENV=production.
 5.  A previously non-functional ordering flow made to work, with correct integer-cent arithmetic and genuine idempotency.
@@ -942,34 +941,34 @@ The defining constraint - that the API bypasses row-level security by design - w
 8.  An optional dependency stopped being able to take out the critical flow. With Redis unreachable, POST /orders did not fail - it hung, for over two minutes. maxRetriesPerRequest: null, left behind by the removed queue, combined with the client's offline queue to produce a command that retried forever and never settled, so the idempotency middleware's existing failure path never ran. Commands now fail after two retries with the offline queue disabled; order submission answered in 485 ms with Redis stopped.
 
 ## 6.3 Limitations
-Stated explicitly; each is evidenced in Table 3.6.
 
-1.  The system is not deployed, by decision rather than by omission. No hosted URL and no application binary, and none planned - see §4.2.2, which states the three consequences that follow rather than leaving them implied. The container image builds and is tested on every push; only the hosting target is absent.
-2.  No performance measurement against a deployment exists. The k6 suite has now run - locally, on 16 August - and the smoke profile passes every threshold with a 3,908-byte feed page (§3.3.6). What is missing is a *capacity* figure: at 50 virtual users the binding constraint was the project's own per-identity rate limiter rather than the application, so no unconstrained throughput or latency number has been obtained, and none has been estimated.
-3.  Native deep links are unverified, and the iOS evidence is weaker than the Android evidence. This limitation formerly read "iOS is unverified"; both platforms have now run on hardware. The Android run was the substantial one - the keychain-backed session, the image picker, upload progress, role routing and privacy scoping are all proven there, seven defects were found that no other method surfaced, and it supplies the application figures in §4.3 (§3.3.8). The iOS run, on 16 August, exercised all three roles on a physical iPhone but through Expo Go rather than a standalone build, and nothing was captured - so it is an observed pass, and the native paths ran under Expo Go's container rather than the application's own bundle identifier. What remains unproven is narrower than it was. hive:// deep linking was closed on Android on 16 August: a standalone build was produced with expo run:android and installed, after which the operating system resolves the scheme to com.hive.app.MainActivity and routes it both cold and warm, with an unauthenticated link correctly redirected to login (§3.3.8). Two things are still outstanding - that an *authenticated* link resolves to its target screen, which the automation harness could not type a clean sign-in to reach, and iOS, where no standalone build was produced and Expo Go serves under exp://.
-4.  The error-reporting pipeline has never carried an error. Closed on 16 August. A Sentry project was created, SENTRY_DSN supplied, and the backend now logs *"Sentry initialised"* where it previously took its no-op path. A deliberate exception was captured and delivered - issue HIVE-BACKEND-1, event 8a5130bf. The beforeSend scrubber therefore ran against a real transported event rather than only the synthetic one it was unit-tested with. The mobile application is not wired to Sentry: it reads EXPO_PUBLIC_SENTRY_DSN, which is unset, so client-side reporting remains unproven.
-5.  The continuous-integration test step is advisory. Closed on 16 August, and worth recording because of what it turned out to be. The step had been marked continue-on-error: true and was not merely failing to gate - it was *failing*, on every push, with the failure masked. The harness refused to start (*"SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in packages/backend/.env.test"*), the step exited 1, and the job still reported green. A green tick beside Test backend implied a guard that did not exist, and the only place the truth appeared was the run's annotations. Adding TEST_SUPABASE_URL, TEST_SUPABASE_SERVICE_KEY and TEST_SUPABASE_ANON_KEY as repository secrets, pointing at the separate hive-test project, let the suite run: 218 tests passed across 8 files in 373.86 s in CI. The escape hatch was then removed, and Figure 5.2 is the first run in which the tick beside Test backend means the suite passed. All four checks - lint, typecheck, build and the test suite - now block a merge, and the suite has since grown to 247.
-6.  Server-side HEIC conversion does not work. sharp's prebuilt libvips ships libheif without an HEVC decoder, and an iPhone HEIC is HEVC-coded, so the container parses and the pixel decode fails. Established by testing a real HEVC HEIC on 24 July 2026. The mobile client transcodes on the device instead, and the server refuses HEVC with an actionable 400. Magic-byte rejection, previously listed here alongside it, is covered - by photos.test.ts T-20.
-7.  The diary was driven on hardware on 24 August and is captured in §4.3, closing what had been the largest gap in the evidence. Two defects found on that run are open and are recorded here rather than left for a reader to notice: the diary's three summary figures render as clipped glyph fragments on Android, because AnimatedCounter paints into a TextInput with no explicit line height and the diary does not override the inherited font size; and EXIF orientation is never applied anywhere in the image pipeline, so a photograph taken in portrait on a phone is displayed rotated a quarter turn in both the feed and the diary. The second is visible in the figures themselves. Neither is a design decision; both are defects with known causes and neither was fixed before submission.
-8.  A Redis outage is reported but does not change the health status code. /health surfaces "cache" alongside "database", but only the database determines 200 against 503. This is deliberate - losing the idempotency cache degrades deduplication rather than availability, so the instance should stay in rotation - with the consequence that an orchestrator probing only the status code will not restart or drain an instance whose Redis is unreachable.
+Stated explicitly. Each is a genuine gap rather than a task in progress.
+
+1.  There is no hosted backend. The Android application is a real build and runs on a handset, but it reaches the API over the local network, so the system is demonstrable rather than distributable. The container image is built and tested on every push; provisioning a host is a configuration step, not development work.
+2.  No capacity figure exists. The k6 suite runs and the smoke profile passes every threshold, with a feed page of 3,908 bytes. At fifty virtual users the binding constraint was the application's own per-identity rate limiter rather than the application itself, so no unconstrained throughput number was obtained, and none has been estimated.
+3.  iOS has not been built. The project carries no iOS target, so the platform-specific paths - the keychain-backed session and the native image picker - are proven on Android only. Native hive:// deep links are unverified on both platforms.
+4.  Photographs do not respect EXIF orientation. Nothing in the image pipeline applies rotation, so a photograph taken in portrait on a phone is displayed a quarter turn out in both the feed and the diary. It is visible in the figures. The correction is a single call on each processing chain and is not in this submission.
+5.  The diary's three summary figures clip on Android. The animated counter draws into a text input with no explicit line height, and the diary does not override the inherited font size the way the administration dashboard does, so the glyphs are cut off at the descenders.
+6.  Server-side HEIC conversion does not work. sharp's prebuilt libvips ships libheif without an HEVC decoder and an iPhone HEIC is HEVC-coded, so the container parses and only the pixel decode fails. The client transcodes on the device instead, and the server refuses an HEVC HEIC that arrives anyway with an actionable 400.
+7.  A Redis outage is reported but does not change the health status code. The health endpoint surfaces the cache alongside the database, but only the database determines 200 against 503. This is deliberate - losing the idempotency cache degrades deduplication rather than availability - with the consequence that an orchestrator probing only the status code will not drain an instance whose Redis is unreachable.
 
 ## 6.4 Future enhancements
-Immediate, in dependency order:
 
-1.  Deploy. One step that simultaneously unblocks the HTTPS and CORS checks, the load tests, and device testing against a real origin.
-2.  Execute the k6 suite against that deployment and record the results.
-3.  Produce iOS and Android builds and verify the platform-specific paths.
-4.  Make the test step blocking. Done 16 August - see §6.3 item 5.
+Engineering, in dependency order:
+
+1.  Apply EXIF orientation in the image pipeline and backfill the existing rows. This is the most visible defect in the product and the cheapest to correct.
+2.  Add an iOS target and verify the keychain-backed session, the native image picker and hive:// deep links on both platforms.
+3.  Generate thumbnails at more than one size. The feed and the diary currently share a single 400 px derivative, so the diary's larger cards upscale it.
+4.  Move image processing off the request path once volume justifies it. It is synchronous by deliberate choice at this scale; the boundary is already isolated in one module.
+5.  Obtain a capacity figure with per-user identities, so the measurement reflects the application rather than its own rate limiter.
 
 Product:
 
-5.  Payment gateway integration for print orders.
-6.  Push notifications, replacing in-app only.
-7.  Bulk upload with client-side compression.
-8.  Photograph search by child, class or date range.
-9.  Data-retention policy and parent-initiated deletion, appropriate to a child-privacy product.
-
-------------------------------------------------------------------------
+6.  Payment gateway integration for print orders.
+7.  Push notifications, replacing in-app only.
+8.  Bulk upload with client-side compression.
+9.  Photograph search by child, class or date range.
+10. Data-retention policy and parent-initiated deletion, appropriate to a child-privacy product.
 
 # REFERENCES
 *(IEEE style)*

@@ -170,6 +170,62 @@ def toc_field(style: str, placeholder: str) -> str:
     )
 
 
+
+def fit_tables(docx_path: Path) -> int:
+    """Rescale every table to the printable width.
+
+    pandoc sizes columns from content length with no page constraint, so a
+    wide table lands at 18484 twips against the 9026 available on A4 with one
+    inch margins - more than double. Word then squeezes it, which is what
+    produces the three-words-per-line columns and the squashed headers the
+    review kept flagging as "make table fit" and "alignment".
+
+    Each grid is rescaled proportionally to the printable width, so the
+    relative column balance pandoc chose is preserved while the table stops
+    overflowing. Autofit is left on so Word can still adjust to content.
+    """
+    import zipfile, re, shutil, tempfile
+    PAGE = 9026
+    z = zipfile.ZipFile(docx_path)
+    parts = {n: z.read(n) for n in z.namelist()}
+    z.close()
+    doc = parts["word/document.xml"].decode("utf8")
+
+    fixed = 0
+
+    def rescale(m):
+        nonlocal fixed
+        grid = m.group(0)
+        widths = [int(w) for w in re.findall(r'w:w="(\d+)"', grid)]
+        total = sum(widths)
+        if not total or total <= PAGE:
+            return grid
+        scaled, run = [], 0
+        for w in widths[:-1]:
+            v = max(360, round(w * PAGE / total))
+            scaled.append(v); run += v
+        scaled.append(max(360, PAGE - run))
+        fixed += 1
+        out = grid
+        for old, new in zip(widths, scaled):
+            out = re.sub(r'w:w="%d"' % old, 'w:w="%d"' % new, out, count=1)
+        return out
+
+    doc = re.sub(r"<w:tblGrid>.*?</w:tblGrid>", rescale, doc, flags=re.S)
+    # pin the table itself to the printable width and let Word autofit within it
+    doc = re.sub(r"<w:tblW[^/]*/>", '<w:tblW w:w="5000" w:type="pct"/>', doc)
+    doc = re.sub(r"<w:tblLayout[^/]*/>", '<w:tblLayout w:type="autofit"/>', doc)
+
+    parts["word/document.xml"] = doc.encode("utf8")
+    tmp = tempfile.mktemp(suffix=".docx")
+    zo = zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED)
+    for n, data in parts.items():
+        zo.writestr(n, data)
+    zo.close()
+    shutil.move(tmp, docx_path)
+    return fixed
+
+
 def main() -> int:
     if not REF.exists():
         print(f"error: reference doc missing at {REF}", file=sys.stderr)
@@ -200,7 +256,10 @@ def main() -> int:
     md = re.sub(
         r"^\*\*(Table \d+\.\d+ -[^\n]*?)\*\*(\s*\*\([^\n]*\)\*)?$",
         lambda m: '::: {custom-style="TableCaption"}\n'
-                  + m.group(1) + (m.group(2).strip() if m.group(2) else "")
+                  # strip any residual bold markers: a caption that arrived from a
+                  # Google Docs round-trip can carry split spans, and they render
+                  # as literal asterisks in Word
+                  + (m.group(1) + (m.group(2).strip() if m.group(2) else "")).replace("**", "")
                   + "\n:::",
         md, flags=re.M)
 
@@ -278,6 +337,10 @@ def main() -> int:
         return r.returncode
     if r.stderr.strip():
         print("  pandoc warnings:\n" + r.stderr.strip()[:1500])
+
+    n_fit = fit_tables(OUT)
+    if n_fit:
+        print(f"  rescaled {n_fit} table(s) to the printable width")
 
     size = OUT.stat().st_size
     print(f"\n  wrote {OUT.relative_to(ROOT)}  ({size:,} bytes)")
