@@ -60,19 +60,19 @@ Keywords: privacy by design, access control, REST API, React Native, PostgreSQL,
 | 2.1 | High-level system architecture | «» |
 | 2.2 | Data flow - photograph upload to parent notification | «» |
 | 2.3 | Entity-relationship diagram | «» |
-| 2.4 | Component interaction - authorization pipeline | «» |
+| 2.4 | Component interaction - authentication and the authorization pipeline | «» |
 | 2.5 | Teacher upload screen with student tagger | «» |
 | 2.6 | Parent feed with child switcher | «» |
 | 2.7 | Order placement and confirmation | «» |
 | 2.8 | Administrator dashboard | «» |
-| 3.1 | Test suite execution - the 218-test suite, 16 August; Section 3.3.1 carries the current 247 | «» |
-| 3.2 | Security verification output - 29/0/1 | «» |
+| 3.1 | Test suite execution - 247 tests across 9 files, with 117 mobile unit tests | «» |
+| 3.2 | Security verification output - 29 passed, 0 failed, 1 skipped | «» |
 | 3.3 | Sabotage exercise - targeted tests failing | «» |
 | 3.4 | Privacy comparison - two parents, zero overlap | «» |
 | 3.5 | Signed URL 200 versus stripped-token 400 | «» |
 | 4.1 | Health endpoint, healthy and degraded | «» |
 | 5.1 | Commit history | «» |
-| 5.2 | Continuous integration run | «» |
+| 5.2 | Continuous integration run - lint, typecheck, build and the 247-test suite, all blocking | «» |
 
 # LIST OF TABLES
 

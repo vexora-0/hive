@@ -48,15 +48,16 @@ FIGURES = {
     "2.6": ("fig-2.6-feed-child-switcher.png", "Parent feed with child switcher"),
     "2.7": ("fig-2.7-order-confirm.png", "Order placement and confirmation"),
     "2.8": ("fig-2.8-admin-dashboard.png", "Administrator dashboard"),
-    "3.1": ("fig-3.1-test-suite.png", "Test suite execution - 218 tests passing"),
+    "3.1": ("fig-3.1-test-suite.png",
+            "Test suite execution - 247 tests across 9 files, with 117 mobile unit tests"),
     "3.2": ("fig-3.2-verify-security.png", "Security verification output - 29 passed, 0 failed, 1 skipped"),
     "3.3": ("fig-3.3-sabotage.png", "Sabotage exercise - targeted tests failing"),
     "3.5": ("fig-3.5-signed-url.png", "Signed URL 200 versus stripped-token 400"),
     "4.1": ("fig-4.1-health.png", "Health endpoint, healthy and degraded"),
     "5.1": ("fig-5.1-commit-history.png", "Commit history"),
     "5.2": ("fig-5.2-ci-run.png",
-            "Continuous integration run - lint, typecheck, build and 218 tests, "
-            "all blocking"),
+            "Continuous integration run - lint, typecheck, build and the 247-test "
+            "suite, all blocking"),
 }
 
 # Portrait phone captures are 1240x2562. Left unconstrained they run over a
@@ -91,6 +92,70 @@ def fig_md(num: str) -> str:
     width = WIDTH_OVERRIDE.get(num, WIDTH[kind])
     rel = path.relative_to(ROOT)
     return f"![Figure {num} - {caption}]({rel}){{width={width}}}"
+
+
+def place_figure(md: str, num: str, anchor: str) -> tuple[str, bool]:
+    """Swap an anchor for the figure, always as a paragraph of its own.
+
+    pandoc's `implicit_figures` only fires for an image that is alone in its
+    paragraph. Fold one into surrounding prose and it stays an inline run: no
+    caption paragraph is emitted, and since the LIST OF FIGURES is a field that
+    collects caption paragraphs, the figure disappears from the list while
+    still sitting in the body. That is silent - the build succeeds, the image
+    is there, and only the list is short.
+
+    Two anchor shapes exist in the markdown and they need different handling:
+
+      *(Figure 2.1)*                     - alone on its line; swap in place
+      "...succeeding. *(Figure 3.1)*"    - trailing a sentence; strip it and
+                                           emit the figure after the paragraph
+
+    The second used to be handled by inserting after a hard-coded heading
+    instead, which broke the moment the heading stopped being followed by a
+    blank line.
+    """
+    fig = fig_md(num)
+    esc = re.escape(anchor)
+
+    m = re.search(rf"^[ \t]*{esc}[ \t]*$", md, re.M)
+    if m:
+        return md[:m.start()] + fig + md[m.end():], True
+
+    m = re.search(rf"[ \t]*{esc}[ \t]*(?=\n|$)", md)
+    if m:
+        end = md.find("\n\n", m.end())
+        end = len(md) if end == -1 else end
+        return md[:m.start()] + md[m.end():end] + "\n\n" + fig + md[end:], True
+
+    return md, False
+
+
+def check_figures(docx_path: Path) -> None:
+    """Confirm every figure really became a figure.
+
+    Counting images is not enough - a folded-in image is still an image. What
+    the LIST OF FIGURES needs is a caption paragraph in ImageCaption style, so
+    that is what gets counted, and any figure whose caption is missing is named.
+    """
+    import zipfile
+    doc = zipfile.ZipFile(docx_path).read("word/document.xml").decode("utf8")
+    captions = [
+        "".join(re.findall(r"<w:t[^>]*>(.*?)</w:t>", p, re.S))
+        for p in re.findall(r"<w:p\b.*?</w:p>", doc, re.S)
+        if 'w:pStyle w:val="ImageCaption"' in p
+    ]
+    drawings = len(re.findall(r"<w:drawing>", doc))
+    expected = sorted(set(FIGURES) | {"3.4"}, key=lambda n: [int(x) for x in n.split(".")])
+    missing = [n for n in expected
+               if not any(c.startswith(f"Figure {n} ") for c in captions)]
+
+    print(f"  {drawings} image(s), {len(captions)} of {len(expected)} in the LIST OF FIGURES")
+    if missing:
+        print(f"  !! not in the list: {', '.join(missing)}")
+        print("     The image is on the page but carries no ImageCaption paragraph,")
+        print("     so the field cannot collect it. Usually means the image ended up")
+        print("     sharing a paragraph with prose or with another image.")
+
 
 
 def check_commit_stats(md: str) -> None:
@@ -275,23 +340,29 @@ def main() -> int:
                     "Update fields in Word (select all, then F9) to build this list."),
                 md, flags=re.S)
 
-    # 3.4 first — its anchor is a plain *(Figure 3.4)* and the pair needs a table.
+    # 3.4 first - its anchor is a plain *(Figure 3.4)* and the pair needs a table.
+    # The caption is emitted in ImageCaption explicitly. pandoc gives that style
+    # to the captions it generates itself, and the LIST OF FIGURES is a field
+    # collecting exactly that style, so a hand-written italic line here would
+    # put 3.4 on the page and leave it out of the list.
     a = (FIGDIR / "fig-3.4a-rajesh-feed.png").relative_to(ROOT)
     b = (FIGDIR / "fig-3.4b-vikram-feed.png").relative_to(ROOT)
     pair = (
         "| Rajesh - Bloom Preschool | Vikram - Little Stars Academy |\n"
         "|:---:|:---:|\n"
         f"| ![]({a}){{width=2.4in}} | ![]({b}){{width=2.4in}} |\n\n"
-        "*Figure 3.4 - Privacy comparison: two parents, zero overlap.*\n"
+        '::: {custom-style="ImageCaption"}\n'
+        "Figure 3.4 - Privacy comparison - two parents, zero overlap\n"
+        ":::\n"
     )
     md = md.replace("*(Figure 3.4)*", pair, 1)
 
     # Anchored single figures.
-    for num in ["2.1", "2.2", "2.3", "2.4", "3.2", "3.3"]:
+    for num in ["2.1", "2.2", "2.3", "2.4", "3.1", "3.2", "3.3", "4.1"]:
         for anchor in (f"*(Figure {num})*",
                        f"*(Figure {num} - entity-relationship diagram)*"):
-            if anchor in md:
-                md = md.replace(anchor, fig_md(num), 1)
+            md, placed = place_figure(md, num, anchor)
+            if placed:
                 break
         else:
             print(f"  .. no anchor found for figure {num}")
@@ -308,15 +379,15 @@ def main() -> int:
         fig_md("5.1") + "\n\n" + fig_md("5.2"),
         1)
 
-    # Three figures the prose never anchored. Place each after the heading of
-    # the section that discusses it.
-    for num, heading in [("3.1", "### 3.3.1 Automated suite"),
-                         ("3.5", "### 3.3.3 Security verification"),
-                         ("4.1", "## 4.1 Execution environment")]:
-        if heading in md:
-            md = md.replace(heading, heading + "\n\n" + fig_md(num), 1)
-        else:
-            print(f"  .. heading not found for figure {num}: {heading}")
+    # 3.5 is the one figure the prose never anchors. It belongs with 3.2 - both
+    # are security verification evidence - so hang it off 3.2 rather than off a
+    # heading, which is the fragile thing: a heading gets renamed or loses its
+    # trailing blank line and the figure silently stops being a figure.
+    marker = fig_md("3.2")
+    if marker in md:
+        md = md.replace(marker, marker + "\n\n" + fig_md("3.5"), 1)
+    else:
+        print("  .. figure 3.2 not placed, so 3.5 has nothing to follow")
 
     STAGE.write_text(md, encoding="utf8")
 
@@ -341,6 +412,8 @@ def main() -> int:
     n_fit = fit_tables(OUT)
     if n_fit:
         print(f"  rescaled {n_fit} table(s) to the printable width")
+
+    check_figures(OUT)
 
     size = OUT.stat().st_size
     print(f"\n  wrote {OUT.relative_to(ROOT)}  ({size:,} bytes)")
