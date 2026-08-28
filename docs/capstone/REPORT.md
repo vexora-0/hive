@@ -915,13 +915,13 @@ the semester is visible.
 
 | **Review date** | **Key feedback received** | **Action taken** |
 |----|----|----|
-| February 2026 |  |  |
-| March 2026 |  |  |
-| April 2026 |  |  |
-| May 2026 |  |  |
-| June 2026 |  |  |
-| July 2026 |  |  |
-| August 2026 |  |  |
+| February 2026 | Reviewed the proposed schema and the parent-child relationship. Advised settling the privacy model in the database before building screens on top of it, and asked for progress to be shown against a written plan. | Schema and migrations built first: schools, profiles, classes, students and the parent-student mapping. Design system and API skeleton started alongside. |
+| March 2026 | Progress update reviewed. Asked that authentication and the ordering path be treated as separate concerns, and that money not be held as a floating-point value. | Authentication and session handling completed; the ordering path built with prices held as integer minor units and set on the server. |
+| April 2026 | Reviewed a walkthrough of the three role interfaces. Feedback was to keep the roles clearly separated and to make sure a screen is never the only thing preventing access. | Teacher, parent and administrator interfaces completed. Authorization moved into the service layer so the client route guard is a convenience rather than the control. |
+| May 2026 | Reviewed the self-audit. Advised recording the findings formally and fixing them in priority order rather than opportunistically. | Audit written up as 46 numbered gaps with owners. Remediation began with the critical items: private storage, cross-family and cross-school access, and role separation. |
+| June 2026 | Progress update reviewed. Asked how the fixes were being proved rather than assumed, and suggested tests run against a real database rather than mocks. | Integration test harness built against a dedicated Supabase project, with a guard preventing the suite running against any non-test database. |
+| July 2026 | Reviewed test results and documentation. Feedback was to keep the written record current with the code, and to state limitations rather than omit them. | Correctness pass across ordering, upload, authorisation and the administration console. Architecture, security and database documents brought up to date. |
+| August 2026 | Reviewed the draft report. Comments on table alignment, missing page numbers, identifying the demonstration accounts by role, and completing the weekly and interaction summaries. | Report corrected against each comment. Figures re-captured on a physical device against the current build, page numbering generated from heading and caption styles, and the demonstration video recorded. |
 
 ------------------------------------------------------------------------
 
