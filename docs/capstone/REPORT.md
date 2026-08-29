@@ -63,7 +63,7 @@ Keywords: privacy by design, access control, REST API, React Native, PostgreSQL,
 | 2.4 | Component interaction - authentication and the authorization pipeline | «» |
 | 2.5 | Teacher upload screen with student tagger | «» |
 | 2.6 | Parent feed with child switcher | «» |
-| 2.7 | Order placement and confirmation | «» |
+| 2.7 | Print order - line items, fulfilment stage and total in rupees | «» |
 | 2.8 | Administrator dashboard | «» |
 | 3.1 | Test suite execution - 247 tests across 9 files, with 117 mobile unit tests | «» |
 | 3.2 | Security verification output - 29 passed, 0 failed, 1 skipped | «» |

@@ -46,7 +46,11 @@ FIGURES = {
             "Component interaction - authentication and the authorization pipeline"),
     "2.5": ("fig-2.5-upload-tagger.png", "Teacher upload screen with student tagger"),
     "2.6": ("fig-2.6-feed-child-switcher.png", "Parent feed with child switcher"),
-    "2.7": ("fig-2.7-order-confirm.png", "Order placement and confirmation"),
+    # The capture is the order *detail* sheet for a delivered order, not the
+    # placement sheet - that is fig-2.7a. Table 4.2 always described it
+    # correctly; only the caption said otherwise.
+    "2.7": ("fig-2.7-order-confirm.png",
+            "Print order - line items, fulfilment stage and total in rupees"),
     "2.8": ("fig-2.8-admin-dashboard.png", "Administrator dashboard"),
     "3.1": ("fig-3.1-test-suite.png",
             "Test suite execution - 247 tests across 9 files, with 117 mobile unit tests"),
