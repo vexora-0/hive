@@ -49,7 +49,7 @@ safe by construction.
 | `photos` | Core content | `status`: processing → ready / failed / archived |
 | `photo_student_tags` | **The privacy pivot** | `UNIQUE (photo_id, student_id)` |
 | `orders` | Print orders | `idempotency_key UNIQUE` prevents duplicate submission |
-| `order_items` | Line items | Prices in integer cents, set server-side |
+| `order_items` | Line items | Prices in integer paise, set server-side - the `*_cents` column names are historical |
 | `notifications` | In-app alerts | `jsonb` payload for deep links |
 
 ## Indexing
@@ -101,7 +101,7 @@ service layer — see `docs/architecture.md` §3.
 | `set_updated_at` | before update, 6 tables | Maintains `updated_at` |
 | `handle_new_user` | after insert on `auth.users` | Creates the profile; role from signup metadata |
 | `notify_parents_on_photo` | photo → `ready` | Notifies each tagged child's parents |
-| `notify_teacher_on_upload_complete` | photo → ready/failed | Notifies the uploader |
+| ~~`notify_teacher_on_upload_complete`~~ | photo → ready/failed | Notified the uploader. **Dropped in `00024`** - confirming a 20-photo batch sent her 20 rows about uploads she had just watched |
 
 `notify_parents_on_photo` loops over `photo_student_tags`, so **tags must exist
 before the status flips**. The original pipeline flipped first, so the loop
@@ -120,8 +120,10 @@ seed script now tag first.
 | 00014 | Profile creation on signup |
 | 00015 | Photos storage bucket |
 | 00016 | `sha256_hash` nullable — client-side hashing abandoned |
-| **00017** | Order money as integer cents |
+| **00017** | Order money as integer minor units |
+| **00018** | Order integrity - workable foreign keys, atomic order creation |
 | **00020** | Photos bucket private; public read dropped |
+| **00024** | Teacher upload notification dropped; notification feed indexed for recency-only ordering |
 
 ```bash
 pnpm db:migrate   # supabase db push

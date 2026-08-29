@@ -11,7 +11,8 @@ made it possible to verify, and what still needs seed data or a device.
 
 The `hive-test` project now exists too (`sdbiuzuyipneioceqysm`,
 ap-southeast-1), with all 19 migrations applied. `pnpm test` runs against it —
-**58 of 59 pass** — so the suite can no longer touch the demo data.
+**58 of 59 pass** on that date - so the suite can no longer touch the demo
+data. The suite is now **247 tests across 9 files**.
 
 Two variables the harness requires were missing from `.env.test.example` and
 have been added: `SUPABASE_ANON_KEY` (without it all four test files fail with
@@ -80,11 +81,13 @@ Then `EXPO_PUBLIC_API_URL=http://192.168.1.5:4000`. Expo inlines
 
 ## 4. Apply the migrations
 
-**Use the CLI. Do not use `supabase/combined_migrations.sql`** — it stops at
-`00015` and silently omits `00016`, `00017`, `00018` and `00020`. That leaves a
-database that looks correctly set up but has a publicly-readable photos bucket
-(G-02) and a broken order flow (G-01). See the warning in
-`supabase/README_MIGRATIONS.md`.
+**Use the CLI.** `supabase/combined_migrations.sql` used to stop at `00015`,
+silently omitting `00016`, `00017`, `00018` and `00020` - which left a database
+that looked correctly set up but had a publicly-readable photos bucket (G-02)
+and a broken order flow (G-01). It is now generated from the migration
+directory by `./scripts/build-combined-migrations.sh` and carries all 20, but
+prefer the CLI anyway: the combined file is for pasting into the SQL editor
+against an **empty** database. See `supabase/README_MIGRATIONS.md`.
 
 Pass `--include-all`: migrations do not arrive in numeric order (`00020` landed
 before `00018`), and without that flag the CLI skips a file whose version is
@@ -151,7 +154,7 @@ a 503 means Supabase is unreachable rather than the process being down:
 
 ```bash
 curl -s localhost:4000/health | jq
-# { "status": "ok", "checks": { "database": "ok" }, ... }
+# { "status": "ok", "checks": { "database": "ok", "cache": "ok" }, ... }
 ```
 
 ---
@@ -208,10 +211,10 @@ the token or `req.ip`, so the PII scrubbing added alongside the correlation IDs
 is doing its job. Sentry took its no-op path cleanly (`Sentry disabled (no
 SENTRY_DSN)`) rather than failing the boot.
 
-**Security verification (Plan 04 / Plan 11)** — *last run 11 Aug, `NODE_ENV=production`*
-- [x] `scripts/verify-security.sh` — **27 passed, 0 failed, 2 skipped** (11 Aug;
-      it was 26/0/3 on 1 Aug). See `docs/security.md` §9 for both runs and for
-      why each remaining skip is skipped
+**Security verification (Plan 04 / Plan 11)** - *last run 16 Aug, `NODE_ENV=production`*
+- [x] `scripts/verify-security.sh` - **29 passed, 0 failed, 1 skipped** (16 Aug;
+      27/0/2 on 11 Aug, 26/0/3 on 1 Aug). See `docs/security.md` §9 for the runs
+      and for why the remaining skip is skipped
 - [x] `SUPABASE_ANON_KEY` present in `packages/backend/.env` — **required**.
       `verify:env` needs it to sign in as the demo accounts; the service-role
       key bypasses RLS and does not mint the user-scoped JWT the API expects,
@@ -221,13 +224,15 @@ SENTRY_DSN)`) rather than failing the boot.
 - [x] Rate limiter returns 429 — **at request 98** against the write limiter
       (100 per identity). The check previously targeted `/health`, which is
       exempt from rate limiting, so it could not pass; fixed in `701c999`
-- [ ] HTTPS and CORS against a real origin — **skipped, needs a deployment**
-- [ ] A triggered 500 carries no stack — **skipped**. Needs `FORCE_500_PATH`
-      pointed at a route that reliably 500s **and** `NODE_ENV=production`;
-      production mode alone does not un-skip it, because the check is gated on
-      `FORCE_500_PATH` being set. No such route exists for an anonymous probe —
-      every `/api/v1/*` route is behind `authenticate`, which answers 401 on any
-      Supabase failure. Covered instead by `errors.test.ts` T-34
+- [ ] HTTPS against a real origin - **skipped, needs a deployment**, and
+      deployment went out of scope on 16 Aug, so this skip is permanent. CORS
+      against a hostile origin *is* checked and passes
+- [x] A triggered 500 carries no stack - **passes since 16 Aug**. It needs
+      `FORCE_500_PATH` pointed at a route that reliably 500s **and**
+      `NODE_ENV=production`, and until `02f82bb` added that route no such target
+      existed for an anonymous probe: every `/api/v1/*` route is behind
+      `authenticate`, which answers 401 on any Supabase failure. Also covered by
+      `errors.test.ts` T-34
 
 To repeat it:
 
@@ -281,6 +286,12 @@ empty.
 ---
 
 ## 8. Deployment
+
+**Out of scope as of 16 August 2026** - decided against, not deferred. Nothing
+is hosted, there is no APK and no `eas.json`, and none is planned; the project
+is demonstrated locally and on physical hardware over the LAN. The steps below
+are kept as the intended procedure for whoever deploys first, not as work
+outstanding.
 
 Owner: **Bhargav**. Full detail in `docs/plans/09-deployment-and-observability.md`.
 

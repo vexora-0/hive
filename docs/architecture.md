@@ -1,7 +1,7 @@
 # Hive — Architecture
 
 **Audience:** anyone picking up this codebase, and the project evaluator.
-**Status:** current as of Week 17 (30 May 2026).
+**Status:** current as of 29 August 2026.
 
 ---
 
@@ -17,7 +17,7 @@ Three roles:
 | Role | Does |
 |---|---|
 | **Teacher** | Uploads photos to a class, tags which children appear in each |
-| **Parent** | Sees a feed of photos their child is tagged in; orders prints |
+| **Parent** | Sees a feed of photos their child is tagged in; reads a per-child diary of the whole year; orders prints |
 | **Admin** | Manages schools, classes, students, teachers, parent↔child links |
 
 ---
@@ -242,7 +242,7 @@ never holds a URL that has expired underneath them.
 
 ## 8. Pagination
 
-All five list endpoints use **cursor pagination**, not offset. The cursor is
+All seven list endpoints use **cursor pagination**, not offset. The cursor is
 base64url of `{ createdAt, id }`.
 
 Offset pagination shifts when rows are inserted mid-scroll — a parent scrolling
@@ -257,7 +257,49 @@ rejects with 414. The feed did not degrade as data grew; it stopped working.
 
 ---
 
-## 9. Key decisions
+## 9. The diary
+
+The feed answers "what arrived today". The diary answers "how has the year
+gone", which is a different query and needed different machinery.
+
+**It is scoped to exactly one child**, not to the caller's children. Every read
+goes through `assertStudentLinked`, which returns **404 rather than 403** — a
+parent asking after a child who is not theirs learns that the child does not
+exist as far as their account is concerned, rather than that it exists and is
+withheld. Doing it once at the entry point means no query below has to
+re-establish the boundary.
+
+That single-student scope also removes work the feed cannot avoid. The feed
+filters on a *set* of children, so a photograph of two siblings matches twice
+and has to be de-duplicated; the diary filters on one, and
+`uq_photo_student_tag` permits at most one tag row per (photograph, student).
+
+**Months are bucketed in the viewer's calendar, not the server's.** The client
+sends `tzOffset` and the boundaries are computed from it, so a photograph taken
+at 11pm does not slide into the next month for a parent in a different timezone.
+The bounds are half-open rather than inclusive, so a photograph taken in the
+first millisecond of a month cannot land in two chapters and consecutive months
+tile the timeline with no gap and no overlap. `tzOffset` is bounded to
+UTC-12:00 through UTC+14:00 so a malformed value cannot shift a boundary
+somewhere absurd, and it defaults to 0 rather than rejecting a caller that omits
+it. The arithmetic lives in `utils/diaryCalendar.ts` because it is pure, and
+being pure it is tested without a database.
+
+**Where the scan gets cut matters.** The outline scans at most 4,000
+photographs, fetched newest-first and then reversed — which is not the same as
+fetching ascending. Scanning ascending and stopping at the ceiling would drop
+the *newest* photographs, so a child past the ceiling would open their diary and
+find it ended a year ago. Cutting from the far end loses the beginning instead,
+which is the half a parent has already seen, and `summary.truncated` reports it.
+A chapter is capped at 300 photographs and fetches one over the cap, so a full
+month is reported as truncated rather than silently ending on a round number.
+
+Each chapter carries one signed cover image, so an outline of a whole year is
+one signing call per month rather than one per photograph.
+
+---
+
+## 10. Key decisions
 
 | # | Decision | Rationale |
 |---|---|---|
@@ -265,13 +307,13 @@ rejects with 414. The feed did not degrade as data grew; it stopped working.
 | 2 | **Synchronous `sharp`** over a job queue | ~200 ms cost; removes a dependency and a failure mode. See §6. |
 | 3 | **Redis kept, but only for idempotency** | Order creation needs a distributed lock. Nothing else does. |
 | 4 | **Cursor over offset pagination** | Stability under concurrent writes. |
-| 5 | **Integer cents** for money | Floating-point currency is a classic defect; the original code mixed cents and dollars across three layers. |
+| 5 | **Integer minor units** for money — rupees held as paise | Floating-point currency is a classic defect; the original code mixed cents and dollars across three layers. |
 | 6 | **Monorepo** with pnpm + Turborepo | Two deployables sharing lint, commit and type conventions. |
 | 7 | **Trunk-based development** | A `develop` branch was tried and abandoned — half the team committed to `main` anyway and the two diverged within days. |
 
 ---
 
-## 10. Known limitations
+## 11. Known limitations
 
 Stated plainly rather than omitted:
 
@@ -288,7 +330,7 @@ Stated plainly rather than omitted:
 
 ---
 
-## 11. Deployment topology
+## 12. Deployment topology
 
 ```mermaid
 graph LR
@@ -302,13 +344,18 @@ graph LR
     APK --> SUPA
 ```
 
+**This topology was never provisioned.** It records the intended shape, not
+something that exists: deployment was ruled out of scope on 16 August 2026, so
+there is no Render service, no EAS build and no APK, and none is planned. The
+project is demonstrated locally and on physical hardware over the LAN.
+
 Deliberately simple. No Kubernetes, no service mesh, no infrastructure-as-code —
 none of it would be exercised at this scale, and each piece would be something
 to explain without a reason for existing.
 
 ---
 
-## 12. Scaling assessment
+## 13. Scaling assessment
 
 Honest rather than aspirational:
 
@@ -319,7 +366,8 @@ Honest rather than aspirational:
 | 1,000 | Would need work | Auth does two DB round trips per request; no caching layer |
 | 10,000 | Not a target | Would need genuine re-architecture |
 
-**100 concurrent users is the demonstrated ceiling.** Beyond that the first
-thing to address is the double round trip in `authenticate` — one call to verify
+**100 concurrent users is the demonstrated ceiling** — a local k6 measurement,
+not one taken against a deployment. Beyond that the first thing to address is
+the double round trip in `authenticate` — one call to verify
 the token, one to load the profile — which could be cached in Redis or carried
 in JWT claims.

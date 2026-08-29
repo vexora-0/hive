@@ -73,10 +73,23 @@ flowchart TD
     NN --> D
 
     H --> PR["(parent)/profile — sign out, confirmed"]
+
+    DY["(parent)/diary — the landing tab"] --> DM{Any photos ever?}
+    DM -->|No| DE["Empty state"]
+    DM -->|Yes| DC["Chapters, one per month, oldest first"]
+    DC --> DD["A month, grouped into days"]
+    DD --> D
 ```
 
-**Order money is integer cents end to end.** Never a float, in the client, the
-validator or the column.
+**The diary leads.** It is the tab the app opens on, because the question a
+family keeps the app for is "how has the year gone", not only "what arrived
+today". It covers one child at a time, buckets months in the viewer's own
+timezone rather than the server's, and every read goes through the same
+parent-to-child check — a diary request for someone else's child is a 404, not
+a 403.
+
+**Order money is integer paise end to end.** Never a float, in the client, the
+validator or the column - the `*_cents` column names are historical.
 
 ---
 

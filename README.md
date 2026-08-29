@@ -194,7 +194,7 @@ database, so a 503 means bad credentials rather than a dead process:
 
 ```bash
 curl -s localhost:4000/health | jq
-# { "status": "ok", "checks": { "database": "ok" }, ... }
+# { "status": "ok", "checks": { "database": "ok", "cache": "ok" }, ... }
 ```
 
 ---
@@ -256,8 +256,8 @@ addresses, which cannot receive an OTP email.
 pnpm test          # Vitest + Supertest against the test Supabase project
 ```
 
-**218 tests across 8 files** (`3b2f4c4`, 13 August; it was 178 through 9
-August). The suite talks to a **real, remote** Supabase
+**247 tests across 9 files** (it was 218 at `3b2f4c4`, 13 August, and 178
+through 9 August). The suite talks to a **real, remote** Supabase
 project — `hive-test` — over the network: it signs users in to mint real JWTs,
 writes real rows and puts real objects in storage. There is no local database
 and no mocking layer. A full pass takes about 2.5 minutes.
@@ -319,8 +319,9 @@ Two of those were re-checked by hand on 9 August 2026 against the running dev
 backend: a feed photo's signed URL returned 200 and the same URL with `?token`
 removed returned 400; a Bloom teacher requesting Little Stars' student roster
 returned 403 `FORBIDDEN`, and her own school's roster returned 200. The rest of
-the list dates from the 1 August `verify-security.sh` run and has **not** been
-re-run since — see [Limitations](#limitations-and-future-scope).
+the list dates from the 1 August `verify-security.sh` run, which has since been
+re-run twice - 27 passed on 11 August, and **29 passed, 0 failed, 1 skipped** on
+16 August.
 
 Full write-up: **[`docs/security.md`](docs/security.md)**.
 
@@ -339,9 +340,9 @@ Checks, re-run rather than copied forward:
 | Check | Result |
 |---|---|
 | `pnpm typecheck` | Clean, both packages |
-| `pnpm lint` | 0 errors, 27 warnings (3 backend, 24 mobile — mostly unused imports) |
+| `pnpm lint` | 0 errors, 6 warnings (3 backend, 3 mobile - four `no-explicit-any`, two unused variables) |
 | `pnpm build:backend` | Succeeds |
-| `pnpm test` | **218 tests, 8 files** since `3b2f4c4` on 13 August; it was 178 on 9 August, and not observed fully green that day — every failure was a 30 s timeout from the shared test project's sign-in quota, and the affected files passed in isolation. See [Testing](#testing) |
+| `pnpm test` | **247 tests, 9 files**; it was 218 at `3b2f4c4` on 13 August, and 178 on 9 August, when it was not observed fully green - every failure that day was a 30 s timeout from the shared test project's sign-in quota, and the affected files passed in isolation. See [Testing](#testing) |
 
 **9 August was a defect round**, not a feature round: 25 commits across
 ordering, upload, auth, notifications, the admin console, the API error surface
@@ -416,28 +417,35 @@ feature works.
 Stated plainly rather than omitted. The first four are about what has *not* been
 proven, and matter more than the feature gaps below them.
 
-- **Nothing has been seen running on a real device.** The screens were driven
-  end to end in Chrome on 9 August, through `react-native-web` — that is the
-  whole of the evidence. No iOS or Android build has been launched, no
-  simulator run is recorded, and web is not the target platform. Anything
-  platform-specific — the keychain-backed session, the image picker, deep
-  links, `AppState` transitions — is unverified where it actually ships.
-- **Nothing is deployed.** No hosted URL, no APK, no `eas.json`. The Dockerfile
-  and the CI workflow exist; nothing is hosted. This is also what blocks the
-  HTTPS and CORS checks in `verify-security.sh` and the k6 load suite.
+- ~~**Nothing has been seen running on a real device.**~~ **Done, 16 August -
+  on a physical iPhone.** Expo Go, SDK 54, against the local backend over the
+  LAN; all three roles were signed in and driven across both demo schools, so
+  the keychain-backed session, the image picker and `AppState` transitions are
+  no longer unverified where they ship. Deep links were closed separately and
+  **on Android only**, through a standalone `expo run:android` build - Expo Go
+  serves under `exp://`, so neither device run registered `hive://`. Two things
+  stay open: **nothing was captured**, so it is an observed pass with no
+  recording or screenshots behind it, and the authenticated-link target screen
+  and iOS are still unchecked.
+- **Nothing is deployed, and deployment is out of scope** as of 16 August -
+  decided against rather than deferred. No hosted URL, no APK, no `eas.json`,
+  and none planned. The Dockerfile and the CI workflow exist; nothing is
+  hosted. This is also what keeps the HTTPS check in `verify-security.sh`
+  skipped, and why the k6 figures are a local measurement.
 - ~~**`scripts/verify-security.sh` has not been re-run since 1 August.**~~
   **Re-run on 11 August**, after the round that changed the rate limiter, the
   CORS configuration and the error handler: **27 passed, 0 failed, 2 skipped**.
   The rate-limit check had been unable to pass at all — it hammered `/health`,
   which is deliberately exempt from rate limiting — and now targets the write
-  limiter, where a 429 arrived at request 98. The two remaining skips need a
-  deployment (HTTPS) and `FORCE_500_PATH` plus `NODE_ENV=production` (the 500
-  response shape). `docs/security.md` §9 records both runs.
-- **The CI test step is `continue-on-error: true`.** It exists and it runs, but
-  it cannot turn a pull request red until `TEST_SUPABASE_URL`,
-  `TEST_SUPABASE_SERVICE_KEY` and `TEST_SUPABASE_ANON_KEY` exist as repository
-  secrets. Until then the 218 tests guard nothing on a pull request. Lint,
-  typecheck and build are blocking.
+  limiter, where a 429 arrived at request 98. **Run again on 16 August**, once
+  `02f82bb` had added a route for `FORCE_500_PATH` to point at: **29 passed, 0
+  failed, 1 skipped**. The single remaining skip is HTTPS, which needs a
+  deployment. `docs/security.md` §9 records all three runs.
+- ~~**The CI test step is `continue-on-error: true`.**~~ **Fixed** -
+  `68021c4` removed it. `TEST_SUPABASE_URL`, `TEST_SUPABASE_SERVICE_KEY` and
+  `TEST_SUPABASE_ANON_KEY` exist as repository secrets, and no workflow step
+  allows failure any more, so the tests block a pull request alongside lint,
+  typecheck and build.
 
 Feature gaps, deliberate or unstarted:
 
@@ -449,7 +457,9 @@ Feature gaps, deliberate or unstarted:
 - **Custom SMTP is not configured**, so OTP email is rate-limited by Supabase's
   default sender. Password sign-in is the reliable path.
 - **No CDN configuration** beyond what Supabase Storage provides.
-- **Sentry is wired but has never received an error.**
+- ~~**Sentry is wired but has never received an error.**~~ **Closed, 16
+  August** - issue `HIVE-BACKEND-1`, event `8a5130bf`, with the `beforeSend`
+  scrubber exercised on a real transported event (`fce17b7`).
 - **Losing Redis loses double-submit protection.** The idempotency middleware
   talks to Redis before the order handler, so an outage disables order
   deduplication — recoverable, but real. It used to be worse: `maxRetriesPerRequest:

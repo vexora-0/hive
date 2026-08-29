@@ -132,7 +132,7 @@ file, so it must never be generated for a caller who is about to be refused.
 | **Feed deduplication** | No duplicate photo IDs in a parent's feed |
 | **`pnpm test`** | **Ran for the first time** against the new `hive-test` project. **58 of 59 pass**, 1 fails. The suite executes end to end: harness, truncation, user creation, HTTP requests through Supertest |
 | **Test-database guard, armed** | `DEV_SUPABASE_URL` is now set, so guard 1 in `tests/setup.ts` actually compares. It previously did nothing |
-| **`verify-security.sh`, in full** | **Ran for the first time, 1 Aug**: 26 passed, 0 failed, 3 skipped, against a backend booted `NODE_ENV=production`. **Re-run 11 Aug** after the 9 Aug sweep: **27 passed, 0 failed, 2 skipped** (`701c999`) — the rate-limit check, which had been unable to pass against the exempt `/health`, now targets the write limiter and got a 429 at request 98. Covers G-02, G-04, G-04b, G-05, G-08 and G-17 over HTTP with real tokens. Both runs and the remaining two skips are in `docs/security.md` §9 |
+| **`verify-security.sh`, in full** | **Ran for the first time, 1 Aug**: 26 passed, 0 failed, 3 skipped, against a backend booted `NODE_ENV=production`. **Re-run 11 Aug** after the 9 Aug sweep: **27 passed, 0 failed, 2 skipped** (`701c999`) - the rate-limit check, which had been unable to pass against the exempt `/health`, now targets the write limiter and got a 429 at request 98. **Run again 16 Aug**, once `02f82bb` had added a forced-500 route for `FORCE_500_PATH` to point at: **29 passed, 0 failed, 1 skipped** (`202d423`). Covers G-02, G-04, G-04b, G-05, G-08 and G-17 over HTTP with real tokens. All three runs and the one remaining skip are in `docs/security.md` §9 |
 | **G-17 upload ownership** | **Confirmed fixed — first time.** A teacher at the same school as the uploader gets **403** on `/confirm`, `/tag` and `/file`. Previously untestable: every probe used teachers at *different* schools, where the school check refuses first and the ownership check never runs |
 | **Plan 08 sabotage exercise** | **Done, and it found something.** With `photo.uploaded_by === user.id` deleted from `assertPhotoAccess`, exactly the 3 new same-school G-17 tests failed. `photos.test.ts`'s similarly-named test stayed **green** — its teachers are at different schools, so it never guarded G-17 at all |
 | **`pnpm test` with the new file** | **79 passed, 0 failed**, 5 files. T-23 now passes; the fixture fix landed in `2928b76` |
@@ -194,13 +194,16 @@ guard does nothing unless the variable exists.
 - ~~**`verify-security.sh` has never run against a real instance.**~~ **Done** —
   26 passed, 0 failed, 3 skipped on 1 Aug, and 27 passed, 0 failed, 2 skipped on
   11 Aug after the 9 Aug sweep.
-- **No error has reached Sentry.** `initSentry()` has only taken its no-op path.
-  Needs a DSN; it is an account signup, not a code change.
+- ~~**No error has reached Sentry.**~~ **Done, 16 Aug** (`fce17b7`) - a DSN was
+  supplied and a real event was transported: issue `HIVE-BACKEND-1`, event
+  `8a5130bf`, with the `beforeSend` scrubber exercised on it rather than on a
+  synthetic object.
 - **Nothing has been verified against a *deployed* instance.** The run above was
   against a local Supabase stack — Postgres, GoTrue, Storage and all 19
   migrations, driven through the real Express app. That proves the authorization
   logic. It is not evidence about how `hive-dev` or any hosted project is
-  configured, and the HTTPS and CORS checks still skip for want of a hosted URL.
+  configured, and the HTTPS check still skips for want of a hosted URL. CORS is
+  checked and passes; the 500-shape check stopped skipping on 16 Aug.
 - ~~**Nothing has been seen on a device.**~~ **Changed on 16 August — the app
   ran on a physical iPhone.** Expo Go, SDK 54, against the local backend over
   the LAN: `EXPO_PUBLIC_API_URL` was repointed from `localhost` to the Mac's
@@ -239,7 +242,7 @@ guard does nothing unless the variable exists.
 | ~~**G-11**~~ | Srujan · Plan 06 | **Closed.** `seed:demo:reset` loads 2 schools, 4 classes, 9 students, 8 profiles, 6 photos with thumbnails, 9 tags and 16 notifications. |
 | ~~**G-27**~~ | Ruthwik · Plan 07 Step 5 | **Closed 9 Aug.** Upload progress is no longer a hardcoded `0.1 → 0.3 → 0.35 → 0.85` ladder. `uploadPhotoFile` in `teacherService.ts` uses `XMLHttpRequest` rather than `fetch` — `fetch` exposes no upload progress — and reports `event.loaded / event.total` from `xhr.upload.onprogress`; `useUpload.ts` maps that fraction into the band it reserves for the transfer. Not yet seen moving on a device. |
 | ~~G-26, G-28…G-33~~ | Bhargav · Plan 07 | **Done.** Toasts on all nine admin mutations, confirm dialogs on all six destructive actions, empty states, onboarding and 404 placeholders replaced, schools routes split into validator/service/controller, controllers all throw `AppError`. See the plan's Deviations. |
-| **Plan 10 / 11 (Bhargav's share)** | — | **Done.** README rewritten against the real stack — it described a Flutter app. Added `user-flows.md` (diagram G-6), `docs/README.md` index and `demo-script.md`. Remaining on this side is deployment only: Render, the EAS APK and the demo video. |
+| **Plan 10 / 11 (Bhargav's share)** | - | **Done.** README rewritten against the real stack - it described a Flutter app. Added `user-flows.md` (diagram G-6), `docs/README.md` index and `demo-script.md`. Nothing remains: Render and the EAS APK went out of scope on 16 Aug, and the demonstration video landed the same day (`ed3ed1b`). |
 | **8a, 8b** | Ruthwik / Srujan | Plan 07 polish needing API changes: the feed does not return the uploader's name, and order items carry only `photoId` so no thumbnail can be rendered. Both need an endpoint to return more, not UI work. |
 | ~~**G-45**~~ | — | **Out of scope, 16 August.** Custom SMTP was never done and will not be. Every demo and test account signs in with a password, so no demonstrated path sends an OTP and Supabase's default rate limit cannot bite. This is a scope decision, not a fix: the limitation is still real for any deployment that turns email sign-in on, and `docs/security.md` keeps it recorded as accepted. |
 | ~~**T-23 fails**~~ | Ruthwik · Plan 08 | **Closed and confirmed green.** It was a defect in the test, not the product: `createTestPhoto` wrote a row with no object behind it, and `confirmUpload` calls `fileExistsInStorage` and 404s when the object is absent. `2928b76` made the helper upload a real fixture. `photos.test.ts > notifies tagged children's parents` — the only automated guard on G-07 — now passes, as part of 79 of 79. |
@@ -258,7 +261,7 @@ guard does nothing unless the variable exists.
 | **CP-1** | App compiles · no "Coming Soon" · no credentials in repo | ✔ **Met.** |
 | **CP-2** | Order placeable · private storage with thumbnails · role guards · IDORs closed | ✔ **Met.** All four verified at runtime — order placed with correct cents and working idempotency, photos private with thumbnails and signed URLs, role guards returning 403, cross-school IDOR closed. |
 | **CP-3** | Demo seed on a fresh DB · test harness runs | ✔ **Met.** Seed loads schools, classes, students, parents, 6 photos with thumbnails and 16 notifications. Harness runs against a separate project. |
-| **CP-4** | 36 tests green · CI on every PR | ✔ **Met. 218 tests across 8 files** since `3b2f4c4` (13 Aug); 178 of 178 green when re-run 9 Aug. Includes 20 authorization tests and the `orders`/`admin` files Plan 08 specified but nobody wrote. T-23 is fixed. The suite has also been shown to *detect* — see the sabotage exercise in §4. **The CI caveat is gone:** `68021c4` removed `continue-on-error`, the `TEST_SUPABASE_*` secrets exist, and the suite went green in CI at 218 across 8 files in 373.86 s — so the tests now genuinely block a pull request alongside lint, typecheck and build. **One caveat remains:** the 40 tests `3b2f4c4` added for the 9 Aug work were not proven by mutation, because the sandbox refused edits under `src/`. The three added on 16 Aug for the two-school order fix *were* — see §6. One known flake — see §10. |
+| **CP-4** | 36 tests green · CI on every PR | ✔ **Met. 247 tests across 9 files**; it was 218 at `3b2f4c4` (13 Aug), and 178 of 178 green when re-run 9 Aug. Includes 20 authorization tests and the `orders`/`admin` files Plan 08 specified but nobody wrote. T-23 is fixed. The suite has also been shown to *detect* - see the sabotage exercise in §4. **The CI caveat is gone:** `68021c4` removed `continue-on-error`, the `TEST_SUPABASE_*` secrets exist, and the suite went green in CI at 218 across 8 files in 373.86 s - so the tests now genuinely block a pull request alongside lint, typecheck and build. **One caveat remains:** the 40 tests `3b2f4c4` added for the 9 Aug work were not proven by mutation, because the sandbox refused edits under `src/`. The three added on 16 Aug for the two-school order fix *were* - see §6. One known flake - see §10. |
 | **CP-5** | Deployed and reachable · Sentry receiving · docs complete | ✗ **Not met, and will not be.** Deployment was descoped on 16 Aug, so the first clause cannot be satisfied. The other two are: Sentry has carried a real event (`fce17b7`), and the documentation set is complete. Recorded as unmet rather than redefined — moving the goalposts to claim a checkpoint would be worse than missing it. |
 | **CP-6** | Manual QA green · demo rehearsed · submission pack | ✗ |
 
@@ -300,11 +303,11 @@ left is the submission itself.
    account signs in with a password, so no demonstrated path sends an OTP.
    Recorded as an accepted limitation in `docs/security.md` rather than deleted.
 7. **What actually remains is the submission pack**, not the software: PDF
-   export and the page numbers in the two lists, the demonstration video link in
-   §4.4 and Appendix D, and the supervisor remarks in §5.3. Two product items
-   are still open and neither is mine to close — the feed does not return the
-   uploader's name, and order items carry only `photoId` so no thumbnail can be
-   rendered (8a/8b, Ruthwik and Srujan).
+   export and the page numbers in the two lists, and the supervisor remarks in
+   §5.3. The demonstration video link is in place in §4.4 and Appendix D
+   (`ed3ed1b`). Two product items are still open and neither is mine to close -
+   the feed does not return the uploader's name, and order items carry only
+   `photoId` so no thumbnail can be rendered (8a/8b, Ruthwik and Srujan).
 
 ---
 

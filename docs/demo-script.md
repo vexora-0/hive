@@ -16,9 +16,11 @@
 >    teacher class picker all changed that day. They worked when checked. They
 >    are not covered by the test suite, so a dry run is the only thing standing
 >    between you and finding out live.
-> 2. **Nothing has ever run on a phone or a simulator.** Every screen has only
->    ever been seen in a browser. If someone asks to see it on a device, the
->    honest answer is that it has not been built for one yet.
+> 2. **This script is a browser demo, but the app has run on a phone.** On 16
+>    August it ran on a physical iPhone through Expo Go over the LAN, and a
+>    standalone Android build was installed to close deep links. Nothing was
+>    captured from either run, so if someone asks to see it on a device the
+>    honest answer is that it has been done and observed, not recorded.
 >
 > **If something breaks mid-demo**, the fastest recovery is almost always to
 > reload the browser tab. The three checks in "Before you start" — Redis,
@@ -34,10 +36,10 @@
 Target **8–10 minutes**. Rehearse end to end twice and time it.
 
 **This is a browser demo.** The app runs in Chrome through `react-native-web`
-at `http://localhost:8081`. That is a deliberate choice and it is also the only
-surface the screens have ever been seen on — say so if asked rather than
-implying a device build exists. The product targets iOS and Android; web is a
-verification convenience. See "Questions to expect".
+at `http://localhost:8081`. That is a deliberate choice for a live run, not the
+only surface the screens have been seen on - the app was driven on a physical
+iPhone on 16 August, and on a standalone Android build. The product targets iOS
+and Android; web is a verification convenience. See "Questions to expect".
 
 Three things that will derail a live run if you skip them:
 
@@ -342,7 +344,7 @@ Now fill the address and place the order. Then open **Orders** from the tab bar
 — the new order is at the top, with its item count and status.
 
 > "Prices live on the **server**. The client sends a product type and a
-> quantity, never a price. Money is integer cents everywhere — client,
+> quantity, never a price. Money is integer paise everywhere - client,
 > validator and column — never a float.
 >
 > The request carries an idempotency key. Send the same one twice and you get
@@ -382,7 +384,7 @@ student. Then open the **fulfilment queue** and advance the order just placed.
 ## 9:00 — Engineering
 
 ```bash
-pnpm test      # 218 tests across 8 files
+pnpm test      # 247 tests across 9 files
 ```
 
 **Do not run this live.** It takes about two and a half minutes at best, and it
@@ -391,7 +393,7 @@ or you have run it a few times already, sign-ins hit the project's quota and
 tests start timing out at 30 seconds. Run it once beforehand and show the
 output.
 
-> "218 tests, against a real Supabase project rather than mocks — they sign
+> "247 tests, against a real Supabase project rather than mocks - they sign
 > users in, write real rows, and put real objects in storage. The known
 > weakness is that the project is shared between CI and four developers, so
 > overlapping runs used to delete each other's fixtures mid-test. That's fixed;
@@ -423,13 +425,17 @@ bundling proves imports resolve, not that a screen draws. Two web-only defects
 had to be fixed first: zustand's `import.meta` made the whole bundle a parse
 error under a classic `<script>` tag, and `expo-secure-store` has no web
 implementation, so the session was never stored and sign-in bounced straight
-back to login. Neither affects native. Nothing has been run on a real device or
-a simulator, and we would not claim otherwise.
+back to login. Neither affects native. It has since run on real hardware - a
+physical iPhone through Expo Go on 16 August, and a standalone Android build
+that closed deep links - but nothing was captured from either run, so the
+browser is what we can show live.
 
 **"Is it deployed? Can I try it?"**
-No. There is no hosted URL and no APK. The Dockerfile and the CI workflow exist;
-nothing is hosted. That is also what blocks the HTTPS and CORS checks in our own
-`verify-security.sh` and the load-test suite.
+No, and deployment is out of scope as of 16 August - decided against rather
+than deferred. There is no hosted URL, no APK and no `eas.json`. The Dockerfile
+and the CI workflow exist; nothing is hosted. That is also what keeps the HTTPS
+check in our own `verify-security.sh` skipped, and why the k6 figures are a
+local measurement.
 
 **"What did you fix today, and how do you know it works?"**
 Roughly two dozen defect fixes: ordering was completely broken (a `null` note
@@ -445,13 +451,14 @@ and WebP accepted at three format gates and refused at the fourth — and those
 were fixed too.
 
 How we know: the parent, teacher and admin flows above were clicked through in
-Chrome; typecheck, lint and build are clean; the API suite is 218 tests. But
+Chrome; typecheck, lint and build are clean; the API suite is 247 tests. But
 **the only tests this round added are the 23 in `tests/cursor.test.ts`**. The
 rest is guarded by review and the typechecker. `verify-security.sh` **was**
 re-run on 11 August, after the round touched the rate limiter, CORS and the
-error handler: **27 passed, 0 failed, 2 skipped**. The two skips need a
-deployment (HTTPS) and `FORCE_500_PATH` with `NODE_ENV=production` (the 500
-response shape).
+error handler: **27 passed, 0 failed, 2 skipped**. It was run again on 16
+August, once a forced-500 route existed to point `FORCE_500_PATH` at:
+**29 passed, 0 failed, 1 skipped**. The single remaining skip is HTTPS, which
+needs a deployment and so will not close.
 
 **"How do you stop a parent seeing another child's photo?"**
 Three layers. A `photo_student_tags` pivot decides visibility; a service-layer

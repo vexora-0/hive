@@ -13,7 +13,9 @@ Base URL `/api/v1`. All endpoints except `/health` require authentication.
 | Cursor | base64url of `{ createdAt, id }` — opaque; pass it back unchanged |
 | Correlation | `X-Request-ID` echoed on every response |
 
-Money is **integer cents** throughout. Never parse it as a float.
+Money is **integer paise** throughout - rupees, never a float. A 4x6 print is
+`3000`, which is ₹30. The columns are named `*_cents` for historical reasons;
+the unit is paise.
 
 ### Status codes
 
@@ -24,7 +26,7 @@ Money is **integer cents** throughout. Never parse it as a float.
 | 403 | Authenticated but not permitted |
 | 404 | Not found — **also returned when a resource exists but is not yours**, so the response does not confirm existence |
 | 409 | Conflict — duplicate idempotency key or mapping |
-| 429 | Rate limited — 100 requests / 15 min |
+| 429 | Rate limited - 1000 requests / 15 min per identity, and 100 on write routes |
 | 503 | `/health` only: database unreachable |
 
 ---
@@ -35,7 +37,7 @@ Money is **integer cents** throughout. Never parse it as a float.
 
 ```json
 { "status": "ok", "service": "hive-backend", "version": "1.0.0",
-  "uptimeSeconds": 1420, "checks": { "database": "ok" } }
+  "uptimeSeconds": 1420, "checks": { "database": "ok", "cache": "ok" } }
 ```
 
 Returns **503** with `"database": "error"` when Supabase is unreachable, so a
@@ -99,6 +101,8 @@ success.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/feed?studentId=&cursor=&limit=` | Photos of the parent's children |
+| `GET` | `/feed/diary?studentId=&tzOffset=` | Outline of one child's whole journey, by month |
+| `GET` | `/feed/diary/:month?studentId=&tzOffset=` | One month (`YYYY-MM`), grouped into days |
 | `GET` | `/feed/photos/:id` | Single photo detail |
 
 ```json
@@ -182,8 +186,9 @@ alone. An empty body returns **400**.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/notifications?cursor=&limit=` | Unread first, then newest |
+| `GET` | `/notifications?cursor=&limit=` | Newest first |
 | `GET` | `/notifications/unread-count` | `{ "count": 3 }` |
+| `PATCH` | `/notifications/read-all` | Mark every unread notification read |
 | `PATCH` | `/notifications/:id/read` | Mark read |
 
 Types: `new_photos` `upload_complete` `new_order` `order_status`.

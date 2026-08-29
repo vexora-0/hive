@@ -143,11 +143,13 @@ table for weeks after it was fixed.
 One ordering makes them work together, and it is easy to break: `getPhotoDetails` runs the parent-ownership check **before** minting the signed URL. A signed URL grants access to the file itself, so generating one for a caller who is then refused would hand out exactly what the check exists to prevent. Anyone reordering that function needs to know this.
 
 **Verified against a running system.** `scripts/verify-security.sh` ran for the
-first time on 1 August 2026 — **26 passed, 0 failed, 3 skipped** — and was
+first time on 1 August 2026 - **26 passed, 0 failed, 3 skipped** - was
 re-run on 11 August after the 9 August correctness sweep: **27 passed, 0
-failed, 2 skipped**. `packages/backend/tests/authorization.test.ts` covers the
-same ground on every test run; the suite is **218 tests across 8 files**. The
-full record of both runs, including what they do *not* cover, is in §9.
+failed, 2 skipped** - and was run again on 16 August, once a forced-500 route
+existed: **29 passed, 0 failed, 1 skipped**.
+`packages/backend/tests/authorization.test.ts` covers the same ground on every
+test run; the suite is **247 tests across 9 files**. The full record of all
+three runs, including what they do *not* cover, is in §9.
 
 One entry in this table was never actually being tested. See §9.
 
@@ -344,20 +346,31 @@ posts a deliberately invalid body to `POST /api/v1/photos/upload-url`, so the
 validator that runs *after* the limiter rejects every request: the counter still
 increments and no photo rows are created. **A 429 arrived at request 98.**
 
-### The two remaining skips
+### The run — 16 August 2026
 
-They need different things, and one does not substitute for the other:
+```
+passed 29   failed 0   skipped 1
+```
 
-1. **Transport (§8) — HTTPS.** Needs a deployment. The target was `localhost`
-   and nothing is hosted, so HTTPS, HSTS and real CORS behaviour stay
-   unverified until there is a hosted URL. Unchanged from 1 August.
-2. **The 500 response shape (§7).** Needs `FORCE_500_PATH` pointed at a route
-   that reliably 500s **and** `NODE_ENV=production`. Production mode alone will
-   not un-skip it — the check is gated on `FORCE_500_PATH` being set, so with
-   no route to point it at it skips however the backend was booted. The 1
-   August entry above explains why no such route exists for an anonymous probe:
-   every `/api/v1/*` route sits behind `authenticate`, which answers 401 rather
-   than 500. The property itself stays covered by `errors.test.ts` T-34.
+The §7 error-handling check had skipped on every previous execution, so the one
+property the error handler exists to guarantee was the only one never verified
+over HTTP. It needs `FORCE_500_PATH` pointed at a route that reliably 500s
+**and** `NODE_ENV=production`, and no such route existed for an anonymous
+probe: every `/api/v1/*` route sits behind `authenticate`, which answers 401
+rather than 500. `02f82bb` added one, registered only when `FORCE_500_PATH` is
+set. With it in place and the target booted `NODE_ENV=production`, both checks
+pass - the 500 body is generic and carries no stack trace. Recorded in
+`202d423`.
+
+### The one remaining skip
+
+**Transport (§8) - HTTPS.** Needs a deployment. The target was `localhost` and
+nothing is hosted, so HTTPS and HSTS stay unverified until there is a hosted
+URL - and since deployment went out of scope on 16 August, they will stay that
+way. Unchanged from 1 August, and now permanent rather than pending: 29 of the
+30 attempted checks pass, and the honest figure is **29 passed, 0 failed, 1
+skipped**, never 30/30. CORS against a hostile origin is checked separately and
+passes (§8 of the 1 August table above).
 
 ### The check that was not checking anything
 
