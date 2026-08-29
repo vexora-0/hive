@@ -1,0 +1,42 @@
+HIVE - SOURCE CODE LINK
+BSc Computer Science (Online Mode) capstone project, BITS Pilani, 2025-2026
+Team: Bhargav, Ruthwik, Srujan, Nagachaitanya
+
+Repository (public):   https://github.com/vexora-0/hive
+Default branch:        main
+Demonstration video:   https://youtu.be/_kvid-1KXxA
+
+WHAT THE REPOSITORY CONTAINS
+
+Hive is a privacy-first photo sharing platform for preschools. Teachers upload
+classroom photographs and tag the children in them; each parent sees only their
+own child, and can read a per-child diary covering that child's whole time at
+the school. It is a pnpm and Turborepo monorepo, and it holds everything that
+was built:
+
+  apps/mobile           React Native / Expo SDK 54 application for the three
+                        roles: teacher, parent and administrator
+  packages/backend      Express and TypeScript API, 42 endpoint registrations
+                        across 7 domains, plus the integration test suite
+  supabase/migrations   20 migrations, 10 tables, row-level security, triggers
+  scripts/              demo seed data and verify-security.sh
+  docs/                 capstone report, architecture, security notes,
+                        environment setup, weekly progress report
+  .github/workflows     continuous integration: lint, typecheck, build and the
+                        full test suite, none of them allowed to fail
+
+Size at commit 3156632, 25 August 2026: 461 commits by 4 contributors between
+1 February and 20 August 2026, 245 TypeScript and TSX source files, about
+44,350 lines.
+
+Verification: 247 backend integration tests across 9 files and 117 mobile unit
+tests, 364 in all. Runtime security verification reports 29 passed, 0 failed,
+1 skipped. The one skip is the HTTPS check, which needs a deployment; the
+project is deliberately not deployed and is demonstrated locally and on
+physical hardware over a LAN.
+
+TO RUN IT
+
+See README.md, section "Getting started", and docs/environment-setup.md.
+Environment files are not committed. Create them from the .env.example
+templates first; on a fresh clone nothing runs until you do.
