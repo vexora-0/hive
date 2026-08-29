@@ -281,6 +281,20 @@ def main() -> int:
     md = SRC.read_text(encoding="utf8")
     check_commit_stats(md)
 
+    # Heading 1 breaks to a new page, which is right for every section except
+    # the first one. Word 2010 does not ignore the property on the opening
+    # paragraph - it honours it and the report gains a blank page in front of
+    # the cover. Emit that one heading with the break cancelled, still in
+    # Heading 1 so it looks the same and still reaches the contents page.
+    md = re.sub(
+        r"^# COVER PAGE$",
+        "```{=openxml}\n"
+        '<w:p><w:pPr><w:pStyle w:val="Heading1"/>'
+        '<w:pageBreakBefore w:val="0"/></w:pPr>'
+        "<w:r><w:t>COVER PAGE</w:t></w:r></w:p>\n"
+        "```",
+        md, count=1, flags=re.M)
+
     # The contents page is built here rather than by `pandoc --toc`, which
     # always emits it as the first thing in the document - so the report opened
     # on a 73-entry contents page and the cover page came second. Review asked
@@ -299,13 +313,10 @@ def main() -> int:
                   + "\n",
         md, flags=re.S)
 
-    # Strip the working note under the title. It is guidance to whoever is
-    # assembling the document — "«…» marks what I cannot supply" — and has no
-    # business in a submitted report. Also strip the FORMATTING CHECKLIST at the
-    # end, which is instructions to the typesetter, not content.
-    # `>.*` not `> .*` — the blockquote contains bare `>` separator lines, and
-    # requiring the space stops the match at the first one.
-    md = re.sub(r"(^# Hive - Capstone Report\n)\n(>.*\n)+", r"\1", md, flags=re.M)
+    # Strip the FORMATTING CHECKLIST at the end - instructions to whoever is
+    # assembling the document, not content. The working note that used to sit
+    # under the title went with the Google Docs round trip and no longer needs
+    # removing here.
     md = re.sub(r"\n# FORMATTING CHECKLIST\n.*?(?=\n# |\Z)", "\n", md, flags=re.S)
 
     # Table captions -> a real Word caption style, so the LIST OF TABLES can be
