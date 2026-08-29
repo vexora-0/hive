@@ -23,6 +23,10 @@ What it does that pandoc alone will not:
 
 import re
 import subprocess
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent))
+from docx_tables import fit_tables
 import sys
 from pathlib import Path
 
@@ -251,72 +255,22 @@ def toc_field(style: str, placeholder: str) -> str:
     name, and keep the fenced divs below passing the name too, so pandoc reuses
     that same style rather than minting a near-duplicate beside it.
     """
+    return field(f'TOC \\h \\z \\t "{style},1"', placeholder)
+
+
+def field(instr: str, placeholder: str) -> str:
+    """One Word field, as raw OOXML, dirty so Word offers to update it."""
     return (
         "```{=openxml}\n"
         '<w:p><w:pPr><w:pStyle w:val="BodyText"/></w:pPr>'
         '<w:r><w:fldChar w:fldCharType="begin" w:dirty="true"/></w:r>'
-        f'<w:r><w:instrText xml:space="preserve"> TOC \\h \\z \\t "{style},1" </w:instrText></w:r>'
+        f'<w:r><w:instrText xml:space="preserve"> {instr} </w:instrText></w:r>'
         '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
         f"<w:r><w:t>{placeholder}</w:t></w:r>"
         '<w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>\n'
         "```\n"
     )
 
-
-
-def fit_tables(docx_path: Path) -> int:
-    """Rescale every table to the printable width.
-
-    pandoc sizes columns from content length with no page constraint, so a
-    wide table lands at 18484 twips against the 9026 available on A4 with one
-    inch margins - more than double. Word then squeezes it, which is what
-    produces the three-words-per-line columns and the squashed headers the
-    review kept flagging as "make table fit" and "alignment".
-
-    Each grid is rescaled proportionally to the printable width, so the
-    relative column balance pandoc chose is preserved while the table stops
-    overflowing. Autofit is left on so Word can still adjust to content.
-    """
-    import zipfile, re, shutil, tempfile
-    PAGE = 9026
-    z = zipfile.ZipFile(docx_path)
-    parts = {n: z.read(n) for n in z.namelist()}
-    z.close()
-    doc = parts["word/document.xml"].decode("utf8")
-
-    fixed = 0
-
-    def rescale(m):
-        nonlocal fixed
-        grid = m.group(0)
-        widths = [int(w) for w in re.findall(r'w:w="(\d+)"', grid)]
-        total = sum(widths)
-        if not total or total <= PAGE:
-            return grid
-        scaled, run = [], 0
-        for w in widths[:-1]:
-            v = max(360, round(w * PAGE / total))
-            scaled.append(v); run += v
-        scaled.append(max(360, PAGE - run))
-        fixed += 1
-        out = grid
-        for old, new in zip(widths, scaled):
-            out = re.sub(r'w:w="%d"' % old, 'w:w="%d"' % new, out, count=1)
-        return out
-
-    doc = re.sub(r"<w:tblGrid>.*?</w:tblGrid>", rescale, doc, flags=re.S)
-    # pin the table itself to the printable width and let Word autofit within it
-    doc = re.sub(r"<w:tblW[^/]*/>", '<w:tblW w:w="5000" w:type="pct"/>', doc)
-    doc = re.sub(r"<w:tblLayout[^/]*/>", '<w:tblLayout w:type="autofit"/>', doc)
-
-    parts["word/document.xml"] = doc.encode("utf8")
-    tmp = tempfile.mktemp(suffix=".docx")
-    zo = zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED)
-    for n, data in parts.items():
-        zo.writestr(n, data)
-    zo.close()
-    shutil.move(tmp, docx_path)
-    return fixed
 
 
 def main() -> int:
@@ -327,12 +281,23 @@ def main() -> int:
     md = SRC.read_text(encoding="utf8")
     check_commit_stats(md)
 
-    # Drop the hand-written TABLE OF CONTENTS. pandoc --toc emits a real one
-    # with real page numbers; keeping both gave the document two, the second
-    # of which was a table of «» placeholders. The LIST OF FIGURES and LIST OF
-    # TABLES stay — pandoc does not generate those, the template requires them,
-    # and their page column is filled once pagination is final.
-    md = re.sub(r"\n# TABLE OF CONTENTS\n.*?(?=\n# LIST OF FIGURES\n)", "\n", md, flags=re.S)
+    # The contents page is built here rather than by `pandoc --toc`, which
+    # always emits it as the first thing in the document - so the report opened
+    # on a 73-entry contents page and the cover page came second. Review asked
+    # for it to move inside, behind the cover page, the declaration and the
+    # supervisor sign-off, which is where the markdown already has it.
+    #
+    # The heading is emitted in "TOC Heading" rather than Heading 1 for one
+    # reason: that style carries outlineLvl 9, so the contents page does not
+    # list itself. The reference doc's copy of it has been made to inherit
+    # Heading 1 so it still looks like every other front-matter heading.
+    md = re.sub(
+        r"\n# TABLE OF CONTENTS\n.*?(?=\n# LIST OF FIGURES\n)",
+        lambda m: "\n" + '::: {custom-style="TOC Heading"}\nTABLE OF CONTENTS\n:::\n\n'
+                  + field('TOC \\o "1-3" \\h \\z \\u',
+                          "Update fields in Word (select all, then F9) to build this list.")
+                  + "\n",
+        md, flags=re.S)
 
     # Strip the working note under the title. It is guidance to whoever is
     # assembling the document — "«…» marks what I cannot supply" — and has no
@@ -425,7 +390,6 @@ def main() -> int:
         "--to", "docx",
         "--reference-doc", str(REF),
         "--resource-path", f"{ROOT}:{FIGDIR}",
-        "--toc", "--toc-depth=3",
         "--number-sections=false",
         "-o", str(OUT),
     ]
@@ -437,9 +401,7 @@ def main() -> int:
     if r.stderr.strip():
         print("  pandoc warnings:\n" + r.stderr.strip()[:1500])
 
-    n_fit = fit_tables(OUT)
-    if n_fit:
-        print(f"  rescaled {n_fit} table(s) to the printable width")
+    print(f"  {fit_tables(OUT)} table(s) given a computed, fixed grid")
 
     check_figures(OUT)
 

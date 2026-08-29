@@ -23,6 +23,9 @@ import sys
 import zipfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from docx_tables import fit_tables
+
 ROOT = Path(__file__).resolve().parent.parent
 REF = ROOT / "build/hive-reference.docx"
 FIGDIR = ROOT / "docs/capstone/screenshots/figures"
@@ -31,57 +34,6 @@ DOCS = [
     ("docs/capstone/SUMMARY.md", "Hive-Summary.docx", False),
     ("docs/capstone/USER-MANUAL.md", "Hive-User-Manual.docx", True),
 ]
-
-# A4 with one inch margins, in twips. Same constant the report build uses.
-PAGE = 9026
-
-
-def fit_tables(docx_path: Path) -> int:
-    """Rescale any table wider than the printable area.
-
-    pandoc sizes columns from content length with no page constraint, so a
-    table of prose cells lands well over the page width and Word then squeezes
-    it into three words per line.
-    """
-    z = zipfile.ZipFile(docx_path)
-    parts = {n: z.read(n) for n in z.namelist()}
-    z.close()
-    doc = parts["word/document.xml"].decode("utf8")
-    fixed = 0
-
-    def rescale(m):
-        nonlocal fixed
-        grid = m.group(0)
-        widths = [int(w) for w in re.findall(r'w:w="(\d+)"', grid)]
-        total = sum(widths)
-        if not total or total <= PAGE:
-            return grid
-        scaled, run = [], 0
-        for w in widths[:-1]:
-            v = max(360, round(w * PAGE / total))
-            scaled.append(v)
-            run += v
-        scaled.append(max(360, PAGE - run))
-        fixed += 1
-        out = grid
-        for old, new in zip(widths, scaled):
-            out = re.sub(r'w:w="%d"' % old, 'w:w="%d"' % new, out, count=1)
-        return out
-
-    doc = re.sub(r"<w:tblGrid>.*?</w:tblGrid>", rescale, doc, flags=re.S)
-    doc = re.sub(r"<w:tblW[^/]*/>", '<w:tblW w:w="5000" w:type="pct"/>', doc)
-    doc = re.sub(r"<w:tblLayout[^/]*/>", '<w:tblLayout w:type="autofit"/>', doc)
-    parts["word/document.xml"] = doc.encode("utf8")
-
-    import tempfile, shutil
-    tmp = tempfile.mktemp(suffix=".docx")
-    zo = zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED)
-    for n, data in parts.items():
-        zo.writestr(n, data)
-    zo.close()
-    shutil.move(tmp, docx_path)
-    return fixed
-
 
 def constrain_images(md: str) -> str:
     """Give every image an explicit width.
@@ -155,7 +107,7 @@ def main() -> int:
         z = zipfile.ZipFile(out)
         imgs = sum(1 for n_ in z.namelist() if n_.startswith("word/media/"))
         print(f"  {out.relative_to(ROOT)}  ({out.stat().st_size:,} bytes, "
-              f"{imgs} image(s), {n} table(s) rescaled)")
+              f"{imgs} image(s), {n} table(s) sized)")
         built += 1
 
     if not built:

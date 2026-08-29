@@ -20,6 +20,18 @@ Signature: Team Hive Date: 20th August 2026
 
 ------------------------------------------------------------------------
 
+# SUPERVISOR SIGN-OFF
+
+This is to certify that the capstone project titled "Hive - A Privacy-First Photo Sharing Platform for Preschools" is a record of original work carried out by Dharma Srujan Reddy (2023ebcs634), Vanapala Naga Chaitanya Varma (2023ebcs662), Chikoti Ruthwik (2023ebcs675) and Munigonda Bhargav (2023ebcs724) under my supervision during the academic year 2025-2026, and that it has not been submitted to any other university or institution for the award of any degree.
+
+Internal Supervisor: Prof Raj Kumar
+
+Signature:
+
+Date:
+
+------------------------------------------------------------------------
+
 # ABSTRACT
 
 Preschools routinely share classroom photographs with parents. The obvious implementation, a shared album, is unacceptable because it exposes every child's face to every parent. This project delivers Hive, a photo-sharing platform built so that a parent sees photographs of their own children and nothing else.
