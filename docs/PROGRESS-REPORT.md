@@ -1330,7 +1330,7 @@ Two things *were* executed, and both passed:
 
 One bug was found and fixed while writing this: `.env.example` ships `SENTRY_DSN=` with no value, which dotenv turns into an empty string, and an empty string fails `z.string().url()`. Anyone following the setup instructions would have hit a startup validation failure. The schema now preprocesses empty to undefined.
 
-Incidentally, `require('sharp')` loads on this machine — the check CLAUDE.md flags as the gate on Plan 03's synchronous-thumbnail approach. The fixture JPEG was generated with it.
+Incidentally, `require('sharp')` loads on this machine - the check that gates the synchronous-thumbnail approach. The fixture JPEG was generated with it.
 
 ## Testing and validation
 

@@ -13,8 +13,6 @@
  *    children a stale tile does not read as a loading state.
  *  - **The feed stays in the order it happened.** `MasonryGrid` keeps
  *    `optimizeItemArrangement` off, whatever the prop's name suggests.
- *
- * @see docs/design/UI-REVAMP-BRIEF.md §3 move 1, §9.7
  */
 
 export { HiveImage } from './HiveImage';

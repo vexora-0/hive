@@ -45,7 +45,7 @@ export interface ProcessedPhoto {
  * Runs synchronously inside the upload request rather than through a queue.
  * A typical phone photo takes 100–300 ms, which is imperceptible next to the
  * upload itself, and it removes an entire class of "why is nothing processing"
- * failures. See docs/plans/00-INDEX.md, decision DEC-2.
+ * failures. See docs/architecture.md, "Why processing is synchronous".
  *
  * Steps:
  *   1. Verify the buffer really is an image (magic bytes, not the client's MIME)
@@ -88,8 +88,7 @@ export async function processAndUploadPhoto(
   //    so iOS transcodes before upload); this stays as the server-side backstop
   //    for anything that arrives as HEVC anyway. To make it convert instead of
   //    reject, the deployment needs a libvips built against libheif with
-  //    libde265 — see docs/plans/03-storage-and-media.md, "HEIC conversion does
-  //    not work".
+  //    libde265 - see docs/architecture.md, "Where HEIC is actually handled".
   const isHeif = format === 'heif';
   let finalPath = storagePath;
   let mimeType = declaredMimeType;

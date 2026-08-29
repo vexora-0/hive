@@ -293,7 +293,7 @@ is demonstrated locally and on physical hardware over the LAN. The steps below
 are kept as the intended procedure for whoever deploys first, not as work
 outstanding.
 
-Owner: **Bhargav**. Full detail in `docs/plans/09-deployment-and-observability.md`.
+Owner: **Bhargav**.
 
 1. Render → New Web Service → repo, root `packages/backend`, environment
    **Docker** (the Dockerfile is written and committed)

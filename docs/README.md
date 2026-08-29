@@ -37,52 +37,36 @@ been written. §4 lists what has actually been executed; §5 lists what has not.
 |---|---|
 | [`IMPLEMENTATION-STATUS.md`](IMPLEMENTATION-STATUS.md) | **What is proven vs merely written.** Start here |
 | [`PROGRESS-REPORT.md`](PROGRESS-REPORT.md) | Week-by-week record from Week 1 |
-| [`plans/BASELINE.md`](plans/BASELINE.md) | Known-failing checks — compare before assuming you broke something |
+
+---
+
+## The submission
+
+[`capstone/`](capstone/) holds the assessed deliverables - the report, the
+summary, the user manual, the presentation slides, and the screenshots and
+evidence captured while verifying the system.
 
 ---
 
 ## How the work was planned
 
-These are evidence of method rather than reference material, and are kept
-deliberately visible.
-
-| Document | What it covers |
-|---|---|
-| [`01-PROJECT-AUDIT-AND-COMPLETION-PLAN.md`](01-PROJECT-AUDIT-AND-COMPLETION-PLAN.md) | The audit every plan derives from — 46 numbered gaps, `G-01`…`G-46` |
-| [`02-FOUR-PERSON-DEVELOPMENT-AND-GIT-PLAN.md`](02-FOUR-PERSON-DEVELOPMENT-AND-GIT-PLAN.md) | File ownership map and conflict protocol |
-| [`PHASE-2-EXECUTION-PLAN.md`](PHASE-2-EXECUTION-PLAN.md) | Week-by-week schedule, dependency graph, checkpoints |
-| [`plans/00-INDEX.md`](plans/00-INDEX.md) | Plan index and locked technical decisions |
-
-### The twelve plans
-
-Each contains exact steps, files, verification and commit messages — and a
-`## Deviations` section recording what actually differed, which is often the
-more useful half.
-
-| # | Plan | Covers |
-|---|---|---|
-| 00 | [Typecheck fixes](plans/00-typecheck-fixes.md) | The 22 errors that stopped the app compiling |
-| 01 | [Quick wins](plans/01-quick-wins.md) | Eight small independent fixes |
-| 02 | [Contracts & data model](plans/02-contracts-and-data-model.md) | The order contract — money as integer cents |
-| 03 | [Storage & media](plans/03-storage-and-media.md) | Private bucket, signed URLs, thumbnails, HEIC |
-| 04 | [Authorization](plans/04-authorization.md) | IDORs, role guards, ownership checks |
-| 05 | [Upload correctness & perf](plans/05-upload-correctness-and-perf.md) | Tag-before-confirm ordering, feed N+1 |
-| 06 | [Demo data](plans/06-demo-data.md) | Seed script and demo dataset |
-| 07 | [UX completion](plans/07-ux-completion.md) | Toasts, confirm dialogs, empty states |
-| 08 | [Testing](plans/08-testing.md) | Vitest + Supertest suite |
-| 09 | [Deployment & observability](plans/09-deployment-and-observability.md) | Docker, CI, health check, request IDs, Sentry |
-| 10 | [Documentation](plans/10-documentation.md) | This set of documents |
-| 11 | [QA & demo](plans/11-qa-and-demo.md) | Load tests, manual QA, demo script |
+Phase 1 built the application. Phase 2 opened with an audit that numbered every
+outstanding defect, `G-01` to `G-46`, and split them across four developers with
+a fixed file-ownership map and reserved migration numbers, so parallel work
+could not collide. Those gap IDs are used throughout
+[`security.md`](security.md) and [`PROGRESS-REPORT.md`](PROGRESS-REPORT.md);
+which of them were actually closed, and which were not, is recorded in
+[`IMPLEMENTATION-STATUS.md`](IMPLEMENTATION-STATUS.md) §2.
 
 ---
 
 ## Reading order
 
-**Evaluating the project** — root README → `IMPLEMENTATION-STATUS.md` →
-`architecture.md` → `security.md` → the audit.
+**Evaluating the project** - root README → `IMPLEMENTATION-STATUS.md` →
+`architecture.md` → `security.md`.
 
-**Joining the project** — root README → `environment-setup.md` →
-`plans/BASELINE.md` → `02-FOUR-PERSON-…` for ownership → your plan.
+**Joining the project** - root README → `environment-setup.md` →
+`architecture.md` → `database.md`.
 
-**Running the demo** — `environment-setup.md` → `DEMO_USERS.md` →
+**Running the demo** - `environment-setup.md` → `DEMO_USERS.md` →
 `user-flows.md`.

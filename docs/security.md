@@ -2,7 +2,7 @@
 
 **Scope:** the whole system — Expo app, Express API, Supabase (Postgres, Auth, Storage).
 **Status:** current as of Week 24, after all four streams merged. Sections marked ⚠ describe work that is not finished.
-**Source material:** `docs/01-PROJECT-AUDIT-AND-COMPLETION-PLAN.md` (gap IDs `G-xx`), and the plans under `docs/plans/`.
+**Gap IDs:** the `G-xx` references throughout are the numbered findings of the Phase 2 audit. `docs/IMPLEMENTATION-STATUS.md` §2 records which of them are closed.
 
 ---
 

@@ -2,8 +2,8 @@
 
 **As of:** 9 August 2026. Originally written Week 24 (18 July), after merging
 all four streams into `main`; §9 and §10 continue it.
-**Single source of truth for status.** `CLAUDE.md` links here rather than
-restating it; two status tables drifting apart is worse than one.
+**Single source of truth for status.** Nothing else in the repository restates
+it; two status tables drifting apart is worse than one.
 **Covers:** everything committed during Phase 2.
 
 A factual record of what exists, what runs, and what has been proven to work.
@@ -183,8 +183,7 @@ guard does nothing unless the variable exists.
     so `metadata()` reports `format: 'heif'` and only the pixel decode fails.
     The branch converts AVIF and refuses HEVC with an actionable 400; the real
     fix is the device-side transcode in `(teacher)/upload.tsx`, which asks the
-    iOS picker for a compatible representation. See
-    `docs/plans/03-storage-and-media.md`, "HEIC conversion does not work".
+    iOS picker for a compatible representation.
 - ~~No order has been placed.~~ **Done** — see §4. A parent placed a real order
   with correct integer cents and working idempotency.
 - ~~**G-17 upload-ownership checks are unverified.**~~ **Done** — see §4. The

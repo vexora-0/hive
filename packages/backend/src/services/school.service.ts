@@ -9,7 +9,8 @@ import type { CreateClassInput } from '../validators/school.validator';
  * Every function takes the caller and calls `assertSchoolAccess` itself rather
  * than trusting a route to have done it. The backend uses `supabaseAdmin`,
  * which bypasses row level security entirely, so the service layer is the only
- * place the school boundary is actually enforced — see CLAUDE.md §10.
+ * place the school boundary is actually enforced - see docs/architecture.md,
+ * "The two data paths".
  */
 
 type Caller = { role: string; schoolId: string | null } | undefined;

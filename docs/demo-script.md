@@ -97,10 +97,12 @@ Then, before anyone is watching:
 
 ### Accounts
 
-All of these use the password **`testing123`** on this machine — the seed's
-`DEMO_PASSWORD`, and the admin's `ADMIN_PASSWORD`. All four were confirmed to
-sign in on 9 August 2026. They are local seed credentials on a development
-project, not real accounts.
+All of these sign in with the seed's `DEMO_PASSWORD`, except the admin, which
+uses `ADMIN_PASSWORD`. Both values live in `packages/backend/.env` and are
+deliberately not written down here, the same as in
+[`DEMO_USERS.md`](DEMO_USERS.md). All four were confirmed to sign in on
+9 August 2026. They are local seed credentials on a development project, not
+real accounts.
 
 | Role | Email |
 |---|---|
@@ -259,12 +261,16 @@ Those are real counts, re-checked against the API on 9 August 2026 — 2 and 1.
 Have this ready in a terminal, already run once so you know it works. Verified
 on 9 August 2026 against the running dev backend — `200` then `400`:
 
+The password is the seed's `DEMO_PASSWORD`, read straight out of
+`packages/backend/.env` so nothing is hard-coded here.
+
 ```bash
 set -a && . apps/mobile/.env && set +a
+DEMO_PASSWORD=$(grep '^DEMO_PASSWORD=' packages/backend/.env | cut -d= -f2-)
 
 TOKEN=$(curl -s "$EXPO_PUBLIC_SUPABASE_URL/auth/v1/token?grant_type=password" \
   -H "apikey: $EXPO_PUBLIC_SUPABASE_ANON_KEY" -H 'Content-Type: application/json' \
-  -d '{"email":"parent.rajesh@bloom.demo","password":"testing123"}' | jq -r .access_token)
+  -d "{\"email\":\"parent.rajesh@bloom.demo\",\"password\":\"$DEMO_PASSWORD\"}" | jq -r .access_token)
 
 URL=$(curl -s 'localhost:4000/api/v1/feed?limit=1' \
   -H "Authorization: Bearer $TOKEN" | jq -r '.data[0].url')
@@ -286,7 +292,7 @@ copy-pasteable — also verified on 9 August:
 ```bash
 STOKEN=$(curl -s "$EXPO_PUBLIC_SUPABASE_URL/auth/v1/token?grant_type=password" \
   -H "apikey: $EXPO_PUBLIC_SUPABASE_ANON_KEY" -H 'Content-Type: application/json' \
-  -d '{"email":"teacher.sarita@bloom.demo","password":"testing123"}' | jq -r .access_token)
+  -d "{\"email\":\"teacher.sarita@bloom.demo\",\"password\":\"$DEMO_PASSWORD\"}" | jq -r .access_token)
 
 # Sarita teaches at Bloom. Little Stars is a0000000-…-0002.
 curl -s localhost:4000/api/v1/schools/a0000000-0000-4000-8000-000000000002/students \

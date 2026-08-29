@@ -46,8 +46,6 @@
  * <EmptyAlbum />                                  // on paper
  * <OpenWindow color={colors.text.onInk} wash />   // on an ink surface
  * ```
- *
- * @see docs/design/UI-REVAMP-BRIEF.md §6
  */
 
 export { EmptyAlbum } from './EmptyAlbum';

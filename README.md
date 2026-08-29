@@ -77,8 +77,7 @@ container — and refuses HEVC cleanly with a message a teacher can act on
 ("This photo is in a format the server cannot read (HEIC). Please re-save it as
 JPEG and try again.") rather than leaking raw libvips text. A real server-side
 fix means building `sharp` from source against libheif with `libde265`, which is
-a Dockerfile decision, not an application-code one. See
-`docs/plans/03-storage-and-media.md`, "HEIC conversion does not work".
+a Dockerfile decision, not an application-code one.
 
 ---
 

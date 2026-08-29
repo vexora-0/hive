@@ -17,8 +17,6 @@
  * | Something happened | {@link useToast} |
  * | Irreversible action | {@link ConfirmDialog} |
  * | A modal surface | {@link BottomSheet} — the app's one sheet |
- *
- * @see docs/design/UI-REVAMP-BRIEF.md §9.3, §9.4 and rubric items 29 and 48
  */
 
 export { SkeletonShimmer, SkeletonSwap, SKELETON_DELAY } from './SkeletonShimmer';
