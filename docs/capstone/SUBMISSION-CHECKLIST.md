@@ -110,7 +110,7 @@ numbers.
 | Q&A and confidence | 5 | ✅ `VIVA-PREP.md` |
 
 ✅ **Report Section 4.4 carries the demonstration video link:**
-https://youtu.be/_kvid-1KXxA. It covers teacher upload and tagging, the parent
+https://youtu.be/rOvrgbP5F4o. It covers teacher upload and tagging, the parent
 feed, the privacy comparison between two parents at different schools,
 signed-URL behaviour, order placement and the administration dashboard. Keep it
 open during the viva - it is the fallback if the live demo fails.
@@ -281,7 +281,7 @@ governs. Status is what is true on 29 August 2026, not what we intend.
 | 7 | User manual | ✅ Written | `docs/capstone/USER-MANUAL.md`, rendered to `Hive-User-Manual.docx`. All three roles, 14 screenshots |
 | 8 | Installation guide | ✅ Done | `README.md` "Getting started" and `docs/environment-setup.md` |
 | 9 | Final presentation in the BITS standard template | ⚠️ **Open** | Content in `PRESENTATION-15min.md`; deck exists outside the repository |
-| 10 | Demonstration video link | ✅ Done | https://youtu.be/_kvid-1KXxA, in Report Section 4.4 |
+| 10 | Demonstration video link | ✅ Done | https://youtu.be/rOvrgbP5F4o, in Report Section 4.4 |
 | 11 | Marketing videos for social media | 🔄 In progress | Produced by the team outside the repository |
 | 12 | Posters for social media | 🔄 In progress | Produced by the team outside the repository |
 

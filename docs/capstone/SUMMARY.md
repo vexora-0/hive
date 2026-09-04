@@ -9,7 +9,7 @@
 | Internal supervisor | Prof Raj Kumar |
 | Team | Dharma Srujan Reddy (2023ebcs634), Vanapala Naga Chaitanya Varma (2023ebcs662), Chikoti Ruthwik (2023ebcs675), Munigonda Bhargav (2023ebcs724) |
 | Repository | https://github.com/vexora-0/hive |
-| Demonstration video | https://youtu.be/_kvid-1KXxA |
+| Demonstration video | https://youtu.be/rOvrgbP5F4o |
 
 ---
 
@@ -102,4 +102,4 @@ Known limitations are stated in the report rather than omitted, and they include
 ## 7. Links
 
 - Repository, public: https://github.com/vexora-0/hive
-- Demonstration video: https://youtu.be/_kvid-1KXxA
+- Demonstration video: https://youtu.be/rOvrgbP5F4o

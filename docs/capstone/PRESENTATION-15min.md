@@ -319,7 +319,7 @@ another 5 you have already earned.
 **Open in tabs before you start**
 Backend running with `/health` green · mobile app signed out · a terminal for the
 `curl` probes · `verify-security.sh` output already on screen · the ER diagram ·
-**the recorded demo** (https://youtu.be/_kvid-1KXxA).
+**the recorded demo** (https://youtu.be/rOvrgbP5F4o).
 
 **If the demo breaks:** do not debug on stage past twenty seconds. Say *"I have a
 recording of this flow"*, switch, and keep talking. The mark is for showing the
